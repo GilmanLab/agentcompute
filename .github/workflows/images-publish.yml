@@ -1,0 +1,512 @@
+# Builds the router image on a hosted runner, boot-tests the candidate on the
+# lab Incus cluster, and publishes it to GHCR as an immutable imgoci release.
+#
+# Trust layout:
+#   * `build` holds no credentials and no environment. It is the same code path a
+#     pull request runs (images-validate.yml), only with the privileged build.
+#   * `publish` is the only job with credentials. It carries the `image-publish`
+#     environment (restricted to the default branch), reaches the lab over an
+#     ephemeral Tailscale node, boot-tests the candidate, then publishes.
+#   * `attest` runs in the ISOLATED reusable workflow so the provenance signing
+#     identity is unreachable from the build/publish steps (SLSA Build L3).
+#
+# Both jobs additionally require a protected default branch at runtime, so a
+# pushed or dispatched run from anywhere else does nothing.
+#
+# Immutability: the published tag is derived from the git tree hash of images/,
+# which is exactly the set of inputs that determines the image. Re-running with
+# an unchanged images/ tree FAILS in `publish` ("release already exists") — the
+# publisher refuses to replace a reference. Promote the existing digest instead
+# of trying to overwrite it.
+#
+# Runner selection: both jobs run on `${{ vars.IMAGES_RUNNER || 'ubuntu-24.04' }}`.
+# Unset — the default — means GitHub-hosted Ubuntu 24.04, which reaches the lab
+# through an ephemeral Tailscale node. When a lab-side runner (scale set) exists,
+# setting the repository variable IMAGES_RUNNER to its label moves both jobs
+# there and automatically skips the tailnet enrollment step (`if: vars.IMAGES_RUNNER
+# == ''`), because such a runner is already inside the network. That is a
+# one-variable switch: no workflow edit, and every other guarantee here (pinned
+# downloads, pinned TLS, boot test before publish, immutable tag, isolated
+# attestation) is unchanged. Note that a self-hosted runner must stay off
+# untrusted pull-request workloads — images-validate.yml never uses it.
+
+name: Router Image Publish
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - images/**
+      - .github/workflows/images-publish.yml
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/gilmanlab/agentcompute/router
+
+# Never cancel a run that may already be talking to the cluster or the registry.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Router Image Build
+    if: ${{ github.ref == 'refs/heads/master' && github.ref_protected }}
+    runs-on: ${{ vars.IMAGES_RUNNER || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      reference: ${{ steps.identity.outputs.reference }}
+      tree: ${{ steps.identity.outputs.tree }}
+      artifact: ${{ steps.identity.outputs.artifact }}
+      tar-sha256: ${{ steps.checksums.outputs.tar-sha256 }}
+      tar-bytes: ${{ steps.checksums.outputs.tar-bytes }}
+    # BUILD_ROOT is exported below rather than declared here: the `runner`
+    # context is not available in job-level `env`.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          cache: true
+
+      - name: Resolve image identity
+        id: identity
+        run: |
+          set -euo pipefail
+
+          # The git tree hash of images/ covers the recipe, the pins and the
+          # build script: everything that decides what the image contains.
+          tree="$(git rev-parse 'HEAD:images')"
+          version="tree-${tree:0:12}"
+
+          {
+            echo "tree=$tree"
+            echo "version=$version"
+            echo "reference=${IMAGE_REPOSITORY}:${version}"
+            echo "artifact=router-image-${version}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "BUILD_ROOT=$RUNNER_TEMP/router" >> "$GITHUB_ENV"
+
+      - name: Build the router image
+        run: |
+          set -euo pipefail
+
+          # build.py creates --work-dir and --output-dir itself and refuses
+          # existing directories, so only the parent is created here.
+          mkdir -p "$BUILD_ROOT"
+
+          # distrobuilder needs root to unpack and assemble the rootfs. `sudo
+          # env PATH=...` keeps the mise-pinned uv resolvable without exporting
+          # the runner user's HOME, so root uses its own caches. build.py
+          # downloads and SHA-verifies its own Go toolchain per images/pins.yaml.
+          sudo env PATH="$PATH" "$(mise which uv)" run --locked --script images/build.py \
+            build --work-dir "$BUILD_ROOT/work" --output-dir "$BUILD_ROOT/out"
+
+          sudo chown -R "$(id -u):$(id -g)" "$BUILD_ROOT/out"
+
+      - name: Record artifact checksums
+        id: checksums
+        env:
+          VERSION: ${{ steps.identity.outputs.version }}
+          TREE: ${{ steps.identity.outputs.tree }}
+        run: |
+          set -euo pipefail
+          cd "$BUILD_ROOT/out"
+
+          test -f router.tar.xz || { echo "build produced no router.tar.xz" >&2; exit 1; }
+          test -f metrics.json || { echo "build produced no metrics.json" >&2; exit 1; }
+
+          sha256sum router.tar.xz metrics.json > checksums.txt
+          tar_sha256="$(awk '$2 == "router.tar.xz" { print $1 }' checksums.txt)"
+
+          {
+            echo "tar-sha256=$tar_sha256"
+            echo "tar-bytes=$(stat -c %s router.tar.xz)"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Router image build"
+            echo
+            echo "- version: \`$VERSION\`"
+            echo "- images/ tree: \`$TREE\`"
+            echo "- router.tar.xz: \`$tar_sha256\` ($(stat -c %s router.tar.xz) bytes)"
+            echo
+            echo '```json'
+            cat metrics.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload router image artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.identity.outputs.artifact }}
+          path: |
+            ${{ runner.temp }}/router/out/router.tar.xz
+            ${{ runner.temp }}/router/out/metrics.json
+            ${{ runner.temp }}/router/out/checksums.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Router Image Publish
+    if: ${{ github.ref == 'refs/heads/master' && github.ref_protected }}
+    needs:
+      - build
+    runs-on: ${{ vars.IMAGES_RUNNER || 'ubuntu-24.04' }}
+    # Credentials live ONLY here: the environment is restricted to the default
+    # branch and holds the Incus client/server certificates plus the private
+    # endpoint. No build step ever sees them.
+    environment: image-publish
+    permissions:
+      contents: read
+      packages: write     # push the imgoci release to GHCR with GITHUB_TOKEN
+      id-token: write     # Tailscale workload identity federation (no OAuth secret)
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+      reference: ${{ steps.publish.outputs.reference }}
+      subject-name: ${{ steps.publish.outputs.subject-name }}
+    # EVIDENCE and CANDIDATE are exported in the first run step instead: the
+    # `runner` context is not available in job-level `env`.
+    env:
+      GOTOOLCHAIN: local
+      INCUS_REMOTE: nas01
+      INCUS_PROJECT: image-build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          cache: true
+
+      - name: Download the candidate image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: ${{ runner.temp }}/artifact
+
+      - name: Verify the candidate against the build checksums
+        env:
+          EXPECTED: ${{ needs.build.outputs.tar-sha256 }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "EVIDENCE=$RUNNER_TEMP/evidence"
+            echo "CANDIDATE=$RUNNER_TEMP/artifact/router.tar.xz"
+          } >> "$GITHUB_ENV"
+
+          EVIDENCE="$RUNNER_TEMP/evidence"
+          CANDIDATE="$RUNNER_TEMP/artifact/router.tar.xz"
+          mkdir -p "$EVIDENCE"
+
+          cd "$(dirname "$CANDIDATE")"
+          sha256sum --check --strict checksums.txt
+
+          actual="$(sha256sum router.tar.xz | cut -d' ' -f1)"
+          if [ "$actual" != "$EXPECTED" ]; then
+            echo "candidate sha256 $actual does not match the build job output $EXPECTED" >&2
+            exit 1
+          fi
+          cp checksums.txt metrics.json "$EVIDENCE/"
+
+      - name: Install the pinned Incus client
+        run: |
+          set -euo pipefail
+
+          # images/pins.yaml is the single source of truth for every downloaded
+          # input, including this client binary. Never install a floating
+          # distribution package: the client must match a reviewed pin.
+          pin() {
+            awk -v key="$1:" '
+              /^[^[:space:]]/ { inside = ($0 == "incus:") }
+              inside && $1 == key { print $2; found = 1; exit }
+              END { if (!found) exit 1 }
+            ' images/pins.yaml
+          }
+
+          version="$(pin version)"
+          url="$(pin url)"
+          sha256="$(pin sha256)"
+
+          case "$url" in
+            https://github.com/lxc/incus/releases/download/*) ;;
+            *) echo "unexpected Incus download URL: $url" >&2; exit 1 ;;
+          esac
+
+          bin="$RUNNER_TEMP/bin"
+          mkdir -p "$bin"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --retry 3 --retry-connrefused --output "$bin/incus" "$url"
+
+          printf '%s  %s\n' "$sha256" "$bin/incus" | sha256sum --check --strict -
+          chmod 0755 "$bin/incus"
+
+          reported="$("$bin/incus" --version)"
+          case "$reported" in
+            *"$version"*) ;;
+            *) echo "pinned Incus $version but the binary reports $reported" >&2; exit 1 ;;
+          esac
+
+          echo "$bin" >> "$GITHUB_PATH"
+          echo "Installed SHA-verified Incus client $version"
+
+      - name: Configure the Incus client
+        env:
+          INCUS_URL: ${{ vars.INCUS_URL }}
+          INCUS_CLIENT_CERT: ${{ secrets.INCUS_CLIENT_CERT }}
+          INCUS_CLIENT_KEY: ${{ secrets.INCUS_CLIENT_KEY }}
+          INCUS_SERVER_CERT: ${{ secrets.INCUS_SERVER_CERT }}
+        run: |
+          set -euo pipefail
+
+          for name in INCUS_URL INCUS_CLIENT_CERT INCUS_CLIENT_KEY INCUS_SERVER_CERT; do
+            if [ -z "${!name:-}" ]; then
+              echo "$name is not configured for the image-publish environment; publication stays disabled" >&2
+              exit 1
+            fi
+          done
+
+          case "$INCUS_URL" in
+            https://*) ;;
+            *) echo "INCUS_URL must be an https:// endpoint" >&2; exit 1 ;;
+          esac
+
+          umask 077
+          conf="$RUNNER_TEMP/incus"
+          mkdir -p "$conf/servercerts"
+
+          printf '%s\n' "$INCUS_CLIENT_CERT" > "$conf/client.crt"
+          printf '%s\n' "$INCUS_CLIENT_KEY" > "$conf/client.key"
+          # The server certificate is pinned here, so the client trusts exactly
+          # this cluster and nothing the public CA set would also accept.
+          printf '%s\n' "$INCUS_SERVER_CERT" > "$conf/servercerts/${INCUS_REMOTE}.crt"
+
+          # Shape checks only — contents are never printed.
+          grep -q 'BEGIN CERTIFICATE' "$conf/client.crt" || { echo "INCUS_CLIENT_CERT is not a PEM certificate" >&2; exit 1; }
+          grep -q 'BEGIN CERTIFICATE' "$conf/servercerts/${INCUS_REMOTE}.crt" || { echo "INCUS_SERVER_CERT is not a PEM certificate" >&2; exit 1; }
+          grep -q 'PRIVATE KEY' "$conf/client.key" || { echo "INCUS_CLIENT_KEY is not a PEM private key" >&2; exit 1; }
+
+          {
+            printf 'default-remote: %s\n' "$INCUS_REMOTE"
+            printf 'remotes:\n'
+            printf '  %s:\n' "$INCUS_REMOTE"
+            printf '    addr: %s\n' "$INCUS_URL"
+            printf '    auth_type: tls\n'
+            printf '    project: %s\n' "$INCUS_PROJECT"
+            printf '    protocol: incus\n'
+            printf '    public: false\n'
+          } > "$conf/config.yml"
+
+          echo "INCUS_CONF=$conf" >> "$GITHUB_ENV"
+
+      # Only hosted runners need to join the tailnet. A lab runner (IMAGES_RUNNER
+      # set) is already inside the network, so enrollment is skipped there.
+      - name: Connect to the tailnet
+        if: ${{ vars.IMAGES_RUNNER == '' }}
+        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
+        with:
+          # Workload identity federation: a GitHub OIDC token is exchanged for an
+          # ephemeral node, so no long-lived Tailscale secret exists anywhere.
+          oauth-client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tags: tag:sandbox
+          # The cluster API sits behind the gateway's advertised lab subnet route.
+          args: --accept-routes
+          version: 1.94.2
+          sha256sum: c6f99a5d774c7783b56902188d69e9756fc3dddfb08ac6be4cb2585f3fecdc32
+          # Do not populate a privileged job from the Actions cache.
+          use-cache: false
+
+      - name: Verify the Incus endpoint over the tailnet
+        run: |
+          set -euo pipefail
+
+          # Tailnet peer propagation is eventually consistent, so retry the very
+          # first API call instead of failing on a cold tailnet.
+          reachable=0
+          for attempt in $(seq 1 12); do
+            if incus query "${INCUS_REMOTE}:/1.0?project=${INCUS_PROJECT}" > "$RUNNER_TEMP/incus-server.json"; then
+              reachable=1
+              break
+            fi
+            echo "Incus API not reachable yet (attempt $attempt); retrying in 5s"
+            sleep 5
+          done
+
+          if [ "$reachable" -ne 1 ]; then
+            echo "the configured Incus endpoint is unreachable over the tailnet; publication stays disabled" >&2
+            exit 1
+          fi
+
+          # /1.0 answers untrusted clients too, so prove the pinned client
+          # certificate is actually trusted for this project by reading a
+          # protected collection (403 for an untrusted or misscoped cert).
+          if ! incus query "${INCUS_REMOTE}:/1.0/images?project=${INCUS_PROJECT}&recursion=1" > "$RUNNER_TEMP/incus-images.json"; then
+            echo "the client certificate is not trusted for project ${INCUS_PROJECT}; publication stays disabled" >&2
+            exit 1
+          fi
+
+          echo "Incus endpoint reachable and the client certificate is trusted for ${INCUS_PROJECT}"
+
+      - name: Boot smoke test the candidate
+        run: |
+          set -euo pipefail
+
+          # Boot the LOCAL artifact before anything is published. The script
+          # never promotes the shared `router` alias and removes only the
+          # instance/alias/image it created; a cleanup failure fails this job.
+          spikes/images/smoke.sh \
+            --file "$CANDIDATE" \
+            --remote "$INCUS_REMOTE" \
+            --project "$INCUS_PROJECT" \
+            --suffix "ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --log "$EVIDENCE/smoke.log" \
+            > "$EVIDENCE/smoke.json"
+
+          cat "$EVIDENCE/smoke.json"
+
+      - name: Build the router publisher
+        working-directory: spikes/images
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          go build -o "$RUNNER_TEMP/bin/images" .
+
+      - name: Publish the immutable router release
+        id: publish
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+          REFERENCE: ${{ needs.build.outputs.reference }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # The publisher refuses to replace an existing reference, so a repeat
+          # run on an unchanged images/ tree fails here by design.
+          "$RUNNER_TEMP/bin/images" publish \
+            --ref "$REFERENCE" \
+            --version "$VERSION" \
+            --file "$CANDIDATE" \
+            > "$EVIDENCE/publish.json"
+
+          cat "$EVIDENCE/publish.json"
+
+          digest="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["digest"])' "$EVIDENCE/publish.json")"
+          case "$digest" in
+            sha256:*) ;;
+            *) echo "publisher returned an unexpected digest: $digest" >&2; exit 1 ;;
+          esac
+
+          {
+            echo "digest=$digest"
+            echo "reference=$REFERENCE"
+            echo "subject-name=$IMAGE_REPOSITORY"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify the published release by digest
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+          DIGEST: ${{ steps.publish.outputs.digest }}
+          EXPECTED: ${{ needs.build.outputs.tar-sha256 }}
+        run: |
+          set -euo pipefail
+
+          "$RUNNER_TEMP/bin/images" fetch \
+            --ref "${IMAGE_REPOSITORY}@${DIGEST}" \
+            --output "$RUNNER_TEMP/fetched.tar.xz" \
+            > "$EVIDENCE/fetch.json"
+
+          cat "$EVIDENCE/fetch.json"
+
+          published="$(sha256sum "$RUNNER_TEMP/fetched.tar.xz" | cut -d' ' -f1)"
+          if [ "$published" != "$EXPECTED" ]; then
+            echo "published content $published does not match the built artifact $EXPECTED" >&2
+            exit 1
+          fi
+          echo "Published release round-trips to the built bytes ($published)"
+
+      - name: Upload publication evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: router-publish-${{ needs.build.outputs.version }}
+          path: ${{ runner.temp }}/evidence
+          # Evidence is uploaded even on failure, where earlier steps may not
+          # have produced any file yet; a missing directory must not mask the
+          # real failure.
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Write publication summary
+        env:
+          DIGEST: ${{ steps.publish.outputs.digest }}
+          REFERENCE: ${{ needs.build.outputs.reference }}
+          VERSION: ${{ needs.build.outputs.version }}
+          TREE: ${{ needs.build.outputs.tree }}
+          TAR_SHA256: ${{ needs.build.outputs.tar-sha256 }}
+          TAR_BYTES: ${{ needs.build.outputs.tar-bytes }}
+        run: |
+          {
+            echo "## Router image published"
+            echo
+            echo "- reference: \`$REFERENCE\`"
+            echo "- release index digest: \`$DIGEST\`"
+            echo "- images/ tree: \`$TREE\`"
+            echo "- router.tar.xz: \`$TAR_SHA256\` ($TAR_BYTES bytes)"
+            echo
+            echo "The tag is immutable: republishing \`$VERSION\` is refused, so a rebuild of the"
+            echo "same images/ tree cannot overwrite it. Change images/ or promote this digest."
+            echo
+            echo "Promote to the fleet (imports, boot-tests, then atomically moves the \`router\` alias):"
+            echo
+            echo '```sh'
+            echo "go run ./spikes/images import --ref \"${IMAGE_REPOSITORY}@${DIGEST}\" --remote ${INCUS_REMOTE} --project ${INCUS_PROJECT}"
+            echo '```'
+            echo
+            echo "Verify provenance (signed in the isolated attest.yml workflow):"
+            echo
+            echo '```sh'
+            echo "gh attestation verify \"oci://${IMAGE_REPOSITORY}@${DIGEST}\" --repo \"$GITHUB_REPOSITORY\" --signer-workflow \"$GITHUB_REPOSITORY/.github/workflows/attest.yml\" --deny-self-hosted-runners"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Provenance for the imgoci release INDEX (not a layer), generated in the
+  # isolated reusable workflow so the signing identity is unreachable from the
+  # build and publish steps.
+  attest:
+    needs:
+      - publish
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
+      # attest.yml's job declares packages: write for its optional registry
+      # push; a reusable workflow cannot exceed the caller's grant, so the
+      # caller must offer it even though push-to-registry is false here.
+      packages: write
+    uses: ./.github/workflows/attest.yml
+    with:
+      subject-name: ${{ needs.publish.outputs.subject-name }}
+      subject-digest: ${{ needs.publish.outputs.digest }}
+      # Provenance stays in GitHub's attestation API. An imgoci release index is
+      # not a runnable container image, so nothing consumes a registry referrer;
+      # `gh attestation verify oci://...` works either way.
+      push-to-registry: false

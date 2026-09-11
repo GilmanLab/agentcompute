@@ -79,6 +79,7 @@ contexts = [
   "ci",
   "Binary Release Dry Run",
   "Container Image Dry Run",
+  "Images Validate",
 ]
 
 [rulesets.tags_default]
