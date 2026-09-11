@@ -280,7 +280,8 @@ imgoci:
   module: github.com/imgoci/go
   version: v0.1.0
 incus:
-  version: 7.4.0
+  # Exactly what `incus --version` prints for the v7.4.0 release asset.
+  version: "7.4"
   url: https://github.com/lxc/incus/releases/download/v7.4.0/bin.linux.incus.x86_64
   sha256: 2fa9b2699672225dde5290962f4087b426b5ecbd4fed0df8e430687d3b76b500
 pyyaml:

@@ -235,7 +235,7 @@ jobs:
           pin() {
             awk -v key="$1:" '
               /^[^[:space:]]/ { inside = ($0 == "incus:") }
-              inside && $1 == key { print $2; found = 1; exit }
+              inside && $1 == key { value = $2; gsub(/"/, "", value); print value; found = 1; exit }
               END { if (!found) exit 1 }
             ' images/pins.yaml
           }
@@ -258,10 +258,10 @@ jobs:
           chmod 0755 "$bin/incus"
 
           reported="$("$bin/incus" --version)"
-          case "$reported" in
-            *"$version"*) ;;
-            *) echo "pinned Incus $version but the binary reports $reported" >&2; exit 1 ;;
-          esac
+          if [ "$reported" != "$version" ]; then
+            echo "pinned Incus $version but the binary reports $reported" >&2
+            exit 1
+          fi
 
           echo "$bin" >> "$GITHUB_PATH"
           echo "Installed SHA-verified Incus client $version"
