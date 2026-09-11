@@ -1,0 +1,50 @@
+version: 2
+
+project_name: template-mcp-codemode
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: template-mcp-codemode
+    main: ./cmd/template-mcp-codemode
+    binary: template-mcp-codemode
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -buildid=
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .FullCommit }}
+      - -X main.date={{ .CommitDate }}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - id: template-mcp-codemode
+    ids:
+      - template-mcp-codemode
+    formats:
+      - binary
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - id: binary
+    artifacts: binary
+
+changelog:
+  disable: true
+
+release:
+  disable: true
