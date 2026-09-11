@@ -239,16 +239,12 @@ func run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := incus(
-			ctx,
-			"query",
-			"-X",
-			"PUT",
-			"-d",
-			string(payload),
-			*remote+":/1.0/images/aliases/router?project="+*project,
-		); err != nil {
-			return err
+		// `incus query` rejects --project; the project travels in the URL.
+		update := exec.CommandContext(ctx, "incus", "query", "-X", "PUT", "-d", string(payload),
+			*remote+":/1.0/images/aliases/router?project="+*project)
+		update.Stdout, update.Stderr = os.Stderr, os.Stderr
+		if err := update.Run(); err != nil {
+			return fmt.Errorf("updating router alias: %w", err)
 		}
 	} else if err := incus(ctx, "image", "alias", "create", *remote+":router", fingerprint); err != nil {
 		return err
