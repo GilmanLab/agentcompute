@@ -1,0 +1,44 @@
+{
+  "status": "blocked-at-required-network-spike",
+  "production_implementation_changed": false,
+  "project_bridge": {
+    "command": "python3 spikes/project-bridge/probe.py",
+    "project": "ac-a",
+    "project_create": "succeeded with features.images=true, features.profiles=true, features.networks=false, restricted=true, managed NICs/disks, blocked nesting/passthrough and restricted.networks.access=ac-a-default",
+    "member": "lab01",
+    "network": "ac-a-default",
+    "target_definition": "succeeded; network pending",
+    "activation_error": "Network not defined on nodes: nas01, lab02, lab03",
+    "cleanup_failures": [],
+    "residue": [],
+    "second_sandbox_attempted": false,
+    "guest_launch_nat_and_cross_attach_tested": false,
+    "cluster_reference": "https://linuxcontainers.org/incus/docs/main/howto/cluster_config_networks/"
+  },
+  "bridge_name": {
+    "command": "incus query 'nas01:/1.0/networks?project=default&target=lab01' --request POST --data '{\"name\":\"ac-abcde-default\",\"type\":\"bridge\",\"config\":{}}'",
+    "error": "Invalid network name: Network interface is too long (maximum 15 characters)",
+    "inference": "The literal ac-<sandbox>-default mapping permits at most four sandbox characters, contradicting the required 32-character sandbox grammar. No truncation or hashing was substituted."
+  },
+  "worker_boundary": {
+    "command": "go run ./spikes/agent-error",
+    "codemode_version": "v0.2.1",
+    "transport": "official MCP SDK in-memory transport; real re-executed CodeMode worker",
+    "search": "instance.get(*, sandbox: str, name: str)",
+    "describe": "succeeded",
+    "execute_source": "def main():\n    return instance.get(sandbox=\"y\", name=\"x\")\n",
+    "isError": true,
+    "text": "capability failed: instance \"x\" not found in sandbox \"y\"",
+    "scope": "Probe handler intentionally returns AgentError; not an implemented Incus lookup."
+  },
+  "not_run": [
+    "full real-agent container acceptance",
+    "restart and TTL acceptance",
+    "exec streaming acceptance",
+    "restricted identity negative tests",
+    "integration lane",
+    "moon run root:check",
+    "container create latency and exec overhead measurements"
+  ],
+  "decision_needed": "Resolve physical bridge naming and all-member network lifecycle before implementing slice 1. Do not merge throwaway probes as production code."
+}
