@@ -90,10 +90,15 @@ in a fresh work directory:
 | 2 (hand-driven) | 0.901 s | 153,284 KiB | 159,199,232 B | 11,677,972 B | 44,462,635 B |
 | 3 (hand-driven) | 0.897 s | 153,544 KiB | 169,447,424 B | 11,678,200 B | 44,462,635 B |
 | `build.py` | 1.17 s | 507,696 KiB | 954,527,744 B | 11,678,052 B | 44,462,635 B |
+| `build.py`, GitHub-hosted `ubuntu-24.04` (run 34649751291) | 2.03 s | 512,460 KiB | 954,454,016 B | 11,678,744 B | 44,462,635 B |
+| `build.py`, GitHub-hosted `ubuntu-24.04` (run 34650677380) | 2.92 s | 514,596 KiB | 954,454,016 B | 11,678,548 B | 44,462,635 B |
 
 `build.py` numbers include the Go toolchain and vendored distrobuilder source
-in the work directory (download 7.8 s, compile 31.6 s), which is why its RSS
-and scratch are higher; the assembly phase itself is the ~1 s row. An earlier
+in the work directory (download 7.8 s / 5.8 s, compile 31.6 s / 66.4 s on
+sandbox01 / the hosted runner), which is why its RSS and scratch are higher;
+the assembly phase itself is the ~1–2 s row. The whole hosted publish run
+(build, boot test on the cluster, publish, fetch-back, attest) took about
+3.5 minutes. An earlier
 first attempt failed in 0.1 s: the minirootfs's `libssl3` pinned the older
 `libcrypto3`, which is why `pins.yaml` now pins the base packages together
 with the router set (59 APKs, 13.2 MB downloaded).
@@ -108,6 +113,16 @@ sizes, modes, and owners. Only `metadata.yaml` (`creation_date`,
 differ, so the compressed bytes and therefore the Incus fingerprint differ per
 build. A CI build will not reproduce a local digest; compare decoded content,
 not the fingerprint. Fixing the timestamps is deliberately not done in Phase 1.
+
+Two releases exist. `tree-b2d8dff139ca` (run 34649751291) has the same
+contents as the local spike build but 0600/0700 modes on files distrobuilder
+generates, because `build.py` assembled under umask 077; that is fixed. The
+catalog points at `tree-05771e889f6c`
+(`sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889`,
+fingerprint `6e3183fe052e…`, run 34650677380), which differs from the local
+build only in `metadata.yaml`. A master run on an unchanged `images/` tree
+stops at the publish step with `release already exists`: the immutability
+guard working (run 34650303253).
 
 ## Throwaway
 

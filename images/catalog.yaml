@@ -1,0 +1,19 @@
+# Image catalog consumed by the agentcompute server (Phase 2). One entry per
+# lab-built image. `reference` is always by digest: it names the imgoci
+# release index, and the reconciler resolves, verifies, imports, and boot-tests
+# it before moving the Incus alias. Updated by pull request after each publish;
+# changing this file does not trigger a publish.
+schema_version: 1
+images:
+  - name: router
+    os: alpinelinux
+    version: "3.22.5"
+    kinds: [container]
+    kind: container
+    # ghcr.io/gilmanlab/agentcompute/router:tree-05771e889f6c, published by
+    # https://github.com/GilmanLab/agentcompute/actions/runs/34650677380
+    # Incus fingerprint 6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f
+    reference: ghcr.io/gilmanlab/agentcompute/router@sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889
+    cpus: 1
+    memory_mb: 512
+    disk_gb: 2
