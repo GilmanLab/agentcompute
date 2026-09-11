@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -32,24 +33,32 @@ func main() {
 	}
 }
 
+const (
+	probeTimeout  = 30 * time.Second
+	instanceGet   = "instance.get"
+	spikeIdentity = "spike"
+)
+
 func run() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
 	defer cancel()
 	builder := codemode.New(codemode.Options{Authorizer: authz.AllowAll()})
 	codemode.Register(builder, codemode.Capability[instanceGetInput, instanceGetOutput]{
-		ID:      "instance.get",
-		Name:    "instance.get",
+		ID:      instanceGet,
+		Name:    instanceGet,
 		Summary: "Get a named instance in a sandbox.",
 		Handler: func(_ context.Context, _ authz.Subject, in instanceGetInput) (instanceGetOutput, error) {
-			return instanceGetOutput{}, &codemode.AgentError{Message: fmt.Sprintf("instance %q not found in sandbox %q", in.Name, in.Sandbox)}
+			return instanceGetOutput{}, &codemode.AgentError{
+				Message: fmt.Sprintf("instance %q not found in sandbox %q", in.Name, in.Sandbox),
+			}
 		},
 	})
 	service, err := builder.Build()
 	if err != nil {
 		return err
 	}
-	server, err := hostmcp.New(service, hostmcp.StaticSubject(authz.Subject{ID: "spike"}), hostmcp.Options{
-		Implementation: &mcp.Implementation{Name: "agentcompute-error-spike", Version: "spike"},
+	server, err := hostmcp.New(service, hostmcp.StaticSubject(authz.Subject{ID: spikeIdentity}), hostmcp.Options{
+		Implementation: &mcp.Implementation{Name: "agentcompute-error-spike", Version: spikeIdentity},
 		Logger:         slog.New(slog.DiscardHandler),
 	})
 	if err != nil {
@@ -61,15 +70,15 @@ func run() error {
 		return err
 	}
 	defer serverSession.Close()
-	client := mcp.NewClient(&mcp.Implementation{Name: "spike-client", Version: "spike"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "spike-client", Version: spikeIdentity}, nil)
 	session, err := client.Connect(ctx, clientTransport, nil)
 	if err != nil {
 		return err
 	}
 	defer session.Close()
 	for _, call := range []*mcp.CallToolParams{
-		{Name: "search_api", Arguments: map[string]any{"query": "instance.get"}},
-		{Name: "describe_api", Arguments: map[string]any{"name": "instance.get"}},
+		{Name: "search_api", Arguments: map[string]any{"query": instanceGet}},
+		{Name: "describe_api", Arguments: map[string]any{"name": instanceGet}},
 		{Name: "execute", Arguments: map[string]any{"source": "def main():\n    return instance.get(sandbox=\"y\", name=\"x\")\n"}},
 	} {
 		result, err := session.CallTool(ctx, call)
@@ -80,20 +89,29 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%s: %s\n", call.Name, encoded)
+		if _, writeErr := fmt.Fprintf(os.Stdout, "%s: %s\n", call.Name, encoded); writeErr != nil {
+			return writeErr
+		}
 		if call.Name != "execute" {
 			if result.IsError {
 				return fmt.Errorf("%s failed", call.Name)
 			}
 			continue
 		}
-		if !result.IsError || len(result.Content) != 1 {
-			return fmt.Errorf("expected one MCP tool error")
+		if err := checkAgentError(result); err != nil {
+			return err
 		}
-		text, ok := result.Content[0].(*mcp.TextContent)
-		if !ok || text.Text != `capability failed: instance "x" not found in sandbox "y"` {
-			return fmt.Errorf("unexpected error content: %v", result.Content)
-		}
+	}
+	return nil
+}
+
+func checkAgentError(result *mcp.CallToolResult) error {
+	if !result.IsError || len(result.Content) != 1 {
+		return errors.New("expected one MCP tool error")
+	}
+	text, ok := result.Content[0].(*mcp.TextContent)
+	if !ok || text.Text != `capability failed: instance "x" not found in sandbox "y"` {
+		return fmt.Errorf("unexpected error content: %v", result.Content)
 	}
 	return nil
 }

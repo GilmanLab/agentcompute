@@ -10,7 +10,7 @@ This server is CodeMode-native. Every healthy child exposes the same three outer
 - `describe_api`
 - `execute`
 
-Capabilities such as `random.int` live behind those tools. Adding or changing a capability normally leaves the three tool definitions unchanged.
+Capabilities such as `image.list` live behind those tools. Adding or changing a capability normally leaves the three tool definitions unchanged.
 
 ## Quick start
 
@@ -30,7 +30,7 @@ The checked-in `.mcp.json` points Claude Code at a wrapper that builds the proxy
 }
 ```
 
-Start Claude Code in the repository root and approve the project-scoped `dev` server. Edits under `cmd` or `internal` trigger rebuilds.
+Export `AGENTCOMPUTE_CONFIG` with an absolute runtime configuration path, then start the client in the repository root. Edits under `cmd` or `internal` trigger rebuilds. The child inherits the environment and reconciles its Incus catalog before the handshake.
 
 Two parts of the wrapper are required:
 
@@ -83,7 +83,7 @@ Cold start serves an empty outer tool list while the first build runs. The first
 
 ## Capability changes and notifications
 
-A CodeMode capability is catalog data behind the fixed outer tools. Adding `records.lookup`, renaming an input field, changing a summary, or removing `random.int` normally produces the same `tools/list` definitions for `search_api`, `describe_api`, and `execute`.
+A CodeMode capability is catalog data behind the fixed outer tools. Adding a capability, renaming an input field, or changing a summary normally produces the same `tools/list` definitions for `search_api`, `describe_api`, and `execute`.
 
 The proxy therefore does not promise `notifications/tools/list_changed` for a capability-only edit. This is expected, not a failed reload. After the swap:
 
@@ -155,7 +155,7 @@ Run these checks after changing the proxy, its child handshake, or the CodeMode 
 
 ### Added capability
 
-1. In the live session, call `search_api` for `random integer`, describe `random.int`, and execute it once.
+1. In the live session, search for `image.list`, describe it, and execute it once.
 2. Add a capability with a unique search term and a handler that returns an unguessable value.
 3. Wait until stderr shows a successful build and swap.
 4. Call `search_api` with the unique term, then `describe_api` with the returned exact name.
@@ -184,7 +184,7 @@ Pass when search no longer returns it, description reports `capability not found
 
 ### Cold start
 
-Start a new client session. The initial outer list can be empty while the first build runs. Pass when the first healthy child makes `search_api`, `describe_api`, and `execute` available and they can discover and execute `random.int` without reconnecting.
+Start a new client session. The initial outer list can be empty while the first build runs. Pass when the first healthy child makes `search_api`, `describe_api`, and `execute` available and they can discover and execute `image.list` without reconnecting.
 
 ## Develop the proxy
 

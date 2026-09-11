@@ -1,13 +1,13 @@
 ---
 title: Add a capability
-description: Register a typed Go capability and remove the random.int demo.
+description: Register a typed Go capability in the compute catalog.
 ---
 
 # Add a capability
 
 Capabilities live in `internal/mcpserver`. The CLI and transports continue to expose only `search_api`, `describe_api`, and `execute`; adding a capability changes the catalog behind those fixed MCP tools.
 
-This guide adds `text.uppercase`, verifies how an agent composes it with `random.int`, and then explains how to remove the demo capability.
+This guide adds `text.uppercase` as a small example alongside the compute capabilities.
 
 ## Define the capability
 
@@ -63,8 +63,7 @@ Set an explicit stable `ID` before policy or deployment filters depend on a capa
 In `internal/mcpserver/server.go`, call the registration after the builder is created and before `Build`:
 
 ```go
-builder := codemode.New(options.Runtime)
-registerRandomInt(builder, options.Deps)
+// Add after the existing registerSandbox/Image/Instance/Net calls.
 registerUppercase(builder, options.Deps)
 service, err := builder.Build()
 ```
@@ -100,37 +99,29 @@ After rebuilding or after the development proxy completes a reload:
 
 ```python
 def main():
-    draw = random.int(min=7, max=7)
-    label = text.uppercase(value="draw " + str(draw["value"]))
-    return {
-        "draw": draw["value"],
-        "label": label["value"],
-    }
+    images = image.list()
+    label = text.uppercase(value=images["items"][0]["name"])
+    return {"name": label["value"]}
 ```
 
-A capability output struct becomes a Starlark dictionary, so this program reads both results through their `"value"` keys. The successful structured MCP result is:
+With the Phase 1 catalog's `router` entry first, the result is:
 
 ```json
-{"result":{"draw":7,"label":"DRAW 7"}}
+{"result":{"name":"ROUTER"}}
 ```
 
 Capability-only edits do not change the outer definitions of `search_api`, `describe_api`, and `execute`. The development proxy therefore does not promise a `notifications/tools/list_changed` notification for this change. Verify the new child by repeating search, description, and execution and checking the returned capability result.
 
 ## Use shared dependencies
 
-Add database pools, HTTP clients, clocks, or other shared collaborators as typed fields on `Dependencies` in `internal/mcpserver/server.go`. The registration function receives `Dependencies`; close over only the fields its handler needs.
+Compute behavior belongs in `compute.Service`; Incus I/O belongs in the adapter. Define small consumer interfaces in `internal/mcpserver` and close handlers over the relevant `Dependencies` fields. Do not construct backend clients in a handler.
 
 Construct `Dependencies` once in the CLI startup path and pass the same value through `mcpserver.Options` for either transport. The HTTP server shares the immutable runtime and its collaborators across sessions. Dependencies and handlers must be safe for concurrent calls.
 
 Handlers run in the privileged parent process, not in the Starlark worker. They must honor context cancellation for I/O, waits, locks, and downstream calls; bound their own resource use; and avoid exposing credentials or trusted diagnostic detail in returned values. CodeMode can kill the worker but cannot forcibly stop a dispatched Go handler or undo its side effects.
 
-## Remove `random.int`
+## Verify the changed catalog
 
-Add and verify at least one real capability first. Then:
+Update the discovery/signature contract test for any added or changed capability. Preserve the actual worker round trip and test meaningful behavior boundaries, not field forwarding.
 
-1. Delete `internal/mcpserver/randomint.go` and its behavior tests.
-2. Remove `registerRandomInt(builder, options.Deps)` from `internal/mcpserver.New`.
-3. Update catalog expectations, documentation, and `.github/scripts/mcp_smoke.py` to exercise your replacement capabilities. The shipped smoke script assumes the demo's `min`/`max` arguments and `value` result; changing only its `--capability` flag is not enough when the contract changes. Both `moon run root:smoke` and the release workflows use this script.
-4. Use a client to search, describe, and execute a replacement capability over every retained transport.
-
-Keep the CodeMode builder, `mcpserver.Options.Runtime`, resolver wiring, and worker entry points. Removing the demo does not turn replacement capabilities into direct MCP tools.
+The live smoke script exercises `image.list`; offline release smoke checks only artifact startup. Cluster mutations belong in the opt-in integration lane. Keep the builder, resolver wiring, and worker entry points when extending the catalog.

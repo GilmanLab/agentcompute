@@ -2,24 +2,12 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Drive a real MCP session against a built server and assert CodeMode behavior.
+"""Check a configured agentcompute MCP server, or an offline release artifact.
 
-This is the release smoke test: it speaks the actual stdio JSON-RPC protocol to a
-server binary (or container) and exercises the full CodeMode loop — discover,
-describe, execute — instead of only probing `--version`/`--help`. Anything that
-breaks the worker re-exec, the capability catalog, or the Starlark execution path
-fails here rather than in a user's client.
-
-The target is passed as a literal argv after `--`, so the same script covers every
-release artifact:
-
-    uv run .github/scripts/mcp_smoke.py -- ./bin/agentcompute stdio
-    uv run .github/scripts/mcp_smoke.py -- dist/release-assets/BINARY stdio
-    uv run .github/scripts/mcp_smoke.py -- docker run -i --rm IMAGE stdio
-
-The server identity assertion is exact, so pointing the script at the dev proxy
-(`mcp-devproxy`) or at the bare CodeMode library server (`codemode`) is reported as
-a failure rather than silently passing.
+Live mode requires the server's --config or AGENTCOMPUTE_CONFIG and exercises
+search, describe, execution and binding errors without creating cluster resources.
+Offline mode checks the artifact's CLI startup; worker and transport contracts
+remain covered by the Go tests, and live lifecycle proof is the integration lane.
 """
 
 from __future__ import annotations
@@ -35,23 +23,14 @@ from typing import Any
 # EXPECTED_TOOLS is the exact CodeMode tool surface: no more, no fewer.
 EXPECTED_TOOLS = frozenset({"search_api", "describe_api", "execute"})
 
-# DETERMINISTIC_PROGRAM composes several capability calls whose results are pinned by
-# min == max, so a passing run proves real execution rather than a lucky random draw.
 DETERMINISTIC_PROGRAM = """
 def main():
-    total = 0
-    for _ in range(3):
-        total = total + {capability}(min=7, max=7)["value"]
-    return {{"total": total, "single": {capability}(min=-2, max=-2)["value"]}}
+    return {capability}(os="__smoke_absent__")
 """
-
-# DETERMINISTIC_RESULT is the only correct envelope for DETERMINISTIC_PROGRAM.
-DETERMINISTIC_RESULT = {"result": {"total": 21, "single": -2}}
-
-# INVALID_RANGE_PROGRAM asks for an impossible range, which the capability must reject.
-INVALID_RANGE_PROGRAM = """
+DETERMINISTIC_RESULT = {"result": {"items": []}}
+INVALID_ARGUMENT_PROGRAM = """
 def main():
-    return {capability}(min=5, max=1)
+    return {capability}(os=7)
 """
 
 
@@ -79,13 +58,13 @@ def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument(
         "--capability",
-        default="random.int",
+        default="image.list",
         help="exact capability name to discover, describe, and execute",
     )
     parser.add_argument(
         "--expect-error-text",
-        default="capability failed",
-        help="exact tool error text for the rejected out-of-range call",
+        default="invalid capability arguments",
+        help="stable error prefix for the rejected wrongly typed call",
     )
     parser.add_argument(
         "--protocol-version",
@@ -102,6 +81,7 @@ def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
         type=float,
         help="seconds to wait for any single response",
     )
+    parser.add_argument("--offline", action="store_true", help="check CLI startup without cluster credentials")
     args = parser.parse_args(own)
     if not command:
         parser.error("a target argv is required after `--`")
@@ -111,6 +91,10 @@ def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
 def main(argv: list[str] | None = None) -> int:
     args, command = parse_args(sys.argv[1:] if argv is None else argv)
     try:
+        if args.offline:
+            run_offline(command, timeout=args.timeout)
+            print("[smoke] PASS (offline artifact startup)")
+            return 0
         run_smoke(
             command=command,
             server_name=args.server_name,
@@ -142,7 +126,7 @@ def run_smoke(
         signature = check_search(session, capability=capability)
         check_describe(session, capability=capability, signature=signature)
         check_execute(session, capability=capability)
-        check_invalid_range(session, capability=capability, expect_error_text=expect_error_text)
+        check_invalid_arguments(session, capability=capability, expect_error_text=expect_error_text)
         # The rejected call runs in its own worker process; a healthy server keeps
         # serving afterwards. Re-running the deterministic program proves it.
         check_execute(session, capability=capability)
@@ -221,10 +205,10 @@ def check_describe(session: Session, *, capability: str, signature: str) -> None
         )
     inputs = field_names(payload, "input")
     outputs = field_names(payload, "output")
-    if not {"min", "max"} <= inputs:
-        raise SmokeError(f"describe_api input fields are {sorted(inputs)}, want min and max")
-    if "value" not in outputs:
-        raise SmokeError(f"describe_api output fields are {sorted(outputs)}, want value")
+    if not {"os", "desktop", "platform"} <= inputs:
+        raise SmokeError(f"describe_api input fields are {sorted(inputs)}, want catalog filters")
+    if "items" not in outputs:
+        raise SmokeError(f"describe_api output fields are {sorted(outputs)}, want items")
     print(f"[smoke] describe_api: input {sorted(inputs)} output {sorted(outputs)}")
 
 
@@ -236,15 +220,30 @@ def check_execute(session: Session, *, capability: str) -> None:
     print(f"[smoke] execute: {payload}")
 
 
-def check_invalid_range(session: Session, *, capability: str, expect_error_text: str) -> None:
-    program = INVALID_RANGE_PROGRAM.format(capability=capability)
+def check_invalid_arguments(session: Session, *, capability: str, expect_error_text: str) -> None:
+    program = INVALID_ARGUMENT_PROGRAM.format(capability=capability)
     result = session.request("tools/call", {"name": "execute", "arguments": {"source": program}})
     if not result.get("isError"):
-        raise SmokeError(f"execute accepted an impossible range: {result}")
+        raise SmokeError(f"execute accepted an invalid argument type: {result}")
     text = result_text(result)
-    if text != expect_error_text:
-        raise SmokeError(f"execute error text is {text!r}, want exactly {expect_error_text!r}")
-    print(f"[smoke] execute rejected min>max: {text}")
+    if not text.startswith(expect_error_text):
+        raise SmokeError(f"execute error text is {text!r}, want prefix {expect_error_text!r}")
+    print(f"[smoke] execute rejected wrong argument type: {text}")
+
+
+def run_offline(command: list[str], *, timeout: float) -> None:
+    if command[-1] != "stdio":
+        raise SmokeError("offline target must end with stdio")
+    for option in ("--version", "--help"):
+        result = subprocess.run(command[:-1] + [option], capture_output=True, text=True, timeout=timeout)
+        if result.returncode != 0 or "agentcompute" not in result.stdout:
+            raise SmokeError(f"artifact {option} failed: {result.stderr}")
+    result = subprocess.run(
+        command + ["--config", "/nonexistent/agentcompute-smoke.yaml"],
+        capture_output=True, text=True, timeout=timeout,
+    )
+    if result.returncode == 0 or result.stdout:
+        raise SmokeError("missing configuration must fail without corrupting protocol stdout")
 
 
 def field_names(payload: dict[str, Any], key: str) -> set[str]:

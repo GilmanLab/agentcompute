@@ -145,10 +145,9 @@ jobs:
             *) echo "unexpected version output: $output" >&2; exit 1 ;;
           esac
 
-          # Exercise the real MCP session, not just --version: the smoke script
-          # initializes, asserts the exact server identity and tool surface, and runs
-          # a deterministic CodeMode program in a re-executed worker process.
-          uv run .github/scripts/mcp_smoke.py -- "$bin" stdio
+          # Cluster credentials are deliberately absent from release jobs.
+          # MCP worker/transport contracts run in CI; lifecycle proof is opt-in.
+          uv run .github/scripts/mcp_smoke.py --offline -- "$bin" stdio
 
       - name: Upload assets to draft release
         env:
@@ -375,10 +374,8 @@ jobs:
           docker run --rm "$IMAGE_REF" --version
           docker run --rm "$IMAGE_REF" --help
 
-          # Real MCP session against the published image. `docker run -i` keeps stdin
-          # open for the stdio transport; the run also proves the CodeMode worker can
-          # re-execute itself as the image's nonroot user with no shell present.
-          uv run .github/scripts/mcp_smoke.py \
+          # Verify startup and missing-config rejection as the image's nonroot user.
+          uv run .github/scripts/mcp_smoke.py --offline \
             -- docker run -i --rm "$IMAGE_REF" stdio
 
       - name: Sign image (keyless, Sigstore/Fulcio via OIDC)
@@ -447,7 +444,7 @@ jobs:
             echo "asset=\"agentcompute_${RELEASE_VERSION}_\$(go env GOOS)_\$(go env GOARCH)\""
             echo "gh attestation verify \"dist/release-assets/\${asset}\" --repo \"$GITHUB_REPOSITORY\" --signer-workflow \"$GITHUB_REPOSITORY/.github/workflows/attest.yml\" --source-ref \"refs/tags/$RELEASE_TAG\" --deny-self-hosted-runners"
             echo "ghd download \"$GITHUB_REPOSITORY/agentcompute@${RELEASE_VERSION}\" --output \"\$(mktemp -d)\""
-            echo "uv run .github/scripts/mcp_smoke.py -- \"dist/release-assets/\${asset}\" stdio"
+            echo "uv run .github/scripts/mcp_smoke.py --offline -- \"dist/release-assets/\${asset}\" stdio"
             echo '```'
             echo
             echo "Container verification commands:"
@@ -456,7 +453,7 @@ jobs:
             echo "docker login ghcr.io"
             echo "docker pull \"${IMAGE_NAME}:${RELEASE_TAG}\""
             echo "docker run --rm \"${IMAGE_NAME}:${RELEASE_TAG}\" --version"
-            echo "uv run .github/scripts/mcp_smoke.py -- docker run -i --rm \"${IMAGE_NAME}:${RELEASE_TAG}\" stdio"
+            echo "uv run .github/scripts/mcp_smoke.py --offline -- docker run -i --rm \"${IMAGE_NAME}:${RELEASE_TAG}\" stdio"
             echo "gh attestation verify \"oci://${IMAGE_NAME}@${IMAGE_DIGEST}\" --repo \"$GITHUB_REPOSITORY\" --signer-workflow \"$GITHUB_REPOSITORY/.github/workflows/attest.yml\" --source-ref \"refs/tags/$RELEASE_TAG\" --deny-self-hosted-runners"
             echo "cosign verify \"${IMAGE_NAME}@${IMAGE_DIGEST}\" --certificate-identity-regexp \"^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@.*\" --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             echo '```'
