@@ -5,15 +5,15 @@ description: Run the CodeMode server and compose the demo capability.
 
 # Getting started
 
-This tutorial starts the template as a local STDIO server, connects it to an MCP client, and composes two calls to `random.int` in one `execute` request.
+This tutorial starts the server as a local STDIO process, connects it to an MCP client, and composes two calls to `random.int` in one `execute` request.
 
 ## Install the repository toolchain
 
 Clone a disposable checkout and provision the pinned Go 1.26.6 toolchain and project tools with [mise](https://mise.jdx.dev). The server module pins the official MCP Go SDK v1.7.0:
 
 ```sh
-git clone https://github.com/meigma/template-mcp-codemode.git
-cd template-mcp-codemode
+git clone https://github.com/GilmanLab/agentcompute.git
+cd agentcompute
 mise install
 ```
 
@@ -22,7 +22,7 @@ Moon uses the mise-provided tools as system binaries. Python and uv for the docu
 ## Build the server
 
 ```sh
-go build -o bin/template-mcp-codemode ./cmd/template-mcp-codemode
+go build -o bin/agentcompute ./cmd/agentcompute
 ```
 
 The final binary contains both the ordinary server and the CodeMode worker entry point. `codemode.ServeWorkerAndExit()` is the first statement of `main`, so CodeMode can re-execute this same binary for each program run.
@@ -34,8 +34,8 @@ Configure an MCP client that accepts the `mcpServers` shape. Replace the path be
 ```json
 {
   "mcpServers": {
-    "template-mcp-codemode": {
-      "command": "/absolute/path/to/template-mcp-codemode/bin/template-mcp-codemode",
+    "agentcompute": {
+      "command": "/absolute/path/to/agentcompute/bin/agentcompute",
       "args": ["stdio"]
     }
   }
@@ -110,7 +110,7 @@ CodeMode runs this source in a fresh worker process. Only the final converted va
 Start the HTTP transport on loopback:
 
 ```sh
-go run ./cmd/template-mcp-codemode http --addr localhost:8080
+go run ./cmd/agentcompute http --addr localhost:8080
 ```
 
 The server logs its listening address to stderr and shuts down gracefully on `Ctrl-C`. Loopback without a token installs the explicit non-secret development subject ID `development` in trusted request context.
@@ -118,7 +118,7 @@ The server logs its listening address to stderr and shuts down gracefully on `Ct
 To exercise the demo bearer-token seam:
 
 ```sh
-go run ./cmd/template-mcp-codemode http \
+go run ./cmd/agentcompute http \
   --addr localhost:8080 \
   --auth-token development-only-token
 ```

@@ -7,11 +7,11 @@ tags:
   - 'uv'
 
 project:
-  title: 'template-mcp-codemode docs'
-  description: 'MkDocs documentation site for the Meigma CodeMode MCP server template.'
-  owner: 'meigma'
+  title: 'agentcompute docs'
+  description: 'MkDocs documentation site for the agentcompute CodeMode MCP server.'
+  owner: 'GilmanLab'
   maintainers:
-    - 'meigma'
+    - 'GilmanLab'
 
 # uv + Python come from mise (system binaries on PATH); uv creates/activates the
 # project .venv itself, so moon manages no toolchain here.

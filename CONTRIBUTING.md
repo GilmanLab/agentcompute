@@ -1,6 +1,6 @@
 # Contributing
 
-This repository is a Go CodeMode MCP server template. Keep changes focused, preserve the generated-project path, and route private vulnerability reports through [SECURITY.md](SECURITY.md).
+This repository is a Go CodeMode MCP server. Keep changes focused and route private vulnerability reports through [SECURITY.md](SECURITY.md).
 
 ## Report a bug
 
@@ -41,7 +41,7 @@ moon run root:lint
 moon run root:build
 moon run root:test
 moon run docs:serve
-go run ./cmd/template-mcp-codemode --version
+go run ./cmd/agentcompute --version
 ```
 
 The STDIO server blocks until its client closes input or the process receives a signal. This is expected. macOS does not include `timeout` or `gtimeout` by default; use another time-bounding mechanism or install coreutils when a local script needs one.

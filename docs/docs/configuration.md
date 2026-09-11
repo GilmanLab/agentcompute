@@ -5,24 +5,24 @@ description: CLI flags, environment variables, CodeMode options, limits, and tra
 
 # Configuration
 
-The CLI uses Cobra and an instance-scoped Viper configuration. Flags take precedence over environment variables, which take precedence over defaults. `internal/templateinfo.Name` derives the `TEMPLATE_MCP_CODEMODE_*` environment prefix.
+The CLI uses Cobra and an instance-scoped Viper configuration. Flags take precedence over environment variables, which take precedence over defaults. `internal/templateinfo.Name` derives the `AGENTCOMPUTE_*` environment prefix.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `template-mcp-codemode stdio` | Serve over STDIO for a local client-launched subprocess. |
-| `template-mcp-codemode http` | Serve over Streamable HTTP. |
-| `template-mcp-codemode --version` | Print version, commit, and build date. |
+| `agentcompute stdio` | Serve over STDIO for a local client-launched subprocess. |
+| `agentcompute http` | Serve over Streamable HTTP. |
+| `agentcompute --version` | Print version, commit, and build date. |
 
-A local build prints `template-mcp-codemode dev (none) built unknown`. Release builds receive their metadata through linker flags.
+A local build prints `agentcompute dev (none) built unknown`. Release builds receive their metadata through linker flags.
 
 ## Global flags
 
 | Flag | Environment | Default | Meaning |
 | --- | --- | --- | --- |
-| `--log-level` | `TEMPLATE_MCP_CODEMODE_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error`. |
-| `--log-format` | `TEMPLATE_MCP_CODEMODE_LOG_FORMAT` | `text` | `text` or `json`. |
+| `--log-level` | `AGENTCOMPUTE_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error`. |
+| `--log-format` | `AGENTCOMPUTE_LOG_FORMAT` | `text` | `text` or `json`. |
 
 Invalid values fail at startup. Logs always go to stderr. STDIO reserves stdout for JSON-RPC.
 
@@ -30,9 +30,9 @@ Invalid values fail at startup. Logs always go to stderr. STDIO reserves stdout 
 
 | Flag | Environment | Default | Meaning |
 | --- | --- | --- | --- |
-| `--addr` | `TEMPLATE_MCP_CODEMODE_ADDR` | `localhost:8080` | Listen address. |
-| `--auth-token` | `TEMPLATE_MCP_CODEMODE_AUTH_TOKEN` | Empty | Demonstration shared bearer token; empty disables token validation. |
-| `--insecure` | `TEMPLATE_MCP_CODEMODE_INSECURE` | `false` | Permit a non-loopback bind without authentication. |
+| `--addr` | `AGENTCOMPUTE_ADDR` | `localhost:8080` | Listen address. |
+| `--auth-token` | `AGENTCOMPUTE_AUTH_TOKEN` | Empty | Demonstration shared bearer token; empty disables token validation. |
+| `--insecure` | `AGENTCOMPUTE_INSECURE` | `false` | Permit a non-loopback bind without authentication. |
 
 A non-loopback bind without `--auth-token` fails unless `--insecure` explicitly permits unauthenticated exposure. Cross-origin protection is enabled independently of this bind check.
 
@@ -49,9 +49,9 @@ The shared token is not a production credential system. It does not validate a s
 
 For HTTP, the SDK authentication verifier supplies a stable, non-secret `auth.TokenInfo.UserID`. The `installHTTPSubject` receiving middleware reads `req.GetExtra().TokenInfo.UserID` from each MCP request and stores an `authz.Subject` with `authz.WithSubject` on the MCP handler context. `mcpserver.ContextSubject` resolves that value. Setting a value only on the outer `net/http` request context is not sufficient because the SDK establishes the receiving handler context. MCP tool input, Starlark source, request `_meta`, and unvalidated headers are not trusted identity sources.
 
-## Template server options
+## Server options
 
-`internal/mcpserver.New` has this template-owned API:
+`internal/mcpserver.New` has this repository-owned API:
 
 ```text
 New(options Options) (*mcp.Server, error)
@@ -106,11 +106,11 @@ srv, err := mcpserver.New(mcpserver.Options{
 })
 ```
 
-Limits are programmatic options. The template intentionally has no limit flags or `TEMPLATE_MCP_CODEMODE_*` limit variables. For exact accounting and validation rules, see the [CodeMode limits reference](https://meigma.github.io/codemode/reference/public-api/#limits).
+Limits are programmatic options. The server intentionally has no limit flags or `AGENTCOMPUTE_*` limit variables. For exact accounting and validation rules, see the [CodeMode limits reference](https://meigma.github.io/codemode/reference/public-api/#limits).
 
 ## Upstream MCP adapter options
 
-The template wrapper eventually calls the CodeMode adapter with the required three-argument signature:
+The repository wrapper eventually calls the CodeMode adapter with the required three-argument signature:
 
 ```go
 srv, err := codemodemcp.New(
@@ -133,7 +133,7 @@ The complete API is:
 mcpserver.New(service Service, resolver InvocationResolver, options Options) (*mcp.Server, error)
 ```
 
-The third argument is required; use `mcpserver.Options{}` to accept upstream defaults. A nil `Options.Implementation` uses implementation name `codemode` and version `2`. `Options.Logger` is optional and a nil value uses the MCP SDK default. The template supplies its own implementation name, title, version, and logger.
+The third argument is required; use `mcpserver.Options{}` to accept upstream defaults. A nil `Options.Implementation` uses implementation name `codemode` and version `2`. `Options.Logger` is optional and a nil value uses the MCP SDK default. The server supplies its own implementation name, title, version, and logger.
 
 See the [canonical `mcpserver` API reference](https://meigma.github.io/codemode/reference/public-api/#mcpserver) for service, resolver, and error contracts.
 

@@ -1,8 +1,8 @@
-site_name: template-mcp-codemode
-site_description: Meigma CodeMode MCP server template
-site_url: https://meigma.github.io/template-mcp-codemode/
-repo_name: meigma/template-mcp-codemode
-repo_url: https://github.com/meigma/template-mcp-codemode
+site_name: agentcompute
+site_description: agentcompute CodeMode MCP server
+site_url: https://gilmanlab.github.io/agentcompute/
+repo_name: GilmanLab/agentcompute
+repo_url: https://github.com/GilmanLab/agentcompute
 edit_uri: edit/master/docs/docs/
 docs_dir: docs
 site_dir: build
