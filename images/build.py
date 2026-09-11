@@ -449,6 +449,9 @@ def build(work_dir: Path, output_dir: Path) -> dict[str, Any]:
     assemble_started = time.monotonic()
     peak_scratch = scratch_bytes(work)
     log_path = work / "build.log"
+    # The private 0700 work tree is already in place; distrobuilder must
+    # generate files inside the image with normal 0644/0755 modes, not 0600.
+    os.umask(0o022)
     with log_path.open("w", encoding="utf-8") as log:
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
         while process.poll() is None:
