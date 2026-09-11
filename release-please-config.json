@@ -9,7 +9,7 @@
   "bump-patch-for-minor-pre-major": true,
   "packages": {
     ".": {
-      "package-name": "template-mcp-codemode",
+      "package-name": "agentcompute",
       "initial-version": "0.1.0",
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["melange.yaml", "apko.yaml"]

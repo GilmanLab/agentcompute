@@ -1,0 +1,87 @@
+# Credential-free pull-request gate for the router image build inputs.
+#
+# This workflow executes contributor-visible code (images/build.py, the
+# distrobuilder recipe, the publisher module) and therefore holds NO secrets, no
+# environment, and read-only permissions. Everything that needs credentials or
+# network access to the lab lives in images-publish.yml, which only runs on the
+# protected default branch.
+#
+# `build.py validate` is the contract for "the build inputs are coherent": it
+# checks the recipe against images/pins.yaml without downloading anything, and
+# `uv run --locked` fails closed when images/build.py.lock is out of date with
+# the script's inline (PEP 723) dependency metadata.
+
+name: Images Validate
+
+on:
+  # Deliberately NOT path-filtered for pull requests: a path-filtered check can
+  # never be a required status check (it stays pending forever on pull requests
+  # that do not touch the filtered paths). The job is cheap — validation
+  # downloads nothing — so it runs on every pull request and can gate merges.
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+    paths:
+      - images/**
+      - spikes/images/**
+      - .github/workflows/images-validate.yml
+      - .github/workflows/images-publish.yml
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Images Validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      # Never auto-download a Go toolchain other than the mise-pinned one
+      # (mise [env] is not carried by the action's shims, so set it on the job).
+      GOTOOLCHAIN: local
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          cache: true
+          # Installs every tool from mise.toml honoring mise.lock (locked → fail
+          # closed), including the uv and Go versions used below.
+
+      - name: Resolve uv cache directory
+        id: uv-cache
+        run: echo "dir=$(uv cache dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache uv downloads
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ steps.uv-cache.outputs.dir }}
+          key: ${{ runner.os }}-uv-images-${{ hashFiles('images/build.py.lock', 'images/build.py') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-images-
+
+      - name: Validate recipe against pins
+        run: uv run --locked --script images/build.py validate
+
+      # The publisher is its own Go module, so the repository's moon CI gate does
+      # not compile it. Build it here, credential-free, so a broken publisher is
+      # caught in review instead of on publish day.
+      - name: Build router publisher
+        working-directory: spikes/images
+        run: go build -o "$RUNNER_TEMP/images" .
+
+      - name: Check the boot smoke script
+        run: bash -n spikes/images/smoke.sh

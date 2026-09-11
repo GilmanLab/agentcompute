@@ -5,9 +5,9 @@ stack: 'backend'
 project:
   title: 'mcp-devproxy'
   description: 'MCP dev proxy that hot-reloads an in-development server behind a stable client session.'
-  owner: 'meigma'
+  owner: 'GilmanLab'
   maintainers:
-    - 'meigma'
+    - 'GilmanLab'
 
 # Every task runs against `system` binaries that mise (mise.toml + mise.lock) puts
 # on PATH; moon manages no language toolchain itself.
@@ -35,8 +35,8 @@ workspace:
 
 # format/lint reuse the root .golangci.yml. No local-prefix override is needed:
 # goimports matches local-prefixes by string prefix, so the root's
-# 'github.com/meigma/template-mcp-codemode' already covers this nested module's path
-# ('github.com/meigma/template-mcp-codemode/tools/proxy').
+# 'github.com/GilmanLab/agentcompute' already covers this nested module's path
+# ('github.com/GilmanLab/agentcompute/tools/proxy').
 tasks:
   format:
     command: 'golangci-lint fmt --config ../../.golangci.yml --diff'
@@ -91,7 +91,7 @@ tasks:
   # (`settings.locked`). The mocks are generated in-package (filename
   # mocks_test.go, pkgname = source package), so there is no separate-package
   # drift-check task — a stale or broken mock surfaces as a compile/test failure
-  # in `proxy:test`, matching this template's whitebox-test design.
+  # in `proxy:test`, matching this repository's whitebox-test design.
   mockery:
     command: 'mockery'
     inputs:

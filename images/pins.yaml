@@ -1,0 +1,287 @@
+schema_version: 1
+architecture: amd64
+distrobuilder:
+  version: 3.3.1
+  url: https://github.com/lxc/distrobuilder/releases/download/v3.3.1/distrobuilder-3.3.1.tar.gz
+  sha256: 6c411af7178bb55ef649c708f4f38fc3c30e6ecce901c08d8a389448a900a73a
+go:
+  version: 1.26.6
+  url: https://go.dev/dl/go1.26.6.linux-amd64.tar.gz
+  sha256: 708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89
+alpine:
+  version: 3.22.5
+  url: https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine-minirootfs-3.22.5-x86_64.tar.gz
+  sha256: 4b4daa9fe2fc696c4919c4412a4c3d3e770d8fb70292a004a2c72f5096175282
+  requested:
+  - openrc
+  - busybox-openrc
+  - nftables
+  - frr
+  - iproute2
+  - iproute2-tc
+  - dnsmasq
+  - wireguard-tools
+  - tcpdump
+  packages:
+  - name: alpine-baselayout
+    version: 3.7.0-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/alpine-baselayout-3.7.0-r0.apk
+    sha256: 610c9c4627c27d2ee8def1847f0c29bbbb770ab264ff8bb0f875ccfba53cc33c
+  - name: alpine-baselayout-data
+    version: 3.7.0-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/alpine-baselayout-data-3.7.0-r0.apk
+    sha256: 49a9c9b4ff386c3022a52c999f3becdce680ae3b1ee716b041c499d75e07c68c
+  - name: alpine-keys
+    version: 2.5-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/alpine-keys-2.5-r0.apk
+    sha256: 1069fa68769607690e46b0d689f1ad9b5e346be2752ece313685b4f29ec70e25
+  - name: alpine-release
+    version: 3.22.5-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/alpine-release-3.22.5-r0.apk
+    sha256: 0b38cc5b0c5ba92cd62e11ff4db17d3877b94c31fa42582cc1180739edbf8e65
+  - name: apk-tools
+    version: 2.14.10-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/apk-tools-2.14.10-r0.apk
+    sha256: 6d915a6ec2682fda0e850569919ddcb094d8def4ac52a94f2e7371cde06db218
+  - name: bash
+    version: 5.2.37-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/bash-5.2.37-r0.apk
+    sha256: 8218982214f1b51f520d282b0c81d654846e974ce009e758acc6187bd64fe228
+  - name: bridge
+    version: 1.5-r5
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/bridge-1.5-r5.apk
+    sha256: 1c488784e57dd8c9e8b6a33c6ec163cbe1fe6599fff9a628e1afacb96b006419
+  - name: busybox
+    version: 1.37.0-r20
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/busybox-1.37.0-r20.apk
+    sha256: 7cc34c2dda2520b456ab4a55abc37fe245ac90f98ab9f1c7a9be3aec035df48e
+  - name: busybox-binsh
+    version: 1.37.0-r20
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/busybox-binsh-1.37.0-r20.apk
+    sha256: ad33d8d799ed80eab45bb68d63c14062165d3653f4fb52e73959cd31d032210e
+  - name: busybox-openrc
+    version: 1.37.0-r20
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/busybox-openrc-1.37.0-r20.apk
+    sha256: ce506a835109c37ceaf401244d4dddd05390bba487812e191f8f58580ba6c347
+  - name: c-ares
+    version: 1.34.8-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/c-ares-1.34.8-r0.apk
+    sha256: 1397ec9682ff6153e5d037965c76408e570ae6535ce479cc2af37436fdea52ce
+  - name: ca-certificates-bundle
+    version: 20260611-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ca-certificates-bundle-20260611-r0.apk
+    sha256: a18fd1bd8bea03966ee5719aa61e44d9a810db2c8b6641b45f92b30e860f0927
+  - name: dnsmasq
+    version: 2.91-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/dnsmasq-2.91-r1.apk
+    sha256: ea0cdcf3fabad410f961a3b70c51d04a1d43d945811880b04698a44a948410d5
+  - name: dnsmasq-common
+    version: 2.91-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/dnsmasq-common-2.91-r1.apk
+    sha256: 7644492f2669d19bf4177cafe15c09c4cbad6f170780711330e665c7b6951b89
+  - name: dnsmasq-openrc
+    version: 2.91-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/dnsmasq-openrc-2.91-r1.apk
+    sha256: 3c919c242075b85cbf5e1e0606b792e47d0932780fa77b0115ccfb32ee783652
+  - name: frr
+    version: 10.2.2-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/frr-10.2.2-r0.apk
+    sha256: d68886b3a585304ea915f700fd15c253f894257df5c3cc8c486d78365e6a7632
+  - name: frr-openrc
+    version: 10.2.2-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/frr-openrc-10.2.2-r0.apk
+    sha256: 9f87e079df619cef044569d932d96f17d9dce82dcde029167539828e3122a323
+  - name: gmp
+    version: 6.3.0-r3
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/gmp-6.3.0-r3.apk
+    sha256: d3f987ae3836ac7774324bff443dd49d03b846209660729d0c30dfff5546e138
+  - name: ifupdown-ng
+    version: 0.12.1-r7
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ifupdown-ng-0.12.1-r7.apk
+    sha256: 3c9bcdf2fa59e8f27ae429809e9ed6c3f08aca7b1b9f3e7b3756b2e5d9ebec92
+  - name: ifupdown-ng-iproute2
+    version: 0.12.1-r7
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ifupdown-ng-iproute2-0.12.1-r7.apk
+    sha256: b1479f85f3fe30b3b02e74c55eee30a1fe41643d0b2ae3206b48b4c79b99f979
+  - name: ifupdown-ng-wireguard
+    version: 0.12.1-r7
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ifupdown-ng-wireguard-0.12.1-r7.apk
+    sha256: 378e89663cb1a47a0368821d67d67091f493822913211bae8ddd43977bd9275f
+  - name: ifupdown-ng-wireguard-quick
+    version: 0.12.1-r7
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ifupdown-ng-wireguard-quick-0.12.1-r7.apk
+    sha256: 84ced4638b3074ea843674241345db0c2890efe30010a7410807b81999b2af85
+  - name: iproute2
+    version: 6.15.0-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/iproute2-6.15.0-r0.apk
+    sha256: 40839347a6314307a74da9013f44fbf652e4790752d53268e637a40d45f3274b
+  - name: iproute2-minimal
+    version: 6.15.0-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/iproute2-minimal-6.15.0-r0.apk
+    sha256: fb761fe0df9d23926d20d9ef5d5ca3a6ba08338b16ce26beb02305eba5733382
+  - name: iproute2-ss
+    version: 6.15.0-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/iproute2-ss-6.15.0-r0.apk
+    sha256: 29a1bddb4c469fb03caee166876b3cb6d2993edef7d508ae0612719fc4fc06c6
+  - name: iproute2-tc
+    version: 6.15.0-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/iproute2-tc-6.15.0-r0.apk
+    sha256: 8dbd32a1be3096e8d406e35b2eab72983eb8e21a4469480ad478803359729a37
+  - name: jansson
+    version: 2.14.1-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/jansson-2.14.1-r0.apk
+    sha256: 7fde81421482507163410715a7ef7d7df6a091870edab855c24e8f6fc84e3e2d
+  - name: json-c
+    version: 0.18-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/json-c-0.18-r1.apk
+    sha256: 91d3efdc4577d724e185ad1d655f32437c788533891788885d4267c7bdb84d97
+  - name: libapk2
+    version: 2.14.10-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libapk2-2.14.10-r0.apk
+    sha256: b7b8ccfeaf2396cf022e685b11365be682b3b97c074d4e2a9d73c67f5beec07d
+  - name: libcap2
+    version: 2.78-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libcap2-2.78-r0.apk
+    sha256: 9850759bbb16f1ff6d1a49dc99947ef1401e1c10e5ca24f8380e69ba19f077c9
+  - name: libcrypto3
+    version: 3.5.8-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libcrypto3-3.5.8-r0.apk
+    sha256: 1d111bc0ad6380fdda22e6513941dc2e7988d6b1621d535bed6b3fa5ef086fae
+  - name: libelf
+    version: 0.193-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libelf-0.193-r0.apk
+    sha256: b8df03bd86f172aa1741790592056e6d6588247ddf6473920fa32cd7cc681f6a
+  - name: libmnl
+    version: 1.0.5-r2
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libmnl-1.0.5-r2.apk
+    sha256: e9dc63c95a0c8a263dc7f0705e6f7a2220d632a675ce85db798d33a40b1c1b0b
+  - name: libncursesw
+    version: 6.5_p20250503-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libncursesw-6.5_p20250503-r0.apk
+    sha256: aeafdfca68147b014705b4e2564639ade6345198debb522f2c6c51d32e417651
+  - name: libnftnl
+    version: 1.2.9-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libnftnl-1.2.9-r0.apk
+    sha256: bef674635aec00dca296b8206751245f7664ba10c416f31c01a563af596720ae
+  - name: libpcap
+    version: 1.10.7-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libpcap-1.10.7-r0.apk
+    sha256: 3d2b8ad2eef3e04dfb55f4d28b673543eaf59df0cbfb7a0dbce8f88c315cdd50
+  - name: libssl3
+    version: 3.5.8-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libssl3-3.5.8-r0.apk
+    sha256: e8d3ea5e9750cb1f4c4b459d172630925fe6bc13c113c590ac36c78013821e62
+  - name: libxtables
+    version: 1.8.11-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/libxtables-1.8.11-r1.apk
+    sha256: 5367f1f5c309a0aeede0a08d73af717f582f7a135ff97080aa0e5b7c72fd97af
+  - name: libyang
+    version: 2.1.148-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/libyang-2.1.148-r1.apk
+    sha256: 0b71291a0c5068fbf7fd4ff09b7a28eeae04e7d23321c888642af05446c75ecd
+  - name: musl
+    version: 1.2.5-r12
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/musl-1.2.5-r12.apk
+    sha256: 4990a5e0ba312e478f94cfe431a70efef1538004eb361c8ae424516848be45bb
+  - name: musl-utils
+    version: 1.2.5-r12
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/musl-utils-1.2.5-r12.apk
+    sha256: ee17c4904a3fbbee1e7451465ad5e61c16a3dc6f38dba6c8d61f1bc0e67ee31d
+  - name: ncurses-terminfo-base
+    version: 6.5_p20250503-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ncurses-terminfo-base-6.5_p20250503-r0.apk
+    sha256: 0815a5f0403974bb9c34d456e71dc9c0222cb5455d393bc63c44b573da3d7fe0
+  - name: nftables
+    version: 1.1.3-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/nftables-1.1.3-r0.apk
+    sha256: 96bdef738b0ae22ad86500af3345622c7f5bdc6ade0a407d087d1ea3223c8bc7
+  - name: nftables-openrc
+    version: 1.1.3-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/nftables-openrc-1.1.3-r0.apk
+    sha256: ea553c4d7f56718e47ce740681c6365d3485ff7bded24f251986e0ad65a9083f
+  - name: openrc
+    version: 0.62.6-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/openrc-0.62.6-r0.apk
+    sha256: 8af76f1800c91b24174569ebf372c438eb63328513dd720b261bd9939717ed11
+  - name: openrc-user
+    version: 0.62.6-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/openrc-user-0.62.6-r0.apk
+    sha256: a63ef1de12544cdda8e198cbff58c98b3b318599d7cabba3c0b43b92f527cc95
+  - name: openresolv
+    version: 3.14.1-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/openresolv-3.14.1-r0.apk
+    sha256: 898fa692704121b8028a50d120e11add170ac1810593a1247a89e510ae49d556
+  - name: pcre2
+    version: 10.46-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/pcre2-10.46-r0.apk
+    sha256: cfb8ad103a101fa6a31769e50e188dab9c60124705682d01b3de268795db58ad
+  - name: protobuf-c
+    version: 1.5.2-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/protobuf-c-1.5.2-r0.apk
+    sha256: be89a0a08f2c1827251dc84dffbf4b687aac0b41d437249758c31671b6010c59
+  - name: readline
+    version: 8.2.13-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/readline-8.2.13-r1.apk
+    sha256: 520fa586c689144928191bee13e2c85ff4e170ad87d1471ec48e3e97611673d8
+  - name: scanelf
+    version: 1.3.8-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/scanelf-1.3.8-r1.apk
+    sha256: 8763270cf55b2a38dae0cea774e8dcab547b710fa59e03054924d61a5eba609e
+  - name: ssl_client
+    version: 1.37.0-r20
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ssl_client-1.37.0-r20.apk
+    sha256: 11b2a5f91caf8eb5daa9a0bc2586f93545de62897f3a704fd49533e1654b7a68
+  - name: tcpdump
+    version: 4.99.5-r1
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/tcpdump-4.99.5-r1.apk
+    sha256: 12bb5c3ad8a3d4b81f9a14f6afcd17b188f687cd2a3a432f8e3053cca1ab2933
+  - name: wireguard-tools
+    version: 1.0.20250521-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/wireguard-tools-1.0.20250521-r0.apk
+    sha256: 083231296e619a860cbe6ad5582a75f92262a8276a363db19a1580a27c69b3fd
+  - name: wireguard-tools-openrc
+    version: 1.0.20250521-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/wireguard-tools-openrc-1.0.20250521-r0.apk
+    sha256: 543d0eeebc256a3496a6145bd10f85d6bd42c1d73300190768da0672a0bf6e40
+  - name: wireguard-tools-wg
+    version: 1.0.20250521-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/wireguard-tools-wg-1.0.20250521-r0.apk
+    sha256: 709f4a9823862ddd57b7e1ab31ae247dabe4c448a11980fb4c86e5970edb05eb
+  - name: wireguard-tools-wg-quick
+    version: 1.0.20250521-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/wireguard-tools-wg-quick-1.0.20250521-r0.apk
+    sha256: 105232f048e4887355acdde9d693d8729ad2f171e4d6e283f139d7d5525b1da9
+  - name: zlib
+    version: 1.3.2-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/zlib-1.3.2-r0.apk
+    sha256: 1f3d5f463f490dad3a68097376711bfe5e8156e9e8daff3070513aa4378cdeca
+  - name: zstd-libs
+    version: 1.5.7-r0
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/zstd-libs-1.5.7-r0.apk
+    sha256: 1bdd6e57cfbfbfd6e8481cad37ddd5d199950715bec1879b3afb600272dbb09e
+  base_packages:
+  - alpine-baselayout
+  - alpine-baselayout-data
+  - alpine-keys
+  - alpine-release
+  - apk-tools
+  - busybox
+  - busybox-binsh
+  - ca-certificates-bundle
+  - libapk2
+  - libcrypto3
+  - libssl3
+  - musl
+  - musl-utils
+  - scanelf
+  - ssl_client
+  - zlib
+imgoci:
+  module: github.com/imgoci/go
+  version: v0.1.0
+incus:
+  version: 7.4.0
+  url: https://github.com/lxc/incus/releases/download/v7.4.0/bin.linux.incus.x86_64
+  sha256: 2fa9b2699672225dde5290962f4087b426b5ecbd4fed0df8e430687d3b76b500
+pyyaml:
+  version: 6.0.3

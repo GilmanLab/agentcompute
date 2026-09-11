@@ -17,7 +17,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/meigma/template-mcp-codemode/internal/templateinfo"
+	"github.com/GilmanLab/agentcompute/internal/templateinfo"
 )
 
 // serverExitTimeout bounds how long tests wait for a serving function to
@@ -175,7 +175,7 @@ func TestServeHTTPShutsDownOnContextCancel(t *testing.T) {
 }
 
 // TestHTTPCommandReadsAddrFromEnvironment exercises the
-// TEMPLATE_MCP_CODEMODE_ADDR -> addr binding (the wiring most likely to break
+// AGENTCOMPUTE_ADDR -> addr binding (the wiring most likely to break
 // silently after the rename step). The fail-closed guard refuses the
 // non-loopback address before any socket is bound, so the refusal error
 // mentioning that address proves the env value reached the command.
@@ -193,7 +193,7 @@ func TestHTTPCommandReadsAddrFromEnvironment(t *testing.T) {
 }
 
 // TestEnvBindingResolvesHyphenatedFlag covers the SetEnvKeyReplacer hop that the
-// addr test does not: the "auth-token" flag binds to TEMPLATE_MCP_CODEMODE_AUTH_TOKEN
+// addr test does not: the "auth-token" flag binds to AGENTCOMPUTE_AUTH_TOKEN
 // (hyphen -> underscore). A regression dropping the replacer would break this
 // while the hyphen-free addr key kept working, so it is tested explicitly. It
 // binds flags directly rather than serving, keeping the test deterministic.

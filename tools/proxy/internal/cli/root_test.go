@@ -52,7 +52,7 @@ func discardLogger() *slog.Logger { return slog.New(slog.DiscardHandler) }
 // anything: construction touches no watch paths and spawns no processes.
 func validProxyConfig() config {
 	return config{
-		buildCommand: "go build -o {{artifact}} ./cmd/template-mcp-codemode",
+		buildCommand: "go build -o {{artifact}} ./cmd/agentcompute",
 		watchDirs:    []string{"."},
 		childArgv:    []string{"{{artifact}}", "stdio"},
 	}
@@ -289,7 +289,7 @@ func TestNewProxyConstruction(t *testing.T) {
 		},
 		{
 			name:    "build command without the artifact token surfaces with the flag name",
-			mutate:  func(cfg *config) { cfg.buildCommand = "go build ./cmd/template-mcp-codemode" },
+			mutate:  func(cfg *config) { cfg.buildCommand = "go build ./cmd/agentcompute" },
 			wantErr: "--" + buildFlag + ": the build command must reference " + artifactToken,
 		},
 		{

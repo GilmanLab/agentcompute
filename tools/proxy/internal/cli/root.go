@@ -3,7 +3,7 @@
 // The proxy is a single root command — no transport subcommands: v1 is
 // stdio-downstream-only, and a future HTTP downstream is a new adapter in
 // internal/downstream, not a new verb. The generic flags live here; the
-// zero-config defaults for this template's layout are deliberately isolated
+// zero-config defaults for this repository's layout are deliberately isolated
 // in defaults.go so extraction to a standalone repository stays clean.
 package cli
 
@@ -95,9 +95,9 @@ type launchFunc func(cmd *cobra.Command, cfg config, logger *slog.Logger) error
 // NewRootCommand creates the mcp-devproxy Cobra command.
 //
 // The child command is positional argv after "--"; everything before it is
-// flags. Inside this template repository every flag has a working default
+// flags. Inside this repository every flag has a working default
 // (see defaults.go), so a bare invocation builds and serves
-// ./cmd/template-mcp-codemode.
+// ./cmd/agentcompute.
 func NewRootCommand(options Options) *cobra.Command {
 	return newRootCommand(options, launchProxy)
 }
@@ -128,7 +128,7 @@ func newRootCommand(options Options, launch launchFunc) *cobra.Command {
 			"The child command after \"--\" is re-run for every reload cycle with\n" +
 			"{{artifact}} replaced by that cycle's freshly built binary.",
 		Example: "  " + appName + " \\\n" +
-			"    --build \"go build -o {{artifact}} ./cmd/template-mcp-codemode\" \\\n" +
+			"    --build \"go build -o {{artifact}} ./cmd/agentcompute\" \\\n" +
 			"    --watch cmd --watch internal \\\n" +
 			"    -- {{artifact}} stdio",
 		Version:       options.Build.Version,

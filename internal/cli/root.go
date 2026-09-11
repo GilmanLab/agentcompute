@@ -1,4 +1,4 @@
-// Package cli builds the template-mcp-codemode command tree.
+// Package cli builds the agentcompute command tree.
 //
 // The root command wires two transport subcommands onto the same
 // transport-agnostic MCP server from internal/mcpserver: stdio, for clients
@@ -24,8 +24,8 @@ import (
 	"github.com/meigma/codemode/authz"
 	hostmcp "github.com/meigma/codemode/mcpserver"
 
-	"github.com/meigma/template-mcp-codemode/internal/mcpserver"
-	"github.com/meigma/template-mcp-codemode/internal/templateinfo"
+	"github.com/GilmanLab/agentcompute/internal/mcpserver"
+	"github.com/GilmanLab/agentcompute/internal/templateinfo"
 )
 
 // BuildInfo describes linker-injected build metadata printed by --version.
@@ -53,11 +53,11 @@ type Options struct {
 	Build BuildInfo
 	// Viper is the configuration instance used by the command tree. Flags are
 	// bound to environment variables named after [templateinfo.EnvPrefix],
-	// for example TEMPLATE_MCP_CODEMODE_ADDR.
+	// for example AGENTCOMPUTE_ADDR.
 	Viper *viper.Viper
 }
 
-// NewRootCommand creates the template-mcp-codemode Cobra command tree.
+// NewRootCommand creates the agentcompute Cobra command tree.
 //
 // The root command does no work on its own; it wires the two transport
 // subcommands (stdio and http) onto the same MCP server. To produce a
@@ -102,7 +102,7 @@ func NewRootCommand(options Options) *cobra.Command {
 	root.SetErr(options.Err)
 
 	// Persistent logging flags apply to every subcommand and bind to
-	// TEMPLATE_MCP_CODEMODE_LOG_LEVEL / TEMPLATE_MCP_CODEMODE_LOG_FORMAT via
+	// AGENTCOMPUTE_LOG_LEVEL / AGENTCOMPUTE_LOG_FORMAT via
 	// initializeConfig. Logs always go to stderr; stdout stays the JSON-RPC
 	// channel.
 	root.PersistentFlags().String(

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-This repository has no published release yet. Until the initial `0.1.0` release, security fixes apply to the default branch. After releases begin, only the latest released version receives security fixes; generated projects must replace this statement with their own support policy.
+This repository has no published release yet. Until the initial `0.1.0` release, security fixes apply to the default branch. After releases begin, only the latest released version receives security fixes.
 
 The `0.0.0` value in release configuration is an automation baseline, not a published or supported release.
 

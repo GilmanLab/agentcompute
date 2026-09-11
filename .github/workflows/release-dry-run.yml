@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
 
           version="0.0.0-dryrun.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
-          binary_name="template-mcp-codemode"
+          binary_name="agentcompute"
           host_os="$(go env GOHOSTOS)"
           host_arch="$(go env GOHOSTARCH)"
           bin="dist/release-assets/${binary_name}_${version}_${host_os}_${host_arch}"
@@ -211,19 +211,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          apko build apko.yaml template-mcp-codemode:dry-run image.tar \
+          apko build apko.yaml agentcompute:dry-run image.tar \
             --arch amd64 \
             --keyring-append ./melange-amd64.rsa.pub \
             --keyring-append ./melange-arm64.rsa.pub
 
           docker load < image.tar
-          docker tag template-mcp-codemode:dry-run-amd64 template-mcp-codemode:dry-run
+          docker tag agentcompute:dry-run-amd64 agentcompute:dry-run
 
-          docker run --rm template-mcp-codemode:dry-run --version
-          docker run --rm template-mcp-codemode:dry-run --help
+          docker run --rm agentcompute:dry-run --version
+          docker run --rm agentcompute:dry-run --help
 
           # Real MCP session against the assembled image. `docker run -i` keeps stdin
           # open for the stdio transport; the run also proves the CodeMode worker can
           # re-execute itself as the image's nonroot user with no shell present.
           uv run .github/scripts/mcp_smoke.py \
-            -- docker run -i --rm template-mcp-codemode:dry-run stdio
+            -- docker run -i --rm agentcompute:dry-run stdio

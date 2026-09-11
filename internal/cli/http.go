@@ -18,7 +18,7 @@ import (
 	"github.com/meigma/codemode/authz"
 	hostmcp "github.com/meigma/codemode/mcpserver"
 
-	"github.com/meigma/template-mcp-codemode/internal/templateinfo"
+	"github.com/GilmanLab/agentcompute/internal/templateinfo"
 )
 
 const (

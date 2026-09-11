@@ -1,8 +1,8 @@
-# template-mcp-codemode
+# agentcompute
 
-`template-mcp-codemode` is a Go template for building [Model Context Protocol](https://modelcontextprotocol.io) servers with [CodeMode](https://github.com/meigma/codemode). Instead of registering one MCP tool per operation, you register typed Go capabilities. An agent discovers them and composes several calls in one bounded Starlark program.
+`agentcompute` is a [CodeMode](https://github.com/meigma/codemode) [Model Context Protocol](https://modelcontextprotocol.io) server. Instead of registering one MCP tool per operation, it registers typed Go capabilities. An agent discovers them and composes several calls in one bounded Starlark program.
 
-Every server created from this template exposes exactly three MCP tools:
+The server exposes exactly three MCP tools:
 
 - `search_api` finds capabilities by name, summary, and search terms.
 - `describe_api` returns the exact input and output shape for one capability.
@@ -30,13 +30,13 @@ mise install
 Run the local STDIO transport:
 
 ```sh
-go run ./cmd/template-mcp-codemode stdio
+go run ./cmd/agentcompute stdio
 ```
 
 Run Streamable HTTP on its loopback default:
 
 ```sh
-go run ./cmd/template-mcp-codemode http --addr localhost:8080
+go run ./cmd/agentcompute http --addr localhost:8080
 ```
 
 Both commands build one immutable CodeMode runtime through `internal/mcpserver`. The HTTP command constructs the runtime and MCP server once at startup and shares them across sessions; it does not rebuild the capability catalog per request or per session.
@@ -44,14 +44,14 @@ Both commands build one immutable CodeMode runtime through `internal/mcpserver`.
 For a local MCP client, build the binary and configure its absolute path:
 
 ```sh
-go build -o bin/template-mcp-codemode ./cmd/template-mcp-codemode
+go build -o bin/agentcompute ./cmd/agentcompute
 ```
 
 ```json
 {
   "mcpServers": {
-    "template-mcp-codemode": {
-      "command": "/absolute/path/to/template-mcp-codemode/bin/template-mcp-codemode",
+    "agentcompute": {
+      "command": "/absolute/path/to/agentcompute/bin/agentcompute",
       "args": ["stdio"]
     }
   }
@@ -110,7 +110,7 @@ Add one applicable `TestMain` per Go package. Do not put setup before the worker
 
 ## Identity and authorization
 
-The template keeps authentication identity outside program source, tool arguments, and MCP metadata:
+The server keeps authentication identity outside program source, tool arguments, and MCP metadata:
 
 - STDIO uses `mcpserver.StaticSubject` with the non-secret subject ID `local`. Process ownership is the authentication boundary.
 - HTTP uses `mcpserver.ContextSubject`. The receiving MCP middleware reads the SDK-authenticated `req.GetExtra().TokenInfo.UserID`, stores that non-secret identity with `authz.WithSubject`, and then lets the CodeMode adapter resolve it. Setting an arbitrary value only on the outer `net/http` request context is not sufficient.
@@ -137,20 +137,20 @@ CodeMode capability changes do not change the outer definitions of `search_api`,
 
 ## Configuration and logging
 
-Cobra flags take precedence over `TEMPLATE_MCP_CODEMODE_*` environment variables, which take precedence over defaults. Common commands include:
+Cobra flags take precedence over `AGENTCOMPUTE_*` environment variables, which take precedence over defaults. Common commands include:
 
 ```sh
-go run ./cmd/template-mcp-codemode --version
-go run ./cmd/template-mcp-codemode stdio
-go run ./cmd/template-mcp-codemode http --addr localhost:8080
-TEMPLATE_MCP_CODEMODE_LOG_LEVEL=debug go run ./cmd/template-mcp-codemode stdio
+go run ./cmd/agentcompute --version
+go run ./cmd/agentcompute stdio
+go run ./cmd/agentcompute http --addr localhost:8080
+AGENTCOMPUTE_LOG_LEVEL=debug go run ./cmd/agentcompute stdio
 ```
 
-A local build reports `template-mcp-codemode dev (none) built unknown`. GoReleaser supplies version, commit, and date for releases.
+A local build reports `agentcompute dev (none) built unknown`. GoReleaser supplies version, commit, and date for releases.
 
 Both transports log to stderr. STDIO reserves stdout exclusively for JSON-RPC; never write logs or diagnostics there.
 
-CodeMode execution and discovery limits are set programmatically through `mcpserver.Options.Runtime.Limits`. The template does not add limit flags or environment variables. Zero-valued fields receive CodeMode's bounded defaults. See the [configuration reference](docs/docs/configuration.md) for the defaults and option wiring.
+CodeMode execution and discovery limits are set programmatically through `mcpserver.Options.Runtime.Limits`. The server does not add limit flags or environment variables. Zero-valued fields receive CodeMode's bounded defaults. See the [configuration reference](docs/docs/configuration.md) for the defaults and option wiring.
 
 ## Common tasks
 
@@ -178,7 +178,7 @@ The local image path builds the binary into a signed Wolfi package with [melange
 
 ```sh
 mise run image-local
-docker run --rm template-mcp-codemode:dev --version
+docker run --rm agentcompute:dev --version
 ```
 
 The image runs as uid/gid 65532 and contains CA certificates and timezone data but no shell. Its default command is `http --addr 0.0.0.0:8080 --insecure` so the demonstration starts without credentials. This is intentionally unauthenticated. Remove `--insecure` and install production authentication and authorization before deployment.
@@ -194,11 +194,11 @@ The configured release path is:
 1. Release Please maintains a release pull request and creates a version tag plus draft GitHub release after merge.
 2. The release dry-run workflow rehearses the GoReleaser binary path and the native-runner melange/apko image path on the release pull request.
 3. GoReleaser builds binaries, checksums, and SBOMs without publishing directly. The release workflow validates and uploads them to the draft release.
-4. Native runners build signed per-architecture Wolfi packages. apko publishes `ghcr.io/meigma/template-mcp-codemode:vX.Y.Z` as a multi-platform image.
+4. Native runners build signed per-architecture Wolfi packages. apko publishes `ghcr.io/gilmanlab/agentcompute:vX.Y.Z` as a multi-platform image.
 5. The isolated reusable `attest.yml` workflow creates GitHub provenance for binary checksums and the image. The release workflow also creates a keyless Cosign image signature and attaches an SBOM attestation.
 6. A human inspects the draft before publication.
 
-Before the first release from a generated project, update the release app credentials, protected-tag bypass, package names, asset patterns, image name, and `ghd.toml` signer workflow. Run the release dry-run workflow before merging that project's first release pull request.
+Before the first release, supply the release app credentials, confirm protected-tag bypass for `glab-release-please`, and run the release dry-run workflow before merging the first release pull request.
 
 ## Documentation
 
@@ -207,7 +207,7 @@ Before the first release from a generated project, update the release app creden
 - [Configuration](docs/docs/configuration.md)
 - [Security model](docs/docs/security.md)
 - [Canonical CodeMode documentation](https://meigma.github.io/codemode/)
-- [Go API](https://pkg.go.dev/github.com/meigma/template-mcp-codemode)
+- [Go API](https://pkg.go.dev/github.com/GilmanLab/agentcompute)
 
 ## Contributing
 

@@ -11,11 +11,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/meigma/template-mcp-codemode/tools/proxy/internal/build"
-	"github.com/meigma/template-mcp-codemode/tools/proxy/internal/downstream"
-	"github.com/meigma/template-mcp-codemode/tools/proxy/internal/reloader"
-	"github.com/meigma/template-mcp-codemode/tools/proxy/internal/upstream"
-	"github.com/meigma/template-mcp-codemode/tools/proxy/internal/watch"
+	"github.com/GilmanLab/agentcompute/tools/proxy/internal/build"
+	"github.com/GilmanLab/agentcompute/tools/proxy/internal/downstream"
+	"github.com/GilmanLab/agentcompute/tools/proxy/internal/reloader"
+	"github.com/GilmanLab/agentcompute/tools/proxy/internal/upstream"
+	"github.com/GilmanLab/agentcompute/tools/proxy/internal/watch"
 )
 
 // seams carries test-only adapter overrides; the zero value selects the

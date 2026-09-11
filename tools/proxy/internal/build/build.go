@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/meigma/template-mcp-codemode/tools/proxy/internal/reloader"
+	"github.com/GilmanLab/agentcompute/tools/proxy/internal/reloader"
 )
 
 // artifactToken is the placeholder in the build command template replaced

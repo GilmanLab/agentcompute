@@ -20,7 +20,7 @@ on:
 permissions: {}
 
 env:
-  IMAGE_NAME: ghcr.io/meigma/template-mcp-codemode
+  IMAGE_NAME: ghcr.io/gilmanlab/agentcompute
 
 jobs:
   resolve-release:
@@ -126,7 +126,7 @@ jobs:
           set -euo pipefail
 
           version="${RELEASE_TAG#v}"
-          binary_name="template-mcp-codemode"
+          binary_name="agentcompute"
           host_os="$(go env GOHOSTOS)"
           host_arch="$(go env GOHOSTARCH)"
           bin="dist/release-assets/${binary_name}_${version}_${host_os}_${host_arch}"
@@ -444,9 +444,9 @@ jobs:
             echo
             echo '```sh'
             echo "gh release view $RELEASE_TAG --repo $GITHUB_REPOSITORY --json isDraft,assets"
-            echo "asset=\"template-mcp-codemode_${RELEASE_VERSION}_\$(go env GOOS)_\$(go env GOARCH)\""
+            echo "asset=\"agentcompute_${RELEASE_VERSION}_\$(go env GOOS)_\$(go env GOARCH)\""
             echo "gh attestation verify \"dist/release-assets/\${asset}\" --repo \"$GITHUB_REPOSITORY\" --signer-workflow \"$GITHUB_REPOSITORY/.github/workflows/attest.yml\" --source-ref \"refs/tags/$RELEASE_TAG\" --deny-self-hosted-runners"
-            echo "ghd download \"$GITHUB_REPOSITORY/template-mcp-codemode@${RELEASE_VERSION}\" --output \"\$(mktemp -d)\""
+            echo "ghd download \"$GITHUB_REPOSITORY/agentcompute@${RELEASE_VERSION}\" --output \"\$(mktemp -d)\""
             echo "uv run .github/scripts/mcp_smoke.py -- \"dist/release-assets/\${asset}\" stdio"
             echo '```'
             echo

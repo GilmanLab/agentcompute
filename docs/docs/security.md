@@ -101,4 +101,4 @@ These limits do not bound handler-owned resources or impose operating-system CPU
 
 These are configured paths, not evidence that this repository has already published a release. The release baseline is `0.0.0`, with `0.1.0` pending as the first release.
 
-Report vulnerabilities through the private process in the repository [security policy](https://github.com/meigma/template-mcp-codemode/blob/master/SECURITY.md).
+Report vulnerabilities through the private process in the repository [security policy](https://github.com/GilmanLab/agentcompute/blob/master/SECURITY.md).

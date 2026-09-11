@@ -2,9 +2,9 @@
 
 `mcp-devproxy` keeps one client session open while rebuilding and replacing a STDIO MCP server. The client connects to the proxy once; the proxy watches source directories, builds a unique child binary, initializes it, swaps the active child, and forwards calls to the new process.
 
-The proxy lives in the nested module `github.com/meigma/template-mcp-codemode/tools/proxy`, so its development dependencies do not enter the server module or release artifacts.
+The proxy lives in the nested module `github.com/GilmanLab/agentcompute/tools/proxy`, so its development dependencies do not enter the server module or release artifacts.
 
-This template is CodeMode-native. Every healthy child exposes the same three outer MCP tools:
+This server is CodeMode-native. Every healthy child exposes the same three outer MCP tools:
 
 - `search_api`
 - `describe_api`
@@ -37,11 +37,11 @@ Two parts of the wrapper are required:
 - `>&2` keeps build output away from stdout, which carries JSON-RPC.
 - `proxy:build` declares its inputs and outputs, so Moon can skip a warm build without leaving a missing or stale proxy binary.
 
-The proxy has defaults for this repository. A bare `mcp-devproxy` builds `./cmd/template-mcp-codemode` and runs the artifact with `stdio`. To provide every value explicitly:
+The proxy has defaults for this repository. A bare `mcp-devproxy` builds `./cmd/agentcompute` and runs the artifact with `stdio`. To provide every value explicitly:
 
 ```sh
 mcp-devproxy \
-  --build "go build -o {{artifact}} ./cmd/template-mcp-codemode" \
+  --build "go build -o {{artifact}} ./cmd/agentcompute" \
   --watch cmd --watch internal \
   --debounce 300ms \
   --quiesce 5s \
@@ -57,7 +57,7 @@ Flags take precedence over `MCP_DEVPROXY_*` environment variables, which take pr
 
 | Flag | Environment | Default | Meaning |
 | --- | --- | --- | --- |
-| `--build` | `MCP_DEVPROXY_BUILD` | `go build -o {{artifact}} ./cmd/template-mcp-codemode` | Build command template. It is split on whitespace without a shell and must contain `{{artifact}}`. |
+| `--build` | `MCP_DEVPROXY_BUILD` | `go build -o {{artifact}} ./cmd/agentcompute` | Build command template. It is split on whitespace without a shell and must contain `{{artifact}}`. |
 | `--watch` | `MCP_DEVPROXY_WATCH` | `cmd`, `internal` | Recursively watched directory. Repeat the flag; the environment form is whitespace-separated. |
 | `--dir` | `MCP_DEVPROXY_DIR` | Current directory | Working directory for the build command. |
 | `--debounce` | `MCP_DEVPROXY_DEBOUNCE` | `300ms` | Time used to combine a burst of file events into one build. |
