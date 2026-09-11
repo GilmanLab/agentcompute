@@ -1,0 +1,120 @@
+{
+  "status": "blocked-upstream",
+  "upstream_issue": "https://github.com/meigma/pyinfra-incus/issues/41",
+  "cluster_mutated": false,
+  "sandbox_mutated": false,
+  "events": [
+    {
+      "command": "incus cluster list nas01:",
+      "cwd": null,
+      "seconds": 0.133,
+      "exit_code": 0,
+      "stdout": "+-------+--------------------------+------------------+--------------+----------------+-------------+--------+-------------------+\n| NAME  |           URL            |      ROLES       | ARCHITECTURE | FAILURE DOMAIN | DESCRIPTION | STATUS |      MESSAGE      |\n+-------+--------------------------+------------------+--------------+----------------+-------------+--------+-------------------+\n| lab01 | https://10.10.10.11:8443 | database-standby | x86_64       | default        |             | ONLINE | Fully operational |\n+-------+--------------------------+------------------+--------------+----------------+-------------+--------+-------------------+\n| lab02 | https://10.10.10.12:8443 | database         | x86_64       | default        |             | ONLINE | Fully operational |\n+-------+--------------------------+------------------+--------------+----------------+-------------+--------+-------------------+\n| lab03 | https://10.10.10.13:8443 | database         | x86_64       | default        |             | ONLINE | Fully operational |\n+-------+--------------------------+------------------+--------------+----------------+-------------+--------+-------------------+\n| nas01 | https://10.10.10.14:8443 | database-leader  | x86_64       | default        |             | ONLINE | Fully operational |\n|       |                          | database         |              |                |             |        |                   |\n+-------+--------------------------+------------------+--------------+----------------+-------------+--------+-------------------+\n",
+      "stderr": ""
+    },
+    {
+      "command": "incus network list nas01:",
+      "cwd": null,
+      "seconds": 0.148,
+      "exit_code": 0,
+      "stdout": "+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n|      NAME      |  TYPE   | MANAGED |      IPV4      |           IPV6           |                           DESCRIPTION                            | USED BY |  STATE  |\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n| fast40         | vlan    | NO      |                |                          |                                                                  | 2       |         |\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n| fast40-macvlan | macvlan | YES     |                |                          | macvlan on IncusOS fast40 for the restricted image-build project | 1       | CREATED |\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n| incusbr0       | bridge  | YES     | 10.158.84.1/24 | fd42:37d0:7f47:b4d::1/64 | Local network bridge (NAT)                                       | 7       | CREATED |\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n",
+      "stderr": ""
+    },
+    {
+      "command": "incus project list nas01:",
+      "cwd": null,
+      "seconds": 0.107,
+      "exit_code": 0,
+      "stdout": "+-------------------+--------+----------+-----------------+-----------------+----------+---------------+----------------------------------------------------+---------+\n|       NAME        | IMAGES | PROFILES | STORAGE VOLUMES | STORAGE BUCKETS | NETWORKS | NETWORK ZONES |                    DESCRIPTION                     | USED BY |\n+-------------------+--------+----------+-----------------+-----------------+----------+---------------+----------------------------------------------------+---------+\n| default (current) | YES    | YES      | YES             | YES             | YES      | YES           | Default Incus project                              | 15      |\n+-------------------+--------+----------+-----------------+-----------------+----------+---------------+----------------------------------------------------+---------+\n| image-build       | YES    | YES      | YES             | YES             | NO       | NO            | Restricted image-build project for agentcompute CI | 4       |\n+-------------------+--------+----------+-----------------+-----------------+----------+---------------+----------------------------------------------------+---------+\n",
+      "stderr": ""
+    },
+    {
+      "command": "incus query 'nas01:/os/1.0/services/ovn?target=nas01'",
+      "cwd": null,
+      "seconds": 0.102,
+      "exit_code": 0,
+      "stdout": "{\n\t\"config\": {\n\t\t\"database\": \"\",\n\t\t\"enabled\": false,\n\t\t\"tunnel_address\": \"\",\n\t\t\"tunnel_protocol\": \"\"\n\t},\n\t\"state\": {}\n}\n\n",
+      "stderr": ""
+    },
+    {
+      "command": "incus query 'nas01:/os/1.0/services/ovn?target=lab01'",
+      "cwd": null,
+      "seconds": 0.122,
+      "exit_code": 0,
+      "stdout": "{\n\t\"config\": {\n\t\t\"database\": \"\",\n\t\t\"enabled\": false,\n\t\t\"tunnel_address\": \"\",\n\t\t\"tunnel_protocol\": \"\"\n\t},\n\t\"state\": {}\n}\n\n",
+      "stderr": ""
+    },
+    {
+      "command": "incus query 'nas01:/os/1.0/services/ovn?target=lab02'",
+      "cwd": null,
+      "seconds": 0.53,
+      "exit_code": 0,
+      "stdout": "{\n\t\"config\": {\n\t\t\"database\": \"\",\n\t\t\"enabled\": false,\n\t\t\"tunnel_address\": \"\",\n\t\t\"tunnel_protocol\": \"\"\n\t},\n\t\"state\": {}\n}\n\n",
+      "stderr": ""
+    },
+    {
+      "command": "incus query 'nas01:/os/1.0/services/ovn?target=lab03'",
+      "cwd": null,
+      "seconds": 0.112,
+      "exit_code": 0,
+      "stdout": "{\n\t\"config\": {\n\t\t\"database\": \"\",\n\t\t\"enabled\": false,\n\t\t\"tunnel_address\": \"\",\n\t\t\"tunnel_protocol\": \"\"\n\t},\n\t\"state\": {}\n}\n\n",
+      "stderr": ""
+    },
+    {
+      "command": "ssh -o BatchMode=yes -o ConnectTimeout=10 josh@sandbox01 'dpkg-query -W ovn-central ovn-common openvswitch-common'",
+      "cwd": null,
+      "seconds": 0.136,
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "dpkg-query: no packages found matching ovn-central\ndpkg-query: no packages found matching ovn-common\ndpkg-query: no packages found matching openvswitch-common\n"
+    },
+    {
+      "command": "uv run --locked pyinfra inventory.py src/fleet_cluster/deploys/network.py --dry -v",
+      "cwd": "/Users/josh/code/lab2/fleet/.wt/spike-ovn-mechanism/cluster",
+      "seconds": 2.317,
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "--> Loading config...\n--> Loading inventory...\n--> Connecting to hosts...\n    [@local] Connected\n\n--> Preparing operation files...\n    Loading: src/fleet_cluster/deploys/network.py\n    [@local] Loaded fact pyinfra_incus.facts.IncusOSNetwork (remote=nas01, target=nas01)\n    [@local] Loaded fact pyinfra_incus.facts.IncusOSNetwork (remote=nas01, target=nas01)\n    [@local] noop: IncusOS network configuration is unchanged\n    [@local] Loaded fact pyinfra_incus.facts.IncusOSNetwork (remote=nas01, target=lab01)\n    [@local] Loaded fact pyinfra_incus.facts.IncusOSNetwork (remote=nas01, target=lab01)\n    [@local] noop: IncusOS network configuration is unchanged\n    [@local] Loaded fact pyinfra_incus.facts.IncusOSNetwork (remote=nas01, target=lab02)\n    [@local] Loaded fact pyinfra_incus.facts.IncusOSNetwork (remote=nas01, target=lab02)\n    [@local] noop: IncusOS network configuration is unchanged\n    [@local] Loaded fact pyinfra_incus.facts.IncusOSNetwork (remote=nas01, target=lab03)\n    [@local] Loaded fact pyinfra_incus.facts.IncusOSNetwork (remote=nas01, target=lab03)\n    [@local] noop: IncusOS network configuration is unchanged\n    [@local] Ready: src/fleet_cluster/deploys/network.py\n\n--> Detected changes:\n    Operation                          Change   Conditional Change   \n    Ensure nas01 fast/fast30 network   -        -                    \n    Ensure lab01 fast/fast30 network   -        -                    \n    Ensure lab02 fast/fast30 network   -        -                    \n    Ensure lab03 fast/fast30 network   -        -                    \n\n    Detected changes may not include every change pyinfra will execute.\n    Hidden side effects of operations may alter behaviour of future operations,\n    this will be shown in the results. The remote state will always be updated\n    to reflect the state defined by the input operations.\n\n--> Disconnecting from hosts...\n"
+    },
+    {
+      "command": "sh -c 'incus query nas01:/1.0 | jq '\"'\"'{config, environment: (.environment | {server_version, os_version, server_name})}'\"'\"''",
+      "cwd": null,
+      "seconds": 0.124,
+      "exit_code": 0,
+      "stdout": "{\n  \"config\": {\n    \"cluster.https_address\": \"10.10.10.14:8443\",\n    \"core.https_address\": \":8443\",\n    \"storage.backups_volume\": \"local/backups\",\n    \"storage.images_volume\": \"local/images\",\n    \"storage.logs_volume\": \"local/logs\"\n  },\n  \"environment\": {\n    \"server_version\": \"7.4\",\n    \"os_version\": \"202608242359\",\n    \"server_name\": \"nas01\"\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": "ssh -o BatchMode=yes -o ConnectTimeout=10 josh@sandbox01 'hostname; cat /etc/os-release; ip -4 address; apt-cache policy ovn-central; apt-get --simulate install --no-install-recommends ovn-central'",
+      "cwd": null,
+      "seconds": 0.655,
+      "exit_code": 0,
+      "stdout": "sandbox01\nPRETTY_NAME=\"Ubuntu 26.04 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"26.04\"\nVERSION=\"26.04 (Resolute Raccoon)\"\nVERSION_CODENAME=resolute\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=resolute\nLOGO=ubuntu-logo\n1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000\n    inet 127.0.0.1/8 scope host lo\n       valid_lft forever preferred_lft forever\n2: enp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000\n    altname enx3805253425d0\n    inet 10.10.40.10/24 metric 100 brd 10.10.40.255 scope global dynamic enp2s0\n       valid_lft 66998sec preferred_lft 66998sec\n3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default \n    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0\n       valid_lft forever preferred_lft forever\n4: incusbr0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000\n    inet 10.200.20.1/24 brd 10.200.20.255 scope global incusbr0\n       valid_lft forever preferred_lft forever\n5: tailscale0: <POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP> mtu 1280 qdisc fq_codel state UNKNOWN group default qlen 500\n    inet 100.127.40.86/32 scope global tailscale0\n       valid_lft forever preferred_lft forever\n18: br-3c9a33c9a081: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default \n    inet 172.18.0.1/16 brd 172.18.255.255 scope global br-3c9a33c9a081\n       valid_lft forever preferred_lft forever\novn-central:\n  Installed: (none)\n  Candidate: 26.03.0-2\n  Version table:\n     26.03.0-2 500\n        500 http://us.archive.ubuntu.com/ubuntu resolute/main amd64 Packages\nNOTE: This is only a simulation!\n      apt-get needs root privileges for real execution.\n      Keep also in mind that locking is deactivated,\n      so don't depend on the relevance to the real current situation!\nReading package lists...\nBuilding dependency tree...\nReading state information...\nSolving dependencies...\nThe following packages were automatically installed and are no longer required:\n  cpu-checker incus-agent ipxe-qemu ipxe-qemu-256k-compat-efi-roms libcowsql0\n  libdecor-0-0 libdecor-0-plugin-1-gtk libfdt1 liblxc-common liblxc1t64\n  libraft0 libsdl2-2.0-0 libsdl2-classic libsquashfs1 libtpms0\n  libvirglrenderer1 libvte-2.91-0 libvte-2.91-common lxcfs msr-tools ovmf\n  ovmf-amdsev ovmf-generic ovmf-inteltdx qemu-system-data qemu-system-gui\n  qemu-system-modules-opengl qemu-system-modules-spice qemu-system-x86 seabios\n  squashfs-tools-ng swtpm swtpm-libs virgl-server virtiofsd\nUse 'apt autoremove' to remove them.\nThe following additional packages will be installed:\n  openvswitch-common ovn-common\nSuggested packages:\n  openvswitch-doc\nRecommended packages:\n  openvswitch-switch python3-openvswitch\nThe following NEW packages will be installed:\n  openvswitch-common ovn-central ovn-common\n0 upgraded, 3 newly installed, 0 to remove and 65 not upgraded.\nInst openvswitch-common (3.7.1-2 Ubuntu:26.04/resolute [amd64])\nInst ovn-common (26.03.0-2 Ubuntu:26.04/resolute [amd64])\nInst ovn-central (26.03.0-2 Ubuntu:26.04/resolute [amd64])\nConf openvswitch-common (3.7.1-2 Ubuntu:26.04/resolute [amd64])\nConf ovn-common (26.03.0-2 Ubuntu:26.04/resolute [amd64])\nConf ovn-central (26.03.0-2 Ubuntu:26.04/resolute [amd64])\n",
+      "stderr": ""
+    },
+    {
+      "command": "bash -n /Users/josh/code/lab2/agentcompute/.wt/spike-ovn-mechanism/spikes/ovn/probe.sh",
+      "cwd": null,
+      "seconds": 0.016,
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "bash /Users/josh/code/lab2/agentcompute/.wt/spike-ovn-mechanism/spikes/ovn/probe.sh --help",
+      "cwd": null,
+      "seconds": 0.019,
+      "exit_code": 0,
+      "stdout": "# Read-only OVN connectivity probe for two already-placed guests.\n#\n# Usage:\n#   spikes/ovn/probe.sh <remote> <project> <network> <instance1> <instance2> \\\n#     <forward-url> <expected-body>\n#\n# Checks: network list/show; network type ovn; both instances Running on\n# different members; eth0 attached to the given network with a global IPv4;\n# guest eth0 MTU; cross-member ping both ways; curl internet egress from both\n# guests; workstation GET of forward-url matches expected-body exactly.\n# Large HTTP transfer is out of scope.\n#\n# Dependencies: bash, incus, curl, python3, jq. Guests need ping and curl.\n# Bounds: incus 60s; ping -c 3 -W 2; curl --connect-timeout 5 --max-time 15.\n# Prints commands, output, and elapsed_seconds on stdout; nonzero on failure.\n",
+      "stderr": ""
+    },
+    {
+      "command": "bash /Users/josh/code/lab2/agentcompute/.wt/spike-ovn-mechanism/spikes/ovn/probe.sh nas01 default incusbr0 soak01 meshcommander http://10.10.40.79:8080/ ovn-probe",
+      "cwd": null,
+      "seconds": 0.384,
+      "exit_code": 1,
+      "stdout": "+ incus network list nas01: --project default\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n|      NAME      |  TYPE   | MANAGED |      IPV4      |           IPV6           |                           DESCRIPTION                            | USED BY |  STATE  |\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n| fast40         | vlan    | NO      |                |                          |                                                                  | 2       |         |\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n| fast40-macvlan | macvlan | YES     |                |                          | macvlan on IncusOS fast40 for the restricted image-build project | 1       | CREATED |\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\n| incusbr0       | bridge  | YES     | 10.158.84.1/24 | fd42:37d0:7f47:b4d::1/64 | Local network bridge (NAT)                                       | 7       | CREATED |\n+----------------+---------+---------+----------------+--------------------------+------------------------------------------------------------------+---------+---------+\nelapsed_seconds=0.153 exit=0\n+ incus network show nas01:incusbr0 --project default\nconfig:\n  ipv4.address: 10.158.84.1/24\n  ipv4.nat: \"true\"\n  ipv6.address: fd42:37d0:7f47:b4d::1/64\n  ipv6.nat: \"true\"\ndescription: Local network bridge (NAT)\nname: incusbr0\ntype: bridge\nused_by:\n  - /1.0/instances/dntls-guac01\n  - /1.0/instances/dntls-rdp01\n  - /1.0/instances/dntls-ubuntu2404-template\n  - /1.0/instances/meshcommander\n  - /1.0/instances/phase4-alice\n  - /1.0/instances/soak01\n  - /1.0/profiles/default\nmanaged: true\nstatus: Created\nlocations:\n  - lab01\n  - lab02\n  - lab03\n  - nas01\nproject: default\nelapsed_seconds=0.108 exit=0\n",
+      "stderr": "probe: network incusbr0 type is not ovn\n"
+    }
+  ]
+}
