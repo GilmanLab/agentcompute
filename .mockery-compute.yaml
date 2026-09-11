@@ -1,0 +1,35 @@
+# Mockery config for compute.Backend and compute.PendingInstance.
+#
+# Mocks are generated as an exported subpackage so CLI/transport tests can
+# construct compute.New(mocks.NewMockBackend(t), catalog, Options) without
+# importing the Incus adapter. Parent runs mockery; do not hand-edit output.
+#
+#   mockery --config .mockery-compute.yaml
+all: false
+dir: '{{.InterfaceDir}}/mocks'
+filename: 'mock_{{.InterfaceName | snakecase}}.go'
+force-file-write: true
+formatter: goimports
+formatter-options:
+  goimports:
+    all-errors: false
+    comments: true
+    format-only: true
+    fragment: false
+    local-prefix: github.com/GilmanLab/agentcompute
+    tab-indent: true
+    tab-width: 8
+generate: true
+include-auto-generated: false
+log-level: info
+structname: 'Mock{{.InterfaceName}}'
+pkgname: mocks
+recursive: false
+require-template-schema-exists: true
+template: testify
+template-schema: '{{.Template}}.schema.json'
+packages:
+  github.com/GilmanLab/agentcompute/internal/compute:
+    interfaces:
+      Backend:
+      PendingInstance:

@@ -28,10 +28,11 @@ func TestStdioCommandExitsCleanlyOnInputClose(t *testing.T) {
 		`"clientInfo":{"name":"test","version":"0"}}}` + "\n"
 
 	root := NewRootCommand(Options{
-		In:    strings.NewReader(initialize),
-		Out:   io.Discard,
-		Err:   io.Discard,
-		Viper: viper.New(),
+		In:           strings.NewReader(initialize),
+		Out:          io.Discard,
+		Err:          io.Discard,
+		Viper:        viper.New(),
+		Dependencies: testDependencies(t),
 	})
 	root.SetArgs([]string{stdioCommandName})
 
@@ -71,7 +72,7 @@ func TestStdioCommandServesMCP(t *testing.T) {
 
 	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "execute",
-		Arguments: map[string]any{"source": "def main():\n    return random.int(min=5, max=5)\n"},
+		Arguments: map[string]any{"source": "def main():\n    return image.list()\n"},
 	})
 	require.NoError(t, err, "execute over stdio")
 	require.False(t, result.IsError, "stdio execute failed, content: %+v", result.Content)
@@ -107,7 +108,7 @@ func startStdioCommand(t *testing.T, in io.Reader, out io.Writer) (<-chan error,
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	root := NewRootCommand(Options{In: in, Out: out})
+	root := NewRootCommand(Options{In: in, Out: out, Dependencies: testDependencies(t)})
 	root.SetArgs([]string{stdioCommandName})
 
 	done := make(chan error, 1)

@@ -1,0 +1,50 @@
+package cli
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestRuntimeConfigurationRejectsInvalidDocuments(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, extension, body string }{
+		{"unknown YAML key", ".yaml", "incus:\n  remote: nas01\n  host: lab01\n  pool: data\n  typo: true\n"},
+		{"second YAML document", ".yaml", "incus:\n  remote: nas01\n  host: lab01\n  pool: data\n---\n{}\n"},
+		{"unknown TOML key", ".toml", "[incus]\nremote='nas01'\nhost='lab01'\npool='data'\ntypo=true\n"},
+		{"ambiguous endpoint", ".yaml", "incus:\n  remote: nas01\n  url: https://example.invalid\n  host: lab01\n  pool: data\n"},
+		{"overflowing TTL", ".yaml", "incus:\n  remote: nas01\n  host: lab01\n  pool: data\nsandbox:\n  max_ttl_minutes: 9223372036854775807\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "config"+tc.extension)
+			require.NoError(t, os.WriteFile(path, []byte(tc.body), 0o600))
+			_, err := loadRuntimeConfig(path)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestRuntimeConfigurationResolvesPathsRelativeToFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	require.NoError(
+		t,
+		os.WriteFile(
+			path,
+			[]byte(
+				"images_file='catalog.yaml'\n[incus]\nurl='https://example.invalid'\nclient_cert='client.crt'\nclient_key='client.key'\nhost='lab01'\npool='data'\n",
+			),
+			0o600,
+		),
+	)
+	cfg, err := loadRuntimeConfig(path)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(dir, "catalog.yaml"), cfg.ImagesFile)
+	assert.Equal(t, filepath.Join(dir, "client.crt"), cfg.Incus.ClientCert)
+	assert.Equal(t, filepath.Join(dir, "client.key"), cfg.Incus.ClientKey)
+}

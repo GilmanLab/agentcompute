@@ -154,11 +154,13 @@ func TestServeHTTPShutsDownOnContextCancel(t *testing.T) {
 	defer cancel()
 
 	serveErr := make(chan error, 1)
+	deps := *testDependencies(t)
 	go func() {
 		serveErr <- serveHTTP(ctx, ln, httpConfig{
 			build:  BuildInfo{Version: "test"},
 			addr:   ln.Addr().String(),
 			logger: slog.New(slog.DiscardHandler),
+			deps:   deps,
 		})
 	}()
 
@@ -228,12 +230,14 @@ func TestServeHTTPRejectsMissingBearerThenServes(t *testing.T) {
 	t.Cleanup(cancel)
 
 	serveErr := make(chan error, 1)
+	deps := *testDependencies(t)
 	go func() {
 		serveErr <- serveHTTP(ctx, ln, httpConfig{
 			build:     BuildInfo{Version: "test"},
 			addr:      ln.Addr().String(),
 			authToken: token,
 			logger:    slog.New(slog.DiscardHandler),
+			deps:      deps,
 		})
 	}()
 
@@ -270,6 +274,7 @@ func startHTTPSession(t *testing.T, cfg httpConfig, token *string) (*mcp.ClientS
 
 	ln := startHTTPListener(t)
 	cfg.addr = ln.Addr().String()
+	cfg.deps = *testDependencies(t)
 	if cfg.logger == nil {
 		cfg.logger = slog.New(slog.DiscardHandler)
 	}
@@ -346,7 +351,7 @@ func assertCodeModeExecute(t *testing.T, session *mcp.ClientSession) {
 
 	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "execute",
-		Arguments: map[string]any{"source": "def main():\n    return random.int(min=5, max=5)\n"},
+		Arguments: map[string]any{"source": "def main():\n    return image.list()[\"items\"][0][\"name\"]\n"},
 	})
 	require.NoError(t, err, "execute over HTTP")
 	require.False(t, result.IsError, "HTTP execute failed, content: %+v", result.Content)
@@ -354,12 +359,10 @@ func assertCodeModeExecute(t *testing.T, session *mcp.ClientSession) {
 	raw, err := json.Marshal(result.StructuredContent)
 	require.NoError(t, err)
 	var envelope struct {
-		Result struct {
-			Value int64 `json:"value"`
-		} `json:"result"`
+		Result string `json:"result"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &envelope))
-	assert.Equal(t, int64(5), envelope.Result.Value)
+	assert.Equal(t, "router", envelope.Result)
 }
 
 type bearerRoundTripper struct {

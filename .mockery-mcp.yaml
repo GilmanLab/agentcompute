@@ -1,0 +1,40 @@
+# Mockery config for internal/mcpserver consumer interfaces.
+#
+# Mockery is provisioned by mise (mise.toml + mise.lock at the repo root).
+#
+#   mockery --config .mockery-mcp.yaml
+#
+# Mocks are generated in-package as mocks_test.go so testify/mockery stays
+# out of production builds.
+all: false
+dir: '{{.InterfaceDir}}'
+filename: mocks_test.go
+force-file-write: true
+formatter: goimports
+formatter-options:
+  goimports:
+    all-errors: false
+    comments: true
+    format-only: true
+    fragment: false
+    local-prefix: github.com/GilmanLab/agentcompute
+    tab-indent: true
+    tab-width: 8
+generate: true
+include-auto-generated: false
+log-level: info
+structname: 'Mock{{.InterfaceName}}'
+pkgname: '{{.SrcPackageName}}'
+recursive: false
+require-template-schema-exists: true
+template: testify
+template-schema: '{{.Template}}.schema.json'
+packages:
+  github.com/GilmanLab/agentcompute/internal/mcpserver:
+    config:
+      all: false
+    interfaces:
+      sandboxService:
+      instanceService:
+      networkService:
+      imageService:
