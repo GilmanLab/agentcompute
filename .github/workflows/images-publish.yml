@@ -326,8 +326,6 @@ jobs:
           oauth-client-id: ${{ vars.TS_CLIENT_ID }}
           audience: ${{ vars.TS_AUDIENCE }}
           tags: tag:sandbox
-          # The cluster API sits behind the gateway's advertised lab subnet route.
-          args: --accept-routes
           version: 1.94.2
           sha256sum: c6f99a5d774c7783b56902188d69e9756fc3dddfb08ac6be4cb2585f3fecdc32
           # Do not populate a privileged job from the Actions cache.
