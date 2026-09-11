@@ -9,5 +9,5 @@ import (
 func TestEnvPrefix(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "TEMPLATE_MCP_CODEMODE", EnvPrefix())
+	assert.Equal(t, "AGENTCOMPUTE", EnvPrefix())
 }

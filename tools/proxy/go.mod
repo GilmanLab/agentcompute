@@ -1,4 +1,4 @@
-module github.com/meigma/template-mcp-codemode/tools/proxy
+module github.com/GilmanLab/agentcompute/tools/proxy
 
 go 1.26.6
 

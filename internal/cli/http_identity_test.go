@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/meigma/template-mcp-codemode/internal/mcpserver"
+	"github.com/GilmanLab/agentcompute/internal/mcpserver"
 )
 
 // alicePolicy allows only the authenticated alice identity, irrespective of program metadata.

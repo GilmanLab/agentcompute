@@ -9,7 +9,7 @@ import (
 
 	"github.com/meigma/codemode"
 
-	"github.com/meigma/template-mcp-codemode/internal/cli"
+	"github.com/GilmanLab/agentcompute/internal/cli"
 )
 
 // GoReleaser injects these values with ldflags during releases. When they are

@@ -1,8 +1,8 @@
 package cli
 
-// This file is the zero-config convenience layer for THIS template's layout:
-// inside the template repository a bare `mcp-devproxy` builds and serves
-// ./cmd/template-mcp-codemode. It is kept apart from the generic flag handling so
+// This file is the zero-config convenience layer for this repository's layout:
+// a bare `mcp-devproxy` builds and serves
+// ./cmd/agentcompute. It is kept apart from the generic flag handling so
 // extraction to a standalone repository stays clean — delete this file and
 // its one call in resolveConfig, and nothing else changes.
 
@@ -12,7 +12,7 @@ import (
 )
 
 // defaultBuildCommand builds the template server into the cycle's artifact.
-const defaultBuildCommand = "go build -o {{artifact}} ./cmd/template-mcp-codemode"
+const defaultBuildCommand = "go build -o {{artifact}} ./cmd/agentcompute"
 
 // defaultChildTransport is the template server's stdio transport subcommand.
 const defaultChildTransport = "stdio"
@@ -24,7 +24,7 @@ func defaultWatchDirs() []string { return []string{"cmd", "internal"} }
 func defaultChildArgv() []string { return []string{artifactToken, defaultChildTransport} }
 
 // applyTemplateDefaults fills each empty config field independently with
-// this template's default — a user may override --build and keep the default
+// this repository's default — a user may override --build and keep the default
 // watch directories — and logs every defaulted value so zero-config behavior
 // is never silent.
 func applyTemplateDefaults(cfg *config, logger *slog.Logger) {

@@ -3,11 +3,11 @@ layer: 'application'
 stack: 'backend'
 
 project:
-  title: 'template-mcp-codemode'
-  description: 'Meigma CodeMode MCP server template.'
-  owner: 'meigma'
+  title: 'agentcompute'
+  description: 'agentcompute CodeMode MCP server.'
+  owner: 'GilmanLab'
   maintainers:
-    - 'meigma'
+    - 'GilmanLab'
 
 # Every task runs against `system` binaries that mise (mise.toml + mise.lock) puts
 # on PATH; moon manages no language toolchain itself.
@@ -71,11 +71,11 @@ tasks:
       mutex: 'golangci-lint'
 
   build:
-    command: 'go build -o bin/template-mcp-codemode ./cmd/template-mcp-codemode'
+    command: 'go build -o bin/agentcompute ./cmd/agentcompute'
     inputs:
       - '@group(goSources)'
     outputs:
-      - 'bin/template-mcp-codemode'
+      - 'bin/agentcompute'
 
   test:
     # Space-separated -coverprofile (not `=coverage.out`): under the `system`
@@ -93,7 +93,7 @@ tasks:
   # against the released binary and the published container image, so a break in
   # the end-to-end path surfaces on every PR instead of at release time.
   smoke:
-    command: 'uv run .github/scripts/mcp_smoke.py -- bin/template-mcp-codemode stdio'
+    command: 'uv run .github/scripts/mcp_smoke.py -- bin/agentcompute stdio'
     deps:
       - 'root:build'
     inputs:

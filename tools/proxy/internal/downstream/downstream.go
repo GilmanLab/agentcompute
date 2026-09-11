@@ -8,7 +8,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/meigma/template-mcp-codemode/tools/proxy/internal/reloader"
+	"github.com/GilmanLab/agentcompute/tools/proxy/internal/reloader"
 )
 
 // serverName identifies the proxy on the downstream hop when Options.Impl is

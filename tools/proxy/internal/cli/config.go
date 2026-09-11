@@ -13,7 +13,7 @@ import (
 
 // config carries the resolved proxy configuration from the flag/environment
 // layer into newProxy. The fields are generic; applyTemplateDefaults fills
-// the empty ones with this template's layout before validation.
+// the empty ones with this repository's layout before validation.
 type config struct {
 	// buildCommand is the build command template: whitespace-split, no
 	// shell, with {{artifact}} replaced per cycle by the build adapter.

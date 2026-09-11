@@ -1,4 +1,4 @@
-// Package mcpserver builds the transport-agnostic MCP server for this template.
+// Package mcpserver builds the transport-agnostic MCP server for this repository.
 //
 // The server defined here knows nothing about how it is connected to a client:
 // the same *mcp.Server is driven by the stdio and http subcommands in
@@ -17,7 +17,7 @@ import (
 	"github.com/meigma/codemode"
 	hostmcp "github.com/meigma/codemode/mcpserver"
 
-	"github.com/meigma/template-mcp-codemode/internal/templateinfo"
+	"github.com/GilmanLab/agentcompute/internal/templateinfo"
 )
 
 // Dependencies holds the shared collaborators a real server's capabilities
