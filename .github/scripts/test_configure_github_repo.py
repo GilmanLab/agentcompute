@@ -102,8 +102,8 @@ build_type = "branch"
 
         plan = configure.build_plan(
             api,
-            "meigma",
-            "template-mcp-codemode",
+            "GilmanLab",
+            "agentcompute",
             base_config({"build_type": "workflow", "https_enforced": True}),
             mode="plan",
             hostname="github.com",
@@ -119,8 +119,8 @@ build_type = "branch"
 
         plan = configure.build_plan(
             api,
-            "meigma",
-            "template-mcp-codemode",
+            "GilmanLab",
+            "agentcompute",
             base_config({"build_type": "workflow", "https_enforced": True}),
             mode="plan",
             hostname="github.com",
@@ -133,7 +133,7 @@ build_type = "branch"
     def test_apply_create_pages_runs_follow_up_update(self) -> None:
         api = FakeGitHubApi()
         plan = configure.PlanResult(
-            repo="meigma/template-mcp-codemode",
+            repo="GilmanLab/agentcompute",
             hostname="github.com",
             mode="apply",
             changes=[
@@ -153,7 +153,7 @@ build_type = "branch"
             warnings=[],
         )
 
-        applied = configure.apply_plan(api, "meigma", "template-mcp-codemode", plan)
+        applied = configure.apply_plan(api, "GilmanLab", "agentcompute", plan)
 
         self.assertEqual(applied, ["Create GitHub Pages site"])
         self.assertEqual(api.created_pages, [{"build_type": "workflow"}])

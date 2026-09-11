@@ -13,7 +13,7 @@ fails here rather than in a user's client.
 The target is passed as a literal argv after `--`, so the same script covers every
 release artifact:
 
-    uv run .github/scripts/mcp_smoke.py -- ./bin/template-mcp-codemode stdio
+    uv run .github/scripts/mcp_smoke.py -- ./bin/agentcompute stdio
     uv run .github/scripts/mcp_smoke.py -- dist/release-assets/BINARY stdio
     uv run .github/scripts/mcp_smoke.py -- docker run -i --rm IMAGE stdio
 
@@ -74,7 +74,7 @@ def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument(
         "--server-name",
-        default="template-mcp-codemode",
+        default="agentcompute",
         help="exact initialize serverInfo.name the target must report",
     )
     parser.add_argument(

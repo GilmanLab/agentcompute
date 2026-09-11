@@ -1,15 +1,15 @@
 version: 2
 
-project_name: template-mcp-codemode
+project_name: agentcompute
 
 before:
   hooks:
     - go test ./...
 
 builds:
-  - id: template-mcp-codemode
-    main: ./cmd/template-mcp-codemode
-    binary: template-mcp-codemode
+  - id: agentcompute
+    main: ./cmd/agentcompute
+    binary: agentcompute
     env:
       - CGO_ENABLED=0
     goos:
@@ -28,9 +28,9 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
-  - id: template-mcp-codemode
+  - id: agentcompute
     ids:
-      - template-mcp-codemode
+      - agentcompute
     formats:
       - binary
     name_template: >-

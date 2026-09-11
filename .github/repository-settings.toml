@@ -13,7 +13,7 @@
 
 [repository]
 default_branch = "master"
-is_template = true
+is_template = false
 immutable_releases = true
 
 has_wiki = false
@@ -95,7 +95,7 @@ block_force_pushes = true
 bypass = [
   { type = "repository_admin_role", mode = "always" },
   # Release Please needs tag-creation bypass because tags are protected here.
-  { type = "app", slug = "meigma-release", mode = "always" },
+  { type = "app", slug = "glab-release-please", mode = "always" },
 ]
 
 [rulesets.tags_default.status_checks]
