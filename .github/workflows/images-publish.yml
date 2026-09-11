@@ -38,6 +38,9 @@ on:
       - master
     paths:
       - images/**
+      # The catalog records the last publish; changing it must not publish again.
+      - '!images/catalog.yaml'
+      - '!images/README.md'
       - .github/workflows/images-publish.yml
   workflow_dispatch:
 
