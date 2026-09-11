@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Boot smoke test for a router image that has NOT been published yet.
 #
-# `spikes/images` (main.go) covers the published path: fetch a GHCR release by
-# digest, verify it, import it, boot it, then promote the shared `router` alias.
-# This script covers the gap that tool deliberately leaves open — proving a
+# `cmd/image-publish` publishes a verified GHCR release; the server catalog
+# reconciler imports, boots, and promotes the shared `router` alias.
+# This script covers the gap those tools leave open — proving a
 # freshly built router.tar.xz actually boots and carries its router tooling
 # BEFORE anything is pushed to a registry. Consequently it:
 #
@@ -14,7 +14,7 @@
 #   * fails the run when cleanup fails, so leaked instances/images are loud.
 #
 # Usage:
-#   spikes/images/smoke.sh --file <router.tar.xz> --remote <name> --project <name>
+#   images/smoke.sh --file <router.tar.xz> --remote <name> --project <name>
 #                          [--suffix <token>] [--log <path>] [--timeout <seconds>]
 #
 # Requirements: the `incus` client on PATH (CI installs the SHA-pinned binary,
@@ -109,7 +109,7 @@ fi
 : >"$log"
 
 # The Incus fingerprint of a unified image is the SHA-256 of the tarball itself,
-# which is also the content digest `spikes/images` publishes and verifies.
+# which is also the content digest `cmd/image-publish` publishes and verifies.
 fingerprint="$(sha256sum "$file" | cut -d' ' -f1)"
 
 incus_q() {

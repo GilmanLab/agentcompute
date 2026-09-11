@@ -372,7 +372,7 @@ jobs:
           # Boot the LOCAL artifact before anything is published. The script
           # never promotes the shared `router` alias and removes only the
           # instance/alias/image it created; a cleanup failure fails this job.
-          spikes/images/smoke.sh \
+          images/smoke.sh \
             --file "$CANDIDATE" \
             --remote "$INCUS_REMOTE" \
             --project "$INCUS_PROJECT" \
@@ -383,11 +383,10 @@ jobs:
           cat "$EVIDENCE/smoke.json"
 
       - name: Build the router publisher
-        working-directory: spikes/images
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bin"
-          go build -o "$RUNNER_TEMP/bin/images" .
+          go build -o "$RUNNER_TEMP/bin/image-publish" ./cmd/image-publish
 
       - name: Publish the immutable router release
         id: publish
@@ -401,7 +400,7 @@ jobs:
 
           # The publisher refuses to replace an existing reference, so a repeat
           # run on an unchanged images/ tree fails here by design.
-          "$RUNNER_TEMP/bin/images" publish \
+          "$RUNNER_TEMP/bin/image-publish" publish \
             --ref "$REFERENCE" \
             --version "$VERSION" \
             --file "$CANDIDATE" \
@@ -430,7 +429,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          "$RUNNER_TEMP/bin/images" fetch \
+          "$RUNNER_TEMP/bin/image-publish" fetch \
             --ref "${IMAGE_REPOSITORY}@${DIGEST}" \
             --output "$RUNNER_TEMP/fetched.tar.xz" \
             > "$EVIDENCE/fetch.json"
@@ -476,11 +475,8 @@ jobs:
             echo "The tag is immutable: republishing \`$VERSION\` is refused, so a rebuild of the"
             echo "same images/ tree cannot overwrite it. Change images/ or promote this digest."
             echo
-            echo "Promote to the fleet (imports, boot-tests, then atomically moves the \`router\` alias):"
-            echo
-            echo '```sh'
-            echo "go run ./spikes/images import --ref \"${IMAGE_REPOSITORY}@${DIGEST}\" --remote ${INCUS_REMOTE} --project ${INCUS_PROJECT}"
-            echo '```'
+            echo "Record the digest in images/catalog.yaml. The server reconciler"
+            echo "imports it into ${INCUS_PROJECT}, smoke-tests it, and moves the \`router\` alias."
             echo
             echo "Verify provenance (signed in the isolated attest.yml workflow):"
             echo
