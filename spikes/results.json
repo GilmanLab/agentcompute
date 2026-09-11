@@ -40,5 +40,690 @@
     "moon run root:check",
     "container create latency and exec overhead measurements"
   ],
-  "decision_needed": "Resolve physical bridge naming and all-member network lifecycle before implementing slice 1. Do not merge throwaway probes as production code."
+  "decision_needed": "Resolve physical bridge naming and all-member network lifecycle before implementing slice 1. Do not merge throwaway probes as production code.",
+  "second_run": {
+    "status": "passed",
+    "host": "lab01",
+    "members": [
+      "nas01",
+      "lab01",
+      "lab02",
+      "lab03"
+    ],
+    "bridges": [
+      {
+        "sandbox": "a",
+        "physical": "ac9e93956a",
+        "activation_seconds": 2.859
+      },
+      {
+        "sandbox": "b",
+        "physical": "ac02d54d31",
+        "activation_seconds": 3.334
+      }
+    ],
+    "cross_sandbox_refusal": "Error: Failed checking if instance update allowed: Invalid device \"wrong\" on container \"router\" of project \"ac-a\": Network not allowed in project",
+    "cross_member": {
+      "first": "lab01",
+      "second": "nas01",
+      "ping_exit": 1,
+      "output": "PING 192.0.2.10 (192.0.2.10): 56 data bytes\n\n--- 192.0.2.10 ping statistics ---\n2 packets transmitted, 0 packets received, 100% packet loss"
+    },
+    "cleanup_failures": [],
+    "residue": {
+      "nas01": [],
+      "lab01": [],
+      "lab02": [],
+      "lab03": []
+    },
+    "events": [
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/cluster/members?recursion=1",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.06
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/projects?recursion=1",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.059
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/images/aliases/router?project=image-build",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.057
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&recursion=1",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.108
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/projects",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac-a\", \"config\": {\"features.images\": \"true\", \"features.profiles\": \"true\", \"features.networks\": \"false\", \"restricted\": \"true\", \"restricted.containers.nesting\": \"block\", \"restricted.containers.privilege\": \"unprivileged\", \"restricted.containers.lowlevel\": \"block\", \"restricted.cluster.target\": \"allow\", \"restricted.devices.nic\": \"managed\", \"restricted.devices.disk\": \"managed\", \"restricted.devices.gpu\": \"block\", \"restricted.devices.pci\": \"block\", \"restricted.devices.proxy\": \"block\", \"restricted.devices.usb\": \"block\", \"restricted.devices.unix-block\": \"block\", \"restricted.devices.unix-char\": \"block\", \"restricted.devices.unix-hotplug\": \"block\", \"restricted.devices.infiniband\": \"block\", \"restricted.networks.access\": \"ac9e93956a\", \"user.agentcompute.version\": \"1\", \"user.agentcompute.host\": \"lab01\", \"user.agentcompute.created_at\": \"2026-09-11T22:18:56.128200+00:00\", \"user.agentcompute.expires_at\": \"2026-09-11T22:33:56.128200+00:00\", \"user.agentcompute.subject\": \"phase2-spike\"}}"
+        ],
+        "code": 0,
+        "seconds": 0.489
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&target=nas01",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac9e93956a\", \"type\": \"bridge\", \"config\": {}}"
+        ],
+        "code": 0,
+        "seconds": 0.068
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&target=lab01",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac9e93956a\", \"type\": \"bridge\", \"config\": {}}"
+        ],
+        "code": 0,
+        "seconds": 0.064
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&target=lab02",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac9e93956a\", \"type\": \"bridge\", \"config\": {}}"
+        ],
+        "code": 0,
+        "seconds": 0.061
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&target=lab03",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac9e93956a\", \"type\": \"bridge\", \"config\": {}}"
+        ],
+        "code": 0,
+        "seconds": 0.063
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac9e93956a\", \"type\": \"bridge\", \"config\": {\"ipv4.address\": \"auto\", \"ipv4.nat\": \"true\", \"ipv4.dhcp\": \"true\", \"ipv6.address\": \"none\", \"user.agentcompute.sandbox\": \"a\", \"user.agentcompute.name\": \"default\", \"user.agentcompute.version\": \"1\"}}"
+        ],
+        "code": 0,
+        "seconds": 2.602
+      },
+      {
+        "args": [
+          "image",
+          "copy",
+          "nas01:6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f",
+          "nas01:",
+          "--project",
+          "image-build",
+          "--target-project",
+          "ac-a"
+        ],
+        "code": 0,
+        "seconds": 0.133
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/instances?project=ac-a&target=lab01",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"router\", \"type\": \"container\", \"profiles\": [], \"source\": {\"type\": \"image\", \"fingerprint\": \"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f\"}, \"config\": {\"limits.cpu\": \"1\", \"limits.memory\": \"512MiB\"}, \"devices\": {\"root\": {\"type\": \"disk\", \"path\": \"/\", \"pool\": \"data\", \"size\": \"2GiB\"}, \"eth0\": {\"type\": \"nic\", \"network\": \"ac9e93956a\", \"name\": \"eth0\"}}}"
+        ],
+        "code": 0,
+        "seconds": 0.741
+      },
+      {
+        "args": [
+          "start",
+          "nas01:router",
+          "--project",
+          "ac-a"
+        ],
+        "code": 0,
+        "seconds": 0.521
+      },
+      {
+        "args": [
+          "exec",
+          "nas01:router",
+          "--project",
+          "ac-a",
+          "--",
+          "sh",
+          "-c",
+          "ping -c 1 -W 2 10.10.40.1"
+        ],
+        "code": 0,
+        "seconds": 0.193,
+        "stdout": "PING 10.10.40.1 (10.10.40.1): 56 data bytes\n64 bytes from 10.10.40.1: seq=0 ttl=63 time=0.179 ms\n\n--- 10.10.40.1 ping statistics ---\n1 packets transmitted, 1 packets received, 0% packet loss\nround-trip min/avg/max = 0.179/0.179/0.179 ms",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&recursion=1",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.116
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/projects",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac-b\", \"config\": {\"features.images\": \"true\", \"features.profiles\": \"true\", \"features.networks\": \"false\", \"restricted\": \"true\", \"restricted.containers.nesting\": \"block\", \"restricted.containers.privilege\": \"unprivileged\", \"restricted.containers.lowlevel\": \"block\", \"restricted.cluster.target\": \"allow\", \"restricted.devices.nic\": \"managed\", \"restricted.devices.disk\": \"managed\", \"restricted.devices.gpu\": \"block\", \"restricted.devices.pci\": \"block\", \"restricted.devices.proxy\": \"block\", \"restricted.devices.usb\": \"block\", \"restricted.devices.unix-block\": \"block\", \"restricted.devices.unix-char\": \"block\", \"restricted.devices.unix-hotplug\": \"block\", \"restricted.devices.infiniband\": \"block\", \"restricted.networks.access\": \"ac02d54d31\", \"user.agentcompute.version\": \"1\", \"user.agentcompute.host\": \"lab01\", \"user.agentcompute.created_at\": \"2026-09-11T22:19:01.181207+00:00\", \"user.agentcompute.expires_at\": \"2026-09-11T22:34:01.181207+00:00\", \"user.agentcompute.subject\": \"phase2-spike\"}}"
+        ],
+        "code": 0,
+        "seconds": 0.104
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&target=nas01",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac02d54d31\", \"type\": \"bridge\", \"config\": {}}"
+        ],
+        "code": 0,
+        "seconds": 0.067
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&target=lab01",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac02d54d31\", \"type\": \"bridge\", \"config\": {}}"
+        ],
+        "code": 0,
+        "seconds": 0.067
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&target=lab02",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac02d54d31\", \"type\": \"bridge\", \"config\": {}}"
+        ],
+        "code": 0,
+        "seconds": 0.063
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&target=lab03",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac02d54d31\", \"type\": \"bridge\", \"config\": {}}"
+        ],
+        "code": 0,
+        "seconds": 0.063
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"ac02d54d31\", \"type\": \"bridge\", \"config\": {\"ipv4.address\": \"auto\", \"ipv4.nat\": \"true\", \"ipv4.dhcp\": \"true\", \"ipv6.address\": \"none\", \"user.agentcompute.sandbox\": \"b\", \"user.agentcompute.name\": \"default\", \"user.agentcompute.version\": \"1\"}}"
+        ],
+        "code": 0,
+        "seconds": 3.074
+      },
+      {
+        "args": [
+          "image",
+          "copy",
+          "nas01:6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f",
+          "nas01:",
+          "--project",
+          "image-build",
+          "--target-project",
+          "ac-b"
+        ],
+        "code": 0,
+        "seconds": 0.146
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/instances?project=ac-b&target=lab01",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"router\", \"type\": \"container\", \"profiles\": [], \"source\": {\"type\": \"image\", \"fingerprint\": \"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f\"}, \"config\": {\"limits.cpu\": \"1\", \"limits.memory\": \"512MiB\"}, \"devices\": {\"root\": {\"type\": \"disk\", \"path\": \"/\", \"pool\": \"data\", \"size\": \"2GiB\"}, \"eth0\": {\"type\": \"nic\", \"network\": \"ac02d54d31\", \"name\": \"eth0\"}}}"
+        ],
+        "code": 0,
+        "seconds": 0.364
+      },
+      {
+        "args": [
+          "start",
+          "nas01:router",
+          "--project",
+          "ac-b"
+        ],
+        "code": 0,
+        "seconds": 0.318
+      },
+      {
+        "args": [
+          "exec",
+          "nas01:router",
+          "--project",
+          "ac-b",
+          "--",
+          "sh",
+          "-c",
+          "ping -c 1 -W 2 10.10.40.1"
+        ],
+        "code": 0,
+        "seconds": 0.175,
+        "stdout": "PING 10.10.40.1 (10.10.40.1): 56 data bytes\n64 bytes from 10.10.40.1: seq=0 ttl=63 time=0.147 ms\n\n--- 10.10.40.1 ping statistics ---\n1 packets transmitted, 1 packets received, 0% packet loss\nround-trip min/avg/max = 0.147/0.147/0.147 ms",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "config",
+          "device",
+          "add",
+          "nas01:router",
+          "wrong",
+          "nic",
+          "network=ac02d54d31",
+          "name=eth1",
+          "--project",
+          "ac-a"
+        ],
+        "code": 1,
+        "seconds": 0.09,
+        "stdout": "",
+        "stderr": "Error: Failed checking if instance update allowed: Invalid device \"wrong\" on container \"router\" of project \"ac-a\": Network not allowed in project"
+      },
+      {
+        "args": [
+          "image",
+          "copy",
+          "nas01:6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f",
+          "nas01:",
+          "--project",
+          "image-build",
+          "--target-project",
+          "ac-a"
+        ],
+        "code": 0,
+        "seconds": 0.165
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/instances?project=ac-a&target=nas01",
+          "--request",
+          "POST",
+          "--wait",
+          "--data",
+          "{\"name\": \"other\", \"type\": \"container\", \"profiles\": [], \"source\": {\"type\": \"image\", \"fingerprint\": \"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f\"}, \"config\": {\"limits.cpu\": \"1\", \"limits.memory\": \"512MiB\"}, \"devices\": {\"root\": {\"type\": \"disk\", \"path\": \"/\", \"pool\": \"data\", \"size\": \"2GiB\"}, \"eth0\": {\"type\": \"nic\", \"network\": \"ac9e93956a\", \"name\": \"eth0\"}}}"
+        ],
+        "code": 0,
+        "seconds": 0.344
+      },
+      {
+        "args": [
+          "start",
+          "nas01:other",
+          "--project",
+          "ac-a"
+        ],
+        "code": 0,
+        "seconds": 0.354
+      },
+      {
+        "args": [
+          "exec",
+          "nas01:router",
+          "--project",
+          "ac-a",
+          "--",
+          "sh",
+          "-c",
+          "ip addr add 192.0.2.10/24 dev eth0"
+        ],
+        "code": 0,
+        "seconds": 0.199,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "exec",
+          "nas01:other",
+          "--project",
+          "ac-a",
+          "--",
+          "sh",
+          "-c",
+          "ip addr add 192.0.2.11/24 dev eth0"
+        ],
+        "code": 0,
+        "seconds": 0.172,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "exec",
+          "nas01:other",
+          "--project",
+          "ac-a",
+          "--",
+          "sh",
+          "-c",
+          "ping -c 2 -W 2 192.0.2.10"
+        ],
+        "code": 1,
+        "seconds": 3.191,
+        "stdout": "PING 192.0.2.10 (192.0.2.10): 56 data bytes\n\n--- 192.0.2.10 ping statistics ---\n2 packets transmitted, 0 packets received, 100% packet loss",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/instances?project=ac-b&recursion=1",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.068
+      },
+      {
+        "args": [
+          "delete",
+          "-f",
+          "nas01:router",
+          "--project",
+          "ac-b"
+        ],
+        "code": 0,
+        "seconds": 0.884
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/images?project=ac-b&recursion=1",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.064
+      },
+      {
+        "args": [
+          "image",
+          "delete",
+          "nas01:6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f",
+          "--project",
+          "ac-b"
+        ],
+        "code": 0,
+        "seconds": 0.192
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/instances?project=ac-a&recursion=1",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.072
+      },
+      {
+        "args": [
+          "delete",
+          "-f",
+          "nas01:other",
+          "--project",
+          "ac-a"
+        ],
+        "code": 0,
+        "seconds": 0.858
+      },
+      {
+        "args": [
+          "delete",
+          "-f",
+          "nas01:router",
+          "--project",
+          "ac-a"
+        ],
+        "code": 0,
+        "seconds": 0.927
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/images?project=ac-a&recursion=1",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.065
+      },
+      {
+        "args": [
+          "image",
+          "delete",
+          "nas01:6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f",
+          "--project",
+          "ac-a"
+        ],
+        "code": 0,
+        "seconds": 0.089
+      },
+      {
+        "args": [
+          "network",
+          "delete",
+          "nas01:ac02d54d31",
+          "--project",
+          "default"
+        ],
+        "code": 0,
+        "seconds": 0.721
+      },
+      {
+        "args": [
+          "network",
+          "delete",
+          "nas01:ac9e93956a",
+          "--project",
+          "default"
+        ],
+        "code": 0,
+        "seconds": 1.085
+      },
+      {
+        "args": [
+          "project",
+          "delete",
+          "nas01:ac-b"
+        ],
+        "code": 0,
+        "seconds": 0.069
+      },
+      {
+        "args": [
+          "project",
+          "delete",
+          "nas01:ac-a"
+        ],
+        "code": 0,
+        "seconds": 0.067
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/projects?recursion=1&target=nas01",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.064
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&recursion=1&target=nas01",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.107
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/projects?recursion=1&target=lab01",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.06
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&recursion=1&target=lab01",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.134
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/projects?recursion=1&target=lab02",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.063
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&recursion=1&target=lab02",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.138
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/projects?recursion=1&target=lab03",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.062
+      },
+      {
+        "args": [
+          "query",
+          "nas01:/1.0/networks?project=default&recursion=1&target=lab03",
+          "--request",
+          "GET",
+          "--wait"
+        ],
+        "code": 0,
+        "seconds": 0.135
+      }
+    ]
+  }
 }
