@@ -12,11 +12,11 @@ import (
 func TestRuntimeConfigurationRejectsInvalidDocuments(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, extension, body string }{
-		{"unknown YAML key", ".yaml", "incus:\n  remote: nas01\n  host: lab01\n  pool: data\n  typo: true\n"},
-		{"second YAML document", ".yaml", "incus:\n  remote: nas01\n  host: lab01\n  pool: data\n---\n{}\n"},
+		{"unknown YAML key", yamlExtension, "incus:\n  remote: nas01\n  host: lab01\n  pool: data\n  typo: true\n"},
+		{"second YAML document", yamlExtension, "incus:\n  remote: nas01\n  host: lab01\n  pool: data\n---\n{}\n"},
 		{"unknown TOML key", ".toml", "[incus]\nremote='nas01'\nhost='lab01'\npool='data'\ntypo=true\n"},
-		{"ambiguous endpoint", ".yaml", "incus:\n  remote: nas01\n  url: https://example.invalid\n  host: lab01\n  pool: data\n"},
-		{"overflowing TTL", ".yaml", "incus:\n  remote: nas01\n  host: lab01\n  pool: data\nsandbox:\n  max_ttl_minutes: 9223372036854775807\n"},
+		{"ambiguous endpoint", yamlExtension, "incus:\n  remote: nas01\n  url: https://example.invalid\n  host: lab01\n  pool: data\n"},
+		{"overflowing TTL", yamlExtension, "incus:\n  remote: nas01\n  host: lab01\n  pool: data\nsandbox:\n  max_ttl_minutes: 9223372036854775807\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

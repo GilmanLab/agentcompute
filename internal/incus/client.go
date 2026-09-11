@@ -51,6 +51,7 @@ const (
 	configBlock           = "block"
 	deviceTypeKey         = "type"
 	deviceTypeNIC         = "nic"
+	deviceNetworkKey      = "network"
 	bytesPerMiB           = 1024 * 1024
 	bytesPerGiB           = 1024 * bytesPerMiB
 

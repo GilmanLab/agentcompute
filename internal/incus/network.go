@@ -99,9 +99,9 @@ func (c *Client) AttachNIC(ctx context.Context, ref compute.Ref, network, nic, i
 		return compute.NIC{}, fmt.Errorf("device %q already exists", nicName)
 	}
 	device := map[string]string{
-		deviceTypeKey: deviceTypeNIC,
-		"network":     physical,
-		"name":        nicName,
+		deviceTypeKey:    deviceTypeNIC,
+		deviceNetworkKey: physical,
+		"name":           nicName,
 	}
 	if ip != "" {
 		device["ipv4.address"] = ip

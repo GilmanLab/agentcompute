@@ -27,6 +27,7 @@ const (
 	configFlag        = "config"
 	defaultTTLMinutes = 240
 	maxTTLMinutes     = 1440
+	yamlExtension     = ".yaml"
 )
 
 // runtime owns backend connections and the reaper, not individual MCP sessions.
@@ -83,7 +84,7 @@ func loadRuntimeConfig(path string) (runtimeConfig, error) {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".toml":
 		err = toml.NewDecoder(file).DisallowUnknownFields().Decode(&cfg)
-	case ".yaml", ".yml":
+	case yamlExtension, ".yml":
 		decoder := yaml.NewDecoder(file)
 		decoder.KnownFields(true)
 		err = decoder.Decode(&cfg)

@@ -86,9 +86,9 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 			return nil, resolveErr
 		}
 		devices[defaultNICName] = map[string]string{
-			deviceTypeKey: deviceTypeNIC,
-			"network":     physical,
-			"name":        defaultNICName,
+			deviceTypeKey:    deviceTypeNIC,
+			deviceNetworkKey: physical,
+			"name":           defaultNICName,
 		}
 	}
 
@@ -521,7 +521,7 @@ func (c *Client) mapNICs(ctx context.Context, sandbox string, full *api.Instance
 		if iface == "" {
 			iface = name
 		}
-		physical := device["network"]
+		physical := device[deviceNetworkKey]
 		logical := logicalByPhysical[physical]
 		mac, addresses := observedNIC(full.State, iface)
 		if configuredMAC := device["hwaddr"]; configuredMAC != "" {
