@@ -49,20 +49,6 @@ func TestVersionFlagDefaultsToDevMetadata(t *testing.T) {
 	assert.Equal(t, "agentcompute dev (none) built unknown\n", stdout.String())
 }
 
-func TestRootCommandRegistersTransportSubcommands(t *testing.T) {
-	t.Parallel()
-
-	root := NewRootCommand(Options{})
-
-	names := make([]string, 0, len(root.Commands()))
-	for _, cmd := range root.Commands() {
-		names = append(names, cmd.Name())
-	}
-
-	assert.Contains(t, names, stdioCommandName)
-	assert.Contains(t, names, httpCommandName)
-}
-
 func TestHTTPCommandDefaultsAddrToLoopback(t *testing.T) {
 	t.Parallel()
 

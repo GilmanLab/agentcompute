@@ -1,145 +1,99 @@
 ---
 title: Getting started
-description: Run the CodeMode server and compose the demo capability.
+description: Create, use, and delete an Incus container sandbox through CodeMode.
 ---
 
 # Getting started
 
-This tutorial starts the server as a local STDIO process, connects it to an MCP client, and composes two calls to `random.int` in one `execute` request.
+This tutorial uses a workstation Incus identity and the Phase 1 `image-build` project to create a disposable router container through MCP.
 
-## Install the repository toolchain
-
-Clone a disposable checkout and provision the pinned Go 1.26.6 toolchain and project tools with [mise](https://mise.jdx.dev). The server module pins the official MCP Go SDK v1.7.0:
+## Build and configure
 
 ```sh
-git clone https://github.com/GilmanLab/agentcompute.git
-cd agentcompute
 mise install
-```
-
-Moon uses the mise-provided tools as system binaries. Python and uv for the documentation project are included; no separate install is required.
-
-## Build the server
-
-```sh
 go build -o bin/agentcompute ./cmd/agentcompute
 ```
 
-The final binary contains both the ordinary server and the CodeMode worker entry point. `codemode.ServeWorkerAndExit()` is the first statement of `main`, so CodeMode can re-execute this same binary for each program run.
+Create `agentcompute.yaml` in the repository root. Replace the remote, member, and pool with existing resources your identity can manage:
+
+```yaml
+incus:
+  remote: nas01
+  host: lab01
+  pool: data
+images_file: images/catalog.yaml
+```
+
+The identity must manage sandbox projects and bridges in the default project. The image-build-only CI certificate is insufficient. See [Configuration](configuration.md) for explicit-URL credentials and TTL settings.
 
 ## Connect over STDIO
 
-Configure an MCP client that accepts the `mcpServers` shape. Replace the path below with the absolute path to your checkout:
+Configure an MCP client with absolute paths:
 
 ```json
 {
   "mcpServers": {
     "agentcompute": {
       "command": "/absolute/path/to/agentcompute/bin/agentcompute",
-      "args": ["stdio"]
+      "args": ["stdio", "--config", "/absolute/path/to/agentcompute/agentcompute.yaml"]
     }
   }
 }
 ```
 
-Restart or reload the client's MCP servers. STDIO uses the fixed non-secret subject ID `local`; ownership of the launched process is the authentication boundary. The process writes JSON-RPC only to stdout and sends diagnostics to stderr.
+Startup reconciles the image catalog. The client sees exactly `search_api`, `describe_api`, and `execute`; the 13 compute capabilities live behind those tools. STDIO sends JSON-RPC to stdout and diagnostics to stderr.
 
-The client lists exactly three MCP tools:
+## Discover the capabilities
 
-- `search_api`
-- `describe_api`
-- `execute`
-
-`random.int` is a CodeMode capability behind those tools. It is not a fourth MCP tool.
-
-## Discover the capability
-
-Ask the client to search for a capability that returns a random integer. The corresponding raw `search_api` input is:
-
-```json
-{"query":"random integer"}
-```
-
-The successful results include the exact dotted name and keyword-only signature:
+Call `search_api` with `{"query":"sandbox"}` and then `describe_api` with `{"name":"sandbox.create"}`. Its signature is:
 
 ```text
-random.int(*, min: int, max: int)
+sandbox.create(*, name: str | None, platform: str | None, ttl_minutes: int | None)
 ```
 
-Next, ask the client to describe that exact name. The raw `describe_api` input is:
+Repeat discovery and description for `instance.create`, `instance.exec`, and `sandbox.delete`. Use the returned field names rather than guessing arguments.
 
-```json
-{"name":"random.int"}
-```
+## Create, use, and delete a router
 
-The description reports required `min` and `max` integer inputs and an output dictionary with a `value` integer field. The Go input fields are `int64`, so values must fit the signed 64-bit range.
-
-## Compose two calls
-
-Ask the client to execute this program:
+Pass this source to `execute`:
 
 ```python
 def main():
-    left = random.int(min=3, max=3)
-    right = random.int(min=4, max=4)
-    return {
-        "left": left["value"],
-        "right": right["value"],
-        "total": left["value"] + right["value"],
-    }
+    sb = sandbox.create()
+    instance.create(sandbox=sb["name"], name="router", image="router")
+    result = instance.exec(
+        sandbox=sb["name"],
+        name="router",
+        command="ip -br addr && nft list ruleset",
+    )
+    sandbox.delete(name=sb["name"])
+    return result
 ```
 
-The raw `execute` input has one `source` string property:
+The result contains the command's exit code, stdout, stderr, timeout flag, and per-stream truncation flags. Only the final value returned by `main()` enters the successful MCP result.
 
-```json
-{
-  "source": "def main():\n    left = random.int(min=3, max=3)\n    right = random.int(min=4, max=4)\n    return {\"left\": left[\"value\"], \"right\": right[\"value\"], \"total\": left[\"value\"] + right[\"value\"]}"
-}
-```
+An omitted sandbox name is generated. Its default bridge provides DHCP and NAT on the configured member. All its guests stay on that persisted member. If execution fails before explicit deletion, use `sandbox.list` to find the sandbox; its persisted TTL also survives a server restart and is enforced by the reaper.
 
-Each capability call returns a Starlark dictionary, so the program reads `left["value"]` and `right["value"]`. Equal lower and upper bounds make the result deterministic:
-
-```json
-{"result":{"left":3,"right":4,"total":7}}
-```
-
-CodeMode runs this source in a fresh worker process. Only the final converted value returned by the zero-argument `main()` function appears in the successful MCP result.
-
-## Try Streamable HTTP
-
-Start the HTTP transport on loopback:
+## Use HTTP
 
 ```sh
-go run ./cmd/agentcompute http --addr localhost:8080
+bin/agentcompute http --config agentcompute.yaml --addr localhost:8080
 ```
 
-The server logs its listening address to stderr and shuts down gracefully on `Ctrl-C`. Loopback without a token installs the explicit non-secret development subject ID `development` in trusted request context.
+HTTP is the deployment transport. This slice retains the template's development authentication and `AllowAll` policy: it is not a multi-tenant authorization boundary. Read [Security](security.md) before exposing it beyond a trusted workstation.
 
-To exercise the demo bearer-token seam:
-
-```sh
-go run ./cmd/agentcompute http \
-  --addr localhost:8080 \
-  --auth-token development-only-token
-```
-
-After constant-time token validation, the demo SDK verifier sets the non-secret `auth.TokenInfo.UserID` to `shared-token`; it never uses the token value as identity. `installHTTPSubject` reads that ID from `req.GetExtra()` in receiving middleware, stores it with `authz.WithSubject` on the MCP handler context, and `mcpserver.ContextSubject` resolves it. This shared token is a demonstration, not production authentication.
-
-Without a token in an allowed development mode, the same bridge installs `development`. The HTTP command builds one immutable CodeMode runtime and one MCP server before serving, then reuses that instance for every MCP session. An arbitrary value set only on the outer `net/http` request context is not the adapter's identity channel.
-
-## Run project checks
+## Verify the installation
 
 ```sh
-moon run root:build
-moon run root:test
 moon run root:check
+uv run .github/scripts/mcp_smoke.py -- bin/agentcompute stdio --config agentcompute.yaml
 ```
 
-`root:check` covers formatting, linting, builds, tests, documentation, and the development proxy.
+The live smoke performs read-only discovery and execution. The opt-in integration lane creates disposable cluster resources, kills and restarts the production binary, verifies original expiry, drains large exec output, and waits for TTL cleanup:
 
-## Next steps
+```sh
+AGENTCOMPUTE_TEST_REMOTE=nas01 AGENTCOMPUTE_TEST_HOST=lab01 \
+  go test -tags integration ./internal/cli -run TestClusterLifecycle -count=1 -v
+```
 
-- [Add a capability](how-to/add-a-capability.md) and then remove `random.int`.
-- Review the [configuration](configuration.md) reference.
-- Read the [security](security.md) model before exposing HTTP or adding privileged handlers.
-- Consult the [canonical CodeMode documentation](https://meigma.github.io/codemode/) for the full language and API contracts.
+For the complete network lifecycle program and observed results, see `spikes/acceptance.star` and `spikes/results.json` in the repository. Use the [CodeMode documentation](https://meigma.github.io/codemode/) for the language and worker contracts.

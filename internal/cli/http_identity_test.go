@@ -37,6 +37,7 @@ func TestHTTPAuthorizationUsesEachVerifiedIdentity(t *testing.T) {
 		Logger:   slog.New(slog.DiscardHandler),
 		Resolver: hostmcp.ContextSubject(),
 		Runtime:  codemode.Options{Authorizer: alicePolicy{}},
+		Deps:     *testDependencies(t),
 	})
 	require.NoError(t, err)
 	server.AddReceivingMiddleware(installHTTPSubject(true))
@@ -68,7 +69,7 @@ func TestHTTPAuthorizationUsesEachVerifiedIdentity(t *testing.T) {
 		result, callErr := tc.session.CallTool(context.Background(), &mcp.CallToolParams{
 			Meta:      mcp.Meta{"subject": map[string]any{"id": "alice"}, "subject_id": "alice"},
 			Name:      "execute",
-			Arguments: map[string]any{"source": "def main():\n    return random.int(min=7, max=7)"},
+			Arguments: map[string]any{"source": "def main():\n    return image.list()"},
 		})
 		require.NoError(t, callErr, tc.name)
 		assert.Equal(t, tc.denied, result.IsError, tc.name)

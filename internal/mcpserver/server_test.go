@@ -3,11 +3,11 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -15,20 +15,23 @@ import (
 	"github.com/meigma/codemode"
 	"github.com/meigma/codemode/authz"
 	hostmcp "github.com/meigma/codemode/mcpserver"
+
+	"github.com/GilmanLab/agentcompute/internal/compute"
 )
 
 const trustedSubjectID authz.SubjectID = "local"
 
-type executeEnvelope struct {
-	Result randomIntOutput `json:"result"`
+type executeEnvelope[T any] struct {
+	Result T `json:"result"`
 }
 
-// localRangePolicy authorizes the local subject only for ranges ending above one.
-type localRangePolicy struct{}
+type denyDeletePolicy struct{}
 
-func (localRangePolicy) Authorize(_ context.Context, input authz.AuthorizationInput) error {
-	maximum, valid := input.Arguments["max"].(int64)
-	if input.Subject.ID != trustedSubjectID || !valid || maximum <= 1 {
+func (denyDeletePolicy) Authorize(_ context.Context, input authz.AuthorizationInput) error {
+	if input.Subject.ID != trustedSubjectID {
+		return authz.ErrDenied
+	}
+	if input.CapabilityName == capabilitySandboxDelete {
 		return authz.ErrDenied
 	}
 	return nil
@@ -38,7 +41,9 @@ func TestServerEndToEnd(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	session := newClientSession(t, Options{})
+	tc := newTestDeps(t)
+	tc.sandbox.EXPECT().ListSandboxes(mock.Anything).Return([]compute.Sandbox{}, nil)
+	session := newClientSession(t, Options{Deps: tc.deps})
 
 	tools, err := session.ListTools(ctx, nil)
 	require.NoError(t, err, "list tools")
@@ -52,73 +57,56 @@ func TestServerEndToEnd(t *testing.T) {
 
 	searched, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      "search_api",
-		Arguments: map[string]any{"query": randomIntName},
+		Arguments: map[string]any{"query": capabilitySandboxList},
 	})
 	require.NoError(t, err, "search_api")
 	requireSuccessfulTool(t, searched)
 	var search codemode.SearchResponse
 	decodeStructured(t, searched, &search)
-	require.NotEmpty(t, search.Results, "search_api must find random.int")
-	assert.Equal(t, randomIntName, search.Results[0].Name)
+	require.NotEmpty(t, search.Results, "search_api must find sandbox.list")
+	assert.Equal(t, capabilitySandboxList, search.Results[0].Name)
 
 	described, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      "describe_api",
-		Arguments: map[string]any{"name": randomIntName},
+		Arguments: map[string]any{"name": capabilitySandboxList},
 	})
 	require.NoError(t, err, "describe_api")
 	requireSuccessfulTool(t, described)
 	var description codemode.Description
 	decodeStructured(t, described, &description)
-	assert.Equal(t, randomIntName, description.Name)
-	require.Len(t, description.Input, 2)
-	assert.Equal(t, "min", description.Input[0].Name)
-	assert.Equal(t, "int", description.Input[0].Type)
-	assert.True(t, description.Input[0].Required)
-	assert.Equal(t, "max", description.Input[1].Name)
-	assert.Equal(t, "int", description.Input[1].Type)
-	assert.True(t, description.Input[1].Required)
+	assert.Equal(t, capabilitySandboxList, description.Name)
+	assert.Equal(t, "sandbox.list()", description.Signature)
 
-	const wantMin, wantMax int64 = 3, 7
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      "execute",
-		Arguments: map[string]any{"source": randomIntProgram(wantMin, wantMax)},
+		Arguments: map[string]any{"source": "def main():\n    return sandbox.list()\n"},
 	})
 	require.NoError(t, err, "execute")
 	requireSuccessfulTool(t, result)
 
-	var out executeEnvelope
+	var out executeEnvelope[sandboxListOut]
 	decodeStructured(t, result, &out)
-	assert.GreaterOrEqual(t, out.Result.Value, wantMin)
-	assert.LessOrEqual(t, out.Result.Value, wantMax)
+	require.NotNil(t, out.Result.Items, "empty list root must not be None")
+	assert.Empty(t, out.Result.Items)
 }
 
-func TestServerEndToEndEqualBounds(t *testing.T) {
+func TestServerAgentErrorReachesMCP(t *testing.T) {
 	t.Parallel()
 
-	session := newClientSession(t, Options{})
+	tc := newTestDeps(t)
+	tc.instance.EXPECT().
+		GetInstance(mock.Anything, compute.Ref{Sandbox: "y", Name: "x"}).
+		Return(compute.Instance{}, agentErrorf("instance %q not found in sandbox %q", "x", "y"))
+	session := newClientSession(t, Options{Deps: tc.deps})
+
 	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "execute",
-		Arguments: map[string]any{"source": randomIntProgram(5, 5)},
+		Name: "execute",
+		Arguments: map[string]any{
+			"source": "def main():\n    return instance.get(sandbox=\"y\", name=\"x\")\n",
+		},
 	})
 	require.NoError(t, err, "execute")
-	requireSuccessfulTool(t, result)
-
-	var out executeEnvelope
-	decodeStructured(t, result, &out)
-	assert.Equal(t, int64(5), out.Result.Value)
-}
-
-func TestServerEndToEndToolError(t *testing.T) {
-	t.Parallel()
-
-	session := newClientSession(t, Options{})
-	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "execute",
-		Arguments: map[string]any{"source": randomIntProgram(10, 1)},
-	})
-
-	require.NoError(t, err, "min > max must be a tool-level error, not a protocol error")
-	requireToolError(t, result, codemode.ErrCapabilityFailure.Error())
+	requireToolError(t, result, `capability failed: instance "x" not found in sandbox "y"`)
 }
 
 func TestServerRejectsMissingSubject(t *testing.T) {
@@ -127,7 +115,7 @@ func TestServerRejectsMissingSubject(t *testing.T) {
 	session := newClientSession(t, Options{Resolver: hostmcp.ContextSubject()})
 	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "execute",
-		Arguments: map[string]any{"source": randomIntProgram(1, 1)},
+		Arguments: map[string]any{"source": "def main():\n    return sandbox.list()\n"},
 	})
 	require.NoError(t, err, "missing subject must be a tool-level error")
 	requireToolError(t, result, codemode.ErrUnauthenticated.Error())
@@ -136,27 +124,23 @@ func TestServerRejectsMissingSubject(t *testing.T) {
 func TestServerAuthorizesTrustedSubjectAndArguments(t *testing.T) {
 	t.Parallel()
 
+	tc := newTestDeps(t)
+	tc.sandbox.EXPECT().ListSandboxes(mock.Anything).Return([]compute.Sandbox{}, nil)
 	session := newClientSession(t, Options{
-		Runtime: codemode.Options{Authorizer: localRangePolicy{}},
+		Deps:    tc.deps,
+		Runtime: codemode.Options{Authorizer: denyDeletePolicy{}},
 	})
 
 	allowed, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Meta: mcp.Meta{
-			"subject_id": "subject-attacker",
-			"subject":    map[string]any{"id": "subject-attacker"},
-		},
 		Name:      "execute",
-		Arguments: map[string]any{"source": randomIntProgram(5, 5)},
+		Arguments: map[string]any{"source": "def main():\n    return sandbox.list()\n"},
 	})
 	require.NoError(t, err, "execute")
 	requireSuccessfulTool(t, allowed)
 
 	denied, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Meta: mcp.Meta{
-			"subject_id": "subject-attacker",
-		},
 		Name:      "execute",
-		Arguments: map[string]any{"source": randomIntProgram(0, 1)},
+		Arguments: map[string]any{"source": "def main():\n    return sandbox.delete(name=\"demo\")\n"},
 	})
 	require.NoError(t, err, "denied execute must stay a tool-level error")
 	requireToolError(t, denied, codemode.ErrPermissionDenied.Error())
@@ -184,6 +168,35 @@ func TestServerRequiresResolver(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, codemode.ErrInvalidRegistration)
+}
+
+type testDeps struct {
+	sandbox  *MocksandboxService
+	instance *MockinstanceService
+	network  *MocknetworkService
+	image    *MockimageService
+	deps     Dependencies
+}
+
+func newTestDeps(t *testing.T) *testDeps {
+	t.Helper()
+
+	sandbox := NewMocksandboxService(t)
+	instance := NewMockinstanceService(t)
+	network := NewMocknetworkService(t)
+	image := NewMockimageService(t)
+	return &testDeps{
+		sandbox:  sandbox,
+		instance: instance,
+		network:  network,
+		image:    image,
+		deps: Dependencies{
+			Sandbox:  sandbox,
+			Instance: instance,
+			Network:  network,
+			Image:    image,
+		},
+	}
 }
 
 func newClientSession(t *testing.T, options Options) *mcp.ClientSession {
@@ -216,10 +229,6 @@ func newClientSession(t *testing.T, options Options) *mcp.ClientSession {
 	t.Cleanup(func() { _ = clientSession.Close() })
 
 	return clientSession
-}
-
-func randomIntProgram(minimum, maximum int64) string {
-	return fmt.Sprintf("def main():\n    return random.int(min=%d, max=%d)\n", minimum, maximum)
 }
 
 func decodeStructured(t *testing.T, result *mcp.CallToolResult, dest any) {

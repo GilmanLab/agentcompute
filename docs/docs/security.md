@@ -41,6 +41,17 @@ The CLI passes `authz.AllowAll()` through `mcpserver.Options.Runtime.Authorizer`
 
 `AllowAll` permits every validated native call for every resolved subject. It is not authentication. Replace it when authorization depends on subject, stable capability ID, capability name, or canonical arguments. Keep authorization failures coarse at the client boundary and record trusted diagnostic detail only in protected host logs.
 
+Agentcompute currently uses an Incus administrator connection to create restricted
+projects and cluster-wide bridge definitions. Sandbox subject metadata records
+the creator; it does not enforce ownership. Any admitted caller can manage any
+agentcompute sandbox. This slice is for trusted operators, not untrusted
+multi-tenant access.
+
+Guest instances cannot select another project's managed bridges. Each sandbox
+persists one member and rejects instance placement on another member. Cluster
+bridge definitions do not provide cross-member L2 connectivity: each member has
+its own bridge and NAT domain.
+
 ## Discovery is not authorization-filtered
 
 `search_api` and `describe_api` require a resolved subject, but they do not run per-capability authorization policy. Every authenticated subject can discover every capability that is statically enabled in that runtime.

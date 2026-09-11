@@ -12,17 +12,10 @@ package cli
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-
-	"github.com/meigma/codemode"
-	"github.com/meigma/codemode/authz"
-	hostmcp "github.com/meigma/codemode/mcpserver"
 
 	"github.com/GilmanLab/agentcompute/internal/mcpserver"
 	"github.com/GilmanLab/agentcompute/internal/templateinfo"
@@ -55,6 +48,9 @@ type Options struct {
 	// bound to environment variables named after [templateinfo.EnvPrefix],
 	// for example AGENTCOMPUTE_ADDR.
 	Viper *viper.Viper
+	// Dependencies optionally supplies caller-owned services for embedded transports.
+	// Nil builds Incus dependencies from the required configuration file.
+	Dependencies *mcpserver.Dependencies
 }
 
 // NewRootCommand creates the agentcompute Cobra command tree.
@@ -115,6 +111,7 @@ func NewRootCommand(options Options) *cobra.Command {
 		defaultLogFormat,
 		fmt.Sprintf("log format: text or json (env %s_LOG_FORMAT)", templateinfo.EnvPrefix()),
 	)
+	root.PersistentFlags().String(configFlag, "", "runtime configuration file (env AGENTCOMPUTE_CONFIG)")
 
 	root.AddCommand(newStdioCommand(options))
 	root.AddCommand(newHTTPCommand(options))
@@ -148,21 +145,4 @@ func initializeConfig(cmd *cobra.Command, vp *viper.Viper) error {
 	}
 
 	return nil
-}
-
-// newTemplateServer builds the shared CodeMode MCP server used by both
-// transports. authz.AllowAll is an explicit demo decision, not a constructor
-// default. Runtime limits stay on this composition seam; the CLI does not add
-// limit or Rego flags.
-func newTemplateServer(
-	logger *slog.Logger,
-	version string,
-	resolver hostmcp.InvocationResolver,
-) (*mcp.Server, error) {
-	return mcpserver.New(mcpserver.Options{
-		Version:  version,
-		Logger:   logger,
-		Resolver: resolver,
-		Runtime:  codemode.Options{Authorizer: authz.AllowAll()},
-	})
 }

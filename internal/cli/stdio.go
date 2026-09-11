@@ -14,6 +14,8 @@ import (
 
 	"github.com/meigma/codemode/authz"
 	hostmcp "github.com/meigma/codemode/mcpserver"
+
+	"github.com/GilmanLab/agentcompute/internal/mcpserver"
 )
 
 // stdioCommandName is the name of the stdio subcommand, also used by its tests.
@@ -42,7 +44,12 @@ func newStdioCommand(options Options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runStdio(cmd.Context(), logger, options.Build, cmd.InOrStdin(), cmd.OutOrStdout())
+			rt, err := options.openRuntime(cmd.Context(), logger)
+			if err != nil {
+				return err
+			}
+			runErr := runStdio(cmd.Context(), logger, options.Build, cmd.InOrStdin(), cmd.OutOrStdout(), rt.deps)
+			return errors.Join(runErr, rt.close())
 		},
 	}
 }
@@ -64,8 +71,15 @@ func newStdioCommand(options Options) *cobra.Command {
 //
 // logger receives diagnostics. It must write to stderr, never out: out is the
 // JSON-RPC channel for this transport.
-func runStdio(ctx context.Context, logger *slog.Logger, build BuildInfo, in io.Reader, out io.Writer) error {
-	srv, err := newTemplateServer(logger, build.Version, hostmcp.StaticSubject(authz.Subject{ID: stdioSubjectID}))
+func runStdio(
+	ctx context.Context,
+	logger *slog.Logger,
+	build BuildInfo,
+	in io.Reader,
+	out io.Writer,
+	deps mcpserver.Dependencies,
+) error {
+	srv, err := newComputeServer(logger, build.Version, hostmcp.StaticSubject(authz.Subject{ID: stdioSubjectID}), deps)
 	if err != nil {
 		return err
 	}

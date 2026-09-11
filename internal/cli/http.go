@@ -18,6 +18,7 @@ import (
 	"github.com/meigma/codemode/authz"
 	hostmcp "github.com/meigma/codemode/mcpserver"
 
+	"github.com/GilmanLab/agentcompute/internal/mcpserver"
 	"github.com/GilmanLab/agentcompute/internal/templateinfo"
 )
 
@@ -67,6 +68,8 @@ type httpConfig struct {
 	// write to stderr; the HTTP transport has no stdout JSON-RPC constraint, but
 	// keeping logs on stderr stays consistent with the stdio transport.
 	logger *slog.Logger
+	// deps are constructed once before serving any HTTP session.
+	deps mcpserver.Dependencies
 }
 
 // newHTTPCommand builds the "http" subcommand, which serves the MCP server over
@@ -88,13 +91,26 @@ func newHTTPCommand(options Options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runHTTP(cmd.Context(), httpConfig{
+			if bindErr := checkBindSecurity(
+				options.Viper.GetString(addrFlag),
+				options.Viper.GetString(authTokenFlag),
+				options.Viper.GetBool(insecureFlag),
+			); bindErr != nil {
+				return bindErr
+			}
+			rt, err := options.openRuntime(cmd.Context(), logger)
+			if err != nil {
+				return err
+			}
+			runErr := runHTTP(cmd.Context(), httpConfig{
 				build:     options.Build,
 				addr:      options.Viper.GetString(addrFlag),
 				authToken: options.Viper.GetString(authTokenFlag),
 				insecure:  options.Viper.GetBool(insecureFlag),
 				logger:    logger,
+				deps:      rt.deps,
 			})
+			return errors.Join(runErr, rt.close())
 		},
 	}
 
@@ -160,7 +176,7 @@ func serveHTTP(ctx context.Context, ln net.Listener, cfg httpConfig) error {
 
 	// One CodeMode runtime and MCP server for the process. Identity is not
 	// captured here: HTTP uses ContextSubject and per-request trusted context.
-	mcpServer, err := newTemplateServer(logger, cfg.build.Version, hostmcp.ContextSubject())
+	mcpServer, err := newComputeServer(logger, cfg.build.Version, hostmcp.ContextSubject(), cfg.deps)
 	if err != nil {
 		closeErr := ln.Close()
 		return errors.Join(err, closeErr)

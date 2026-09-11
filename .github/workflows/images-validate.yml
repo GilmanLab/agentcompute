@@ -1,7 +1,7 @@
 # Credential-free pull-request gate for the router image build inputs.
 #
 # This workflow executes contributor-visible code (images/build.py, the
-# distrobuilder recipe, the publisher module) and therefore holds NO secrets, no
+# distrobuilder recipe, cmd/image-publish) and therefore holds NO secrets, no
 # environment, and read-only permissions. Everything that needs credentials or
 # network access to the lab lives in images-publish.yml, which only runs on the
 # protected default branch.
@@ -26,7 +26,7 @@ on:
       - master
     paths:
       - images/**
-      - spikes/images/**
+      - cmd/image-publish/**
       - .github/workflows/images-validate.yml
       - .github/workflows/images-publish.yml
   workflow_dispatch:
@@ -76,12 +76,12 @@ jobs:
       - name: Validate recipe against pins
         run: uv run --locked --script images/build.py validate
 
-      # The publisher is its own Go module, so the repository's moon CI gate does
-      # not compile it. Build it here, credential-free, so a broken publisher is
-      # caught in review instead of on publish day.
+      # The publisher is a separate command (cmd/image-publish), so the
+      # repository's moon build task does not compile it. Build it here,
+      # credential-free, so a broken publisher is caught in review instead of
+      # on publish day.
       - name: Build router publisher
-        working-directory: spikes/images
-        run: go build -o "$RUNNER_TEMP/images" .
+        run: go build -o "$RUNNER_TEMP/image-publish" ./cmd/image-publish
 
       - name: Check the boot smoke script
-        run: bash -n spikes/images/smoke.sh
+        run: bash -n images/smoke.sh

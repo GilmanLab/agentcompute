@@ -1,8 +1,7 @@
-# Image catalog consumed by the agentcompute server (Phase 2). One entry per
-# lab-built image. `reference` is always by digest: it names the imgoci
-# release index, and the reconciler resolves, verifies, imports, and boot-tests
-# it before moving the Incus alias. Updated by pull request after each publish;
-# changing this file does not trigger a publish.
+# Startup image catalog. Lab-built references pin an imgoci release-index digest;
+# reconciliation verifies, imports, and smoke-tests it before moving the alias.
+# Upstream references use an Incus remote alias (for example images:alpine/3.22)
+# and are fetched on first use. Catalog changes do not trigger publication.
 schema_version: 1
 images:
   - name: router

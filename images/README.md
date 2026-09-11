@@ -9,7 +9,9 @@ system container (Alpine 3.22.5 with `nftables`, `frr`, `iproute2` + `tc`,
 | `pins.yaml` | Reproducibility root: distrobuilder 3.3.1 and Go 1.26.6 source URLs + SHA-256, the Alpine minirootfs, every APK in the package closure by URL + SHA-256, the Incus client used by CI, the imgoci Go module version. |
 | `router/distrobuilder.yaml` | The recipe. Installs only the pinned APKs from an offline seed (`--no-network`, empty `/etc/apk/repositories`), enables OpenRC `lxc` mode, and emits a unified tarball. |
 | `build.py` | `validate` (schema and pin checks, no credentials) and `build` (download-verify, compile distrobuilder from vendored source, assemble). PEP 723 script with `build.py.lock`. |
-| `catalog.yaml` | What the Go server reads: image name → GHCR reference **by digest**, kind, OS, defaults. Updated by PR after each publish. |
+| `catalog.yaml` | Startup catalog: image name → digest-pinned GHCR reference or upstream Incus `remote:alias`, kind, OS, defaults. |
+| `smoke.sh` | Shared six-tool router boot smoke used by image CI. |
+| `../cmd/image-publish` | Immutable imgoci publication and verified fetch-back CLI. |
 
 ## Build locally
 
@@ -46,17 +48,17 @@ gh attestation verify oci://ghcr.io/gilmanlab/agentcompute/router:<tag> \
   --signer-workflow GilmanLab/agentcompute/.github/workflows/attest.yml
 ```
 
-Import into the cluster (throwaway tool, see `../spikes/images/README.md`):
+The server's startup reconciler imports catalog digest references into `image-build`, verifies bytes, smoke-launches the image, and moves the alias only after success. It records the imgoci digest in image properties; the Incus fingerprint is derived, not a stable identity across rebuilds.
+
+For a verified download without import:
 
 ```sh
-INCUS_CONF=... spikes/images/images import \
+go run ./cmd/image-publish fetch \
   --ref ghcr.io/gilmanlab/agentcompute/router@sha256:<digest> \
-  --remote nas01 --project image-build
+  --output /tmp/router.tar.xz
 ```
 
-Incus does not read imgoci indexes itself; the importer resolves the digest,
-verifies bytes, imports, boots, runs the six tool checks, then moves the
-`router` alias. In Phase 2 this becomes the Go server's catalog reconciler.
+Upstream references such as `images:alpine/3.22` are fetched when an instance first uses them. Container creation copies lab-built images from `image-build` into the sandbox project before using a local fingerprint.
 
 ## imgoci representation decision
 
@@ -124,9 +126,6 @@ build only in `metadata.yaml`. A master run on an unchanged `images/` tree
 stops at the publish step with `release already exists`: the immutability
 guard working (run 34650303253).
 
-## Throwaway
+## Implementation
 
-- `../spikes/images/` (publisher/importer and `smoke.sh`): absorbed into the
-  Go server's reconciler in Phase 2.
-- The hand-driven build scripts used for the first three measurements are not
-  in the repository; `build.py` replaces them.
+The former image spike is absorbed into `internal/incus/reconcile.go`, `cmd/image-publish`, and `images/smoke.sh`. The hand-driven build scripts used for the first three measurements are replaced by `build.py`.

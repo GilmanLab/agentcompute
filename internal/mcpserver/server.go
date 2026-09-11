@@ -8,34 +8,97 @@
 package mcpserver
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/meigma/codemode"
 	hostmcp "github.com/meigma/codemode/mcpserver"
 
+	"github.com/GilmanLab/agentcompute/internal/compute"
 	"github.com/GilmanLab/agentcompute/internal/templateinfo"
 )
 
-// Dependencies holds the shared collaborators a real server's capabilities
-// need — for example a database handle, an outbound HTTP client, or a config
-// struct. It is empty in the template because the demo capability needs
-// nothing; add fields here and read them in your registrations (see
-// registerRandomInt). Threading dependencies through [Options] keeps the
-// server transport-agnostic: the stdio and http subcommands construct them
-// and pass them in, the same way for both.
-type Dependencies struct{}
+const (
+	defaultMaxExecutionTime = 15 * time.Minute
+	defaultMaxNativeCalls   = 1000
 
-// Options configures the template MCP server.
+	capabilitySandboxCreate  = "sandbox.create"
+	capabilitySandboxList    = "sandbox.list"
+	capabilitySandboxGet     = "sandbox.get"
+	capabilitySandboxExtend  = "sandbox.extend"
+	capabilitySandboxDelete  = "sandbox.delete"
+	capabilityImageList      = "image.list"
+	capabilityInstanceCreate = "instance.create"
+	capabilityInstanceList   = "instance.list"
+	capabilityInstanceGet    = "instance.get"
+	capabilityInstanceDelete = "instance.delete"
+	capabilityInstanceExec   = "instance.exec"
+	capabilityNetCreate      = "net.create"
+	capabilityNetAttach      = "net.attach"
+
+	platformIncus  = "incus"
+	platformMac    = "mac"
+	kindBridge     = "bridge"
+	kindOVN        = "ovn"
+	networkDefault = "default"
+)
+
+// sandboxService is the sandbox lifecycle surface consumed by sandbox.* handlers.
+type sandboxService interface {
+	CreateSandbox(ctx context.Context, name string, ttl time.Duration, subject string) (compute.Sandbox, error)
+	ListSandboxes(ctx context.Context) ([]compute.Sandbox, error)
+	GetSandbox(ctx context.Context, name string) (compute.Sandbox, []compute.Instance, []compute.Network, error)
+	ExtendSandbox(ctx context.Context, name string, ttl time.Duration) (compute.Sandbox, error)
+	DeleteSandbox(ctx context.Context, name string) error
+}
+
+// instanceService is the guest surface consumed by instance.* handlers.
+type instanceService interface {
+	CreateInstance(ctx context.Context, req compute.CreateInstance) (compute.Instance, error)
+	ListInstances(ctx context.Context, sandbox string) ([]compute.Instance, error)
+	GetInstance(ctx context.Context, ref compute.Ref) (compute.Instance, error)
+	DeleteInstance(ctx context.Context, ref compute.Ref) error
+	Exec(ctx context.Context, req compute.ExecRequest) (compute.ExecResult, error)
+}
+
+// networkService is the network surface consumed by net.* handlers.
+type networkService interface {
+	CreateNetwork(ctx context.Context, sandbox string, network compute.Network) (compute.Network, error)
+	AttachNIC(ctx context.Context, ref compute.Ref, network, nic, ip, mac string) (compute.NIC, error)
+}
+
+// imageService is the catalog surface consumed by image.list and instance.create.
+type imageService interface {
+	CatalogImage(name string) (compute.CatalogImage, error)
+	ListImages(os string, desktop *bool, platform string) []compute.CatalogImage
+}
+
+// Dependencies holds the consumer services CodeMode handlers close over.
+type Dependencies struct {
+	// Sandbox is the sandbox lifecycle service consumed by sandbox.* handlers.
+	Sandbox sandboxService
+
+	// Instance is the guest service consumed by instance.* handlers.
+	Instance instanceService
+
+	// Network is the network service consumed by net.* handlers.
+	Network networkService
+
+	// Image is the catalog service consumed by image.list and instance.create.
+	Image imageService
+}
+
+// Options configures the agentcompute MCP server.
 type Options struct {
 	// Version is the release version reported in the server implementation info.
 	Version string
 
-	// Deps carries the shared dependencies the server's capabilities need. The
-	// zero value is valid; the template's demo capability uses none.
+	// Deps carries the shared services the server's capabilities need.
 	Deps Dependencies
 
 	// Logger receives server diagnostics. Nil selects a text handler writing
@@ -55,13 +118,23 @@ type Options struct {
 
 	// Runtime configures the CodeMode catalog, authorizer, and execution
 	// budgets. There is no default authorizer: the CLI supplies
-	// [github.com/meigma/codemode/authz.AllowAll] for the demo. Zero-valued
-	// limit fields receive CodeMode defaults at Build. The template CLI does
-	// not expose limit or Rego flags; change Runtime at this composition seam.
+	// [github.com/meigma/codemode/authz.AllowAll]. Zero MaxExecutionTime and
+	// MaxNativeCalls receive slice-1 defaults (15m / 1000) before Build; other
+	// zero-valued limit fields receive CodeMode defaults at Build.
 	Runtime codemode.Options
 }
 
-// New constructs the template MCP server and registers its capabilities.
+// NewDependencies adapts a compute service to the handler consumer interfaces.
+func NewDependencies(svc *compute.Service) Dependencies {
+	return Dependencies{
+		Sandbox:  svc,
+		Instance: svc,
+		Network:  svc,
+		Image:    svc,
+	}
+}
+
+// New constructs the agentcompute MCP server and registers its capabilities.
 //
 // New is transport-agnostic; callers choose a transport when they run the
 // returned server (see internal/cli). The official MCP surface is exactly
@@ -72,8 +145,14 @@ func New(options Options) (*mcp.Server, error) {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
 
-	builder := codemode.New(options.Runtime)
-	registerRandomInt(builder, options.Deps)
+	runtime := options.Runtime
+	runtime.Limits = applySliceLimits(runtime.Limits)
+
+	builder := codemode.New(runtime)
+	registerSandbox(builder, options.Deps)
+	registerImage(builder, options.Deps)
+	registerInstance(builder, options.Deps)
+	registerNet(builder, options.Deps)
 	service, err := builder.Build()
 	if err != nil {
 		return nil, fmt.Errorf("build CodeMode runtime: %w", err)
@@ -91,4 +170,14 @@ func New(options Options) (*mcp.Server, error) {
 		return nil, fmt.Errorf("construct MCP server: %w", err)
 	}
 	return server, nil
+}
+
+func applySliceLimits(limits codemode.Limits) codemode.Limits {
+	if limits.MaxExecutionTime == 0 {
+		limits.MaxExecutionTime = defaultMaxExecutionTime
+	}
+	if limits.MaxNativeCalls == 0 {
+		limits.MaxNativeCalls = defaultMaxNativeCalls
+	}
+	return limits
 }

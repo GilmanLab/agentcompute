@@ -87,13 +87,11 @@ tasks:
     options:
       cache: false
 
-  # Real MCP session against the freshly built binary: initialize, the exact tool
-  # surface, capability discovery, and a deterministic program executed in a
-  # re-executed worker process. This is the same script the release workflows run
-  # against the released binary and the published container image, so a break in
-  # the end-to-end path surfaces on every PR instead of at release time.
+  # Offline artifacts must start and fail closed without configuration.
+  # Go tests cover worker/transport contracts; the opt-in integration lane uses
+  # the production binary against Incus for full lifecycle proof.
   smoke:
-    command: 'uv run .github/scripts/mcp_smoke.py -- bin/agentcompute stdio'
+    command: 'uv run .github/scripts/mcp_smoke.py --offline -- bin/agentcompute stdio'
     deps:
       - 'root:build'
     inputs:
