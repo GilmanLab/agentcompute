@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only OVN connectivity probe for two already-placed guests.
+# OVN connectivity probe for two already-placed disposable guests.
 #
 # Usage:
 #   spikes/ovn/probe.sh <remote> <project> <network> <instance1> <instance2> \
@@ -8,16 +8,16 @@
 # Checks: network list/show; network type ovn; both instances Running on
 # different members; eth0 attached to the given network with a global IPv4;
 # guest eth0 MTU; cross-member ping both ways; curl internet egress from both
-# guests; workstation GET of forward-url matches expected-body exactly.
-# Large HTTP transfer is out of scope.
+# guests; workstation GET of forward-url matches expected-body exactly;
+# guest HTTP GET of 100000000-byte /large.bin both ways with sha256 match.
 #
-# Dependencies: bash, incus, curl, python3, jq. Guests need ping and curl.
-# Bounds: incus 60s; ping -c 3 -W 2; curl --connect-timeout 5 --max-time 15.
-# Prints commands, output, and elapsed_seconds on stdout; nonzero on failure.
-
+# Dependencies: bash, incus, curl, python3, jq. Guests need ping, curl, sha256sum.
+# Bounds: incus 90s; ping -c 3 -W 2; curl --connect-timeout 5 --max-time 15
+# (large guest GET --max-time 60). Prints commands, output, elapsed_seconds.
+# Writes /tmp/ovn-large.bin in each guest; does not create Incus resources.
 set -euo pipefail
 
-usage() { sed -n '2,16p' "$0"; }
+usage() { sed -n '2,17p' "$0"; }
 die() { printf 'probe: %s\n' "$*" >&2; exit 1; }
 
 RUN_OUT=""
@@ -28,7 +28,7 @@ path, args = sys.argv[1], sys.argv[2:]
 print("+ " + shlex.join(args), flush=True)
 t = time.monotonic()
 try:
-    r = subprocess.run(args, capture_output=True, timeout=60)
+    r = subprocess.run(args, capture_output=True, timeout=90)
 except subprocess.TimeoutExpired:
     open(path, "w").write("")
     print("elapsed_seconds=%.3f exit=timeout" % (time.monotonic() - t))
@@ -130,5 +130,18 @@ if actual != expected:
     sys.stderr.write("probe: forward-url body mismatch: got %d bytes, expected %d\n" % (len(actual), len(expected)))
     sys.exit(1)
 ' "$RUN_OUT" "$expected_body" || die "forward-url body did not match expected-body"
+
+expected_hash="a993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae"
+guest "$instance1" curl -4 -fsS --connect-timeout 5 --max-time 60 -w 'bytes=%{size_download} seconds=%{time_total} bytes_per_second=%{speed_download}\n' -o /tmp/ovn-large.bin "http://${ip2}:8080/large.bin" ||
+	die "large GET ${instance1} <- ${ip2} failed"
+guest "$instance1" sha256sum /tmp/ovn-large.bin || die "sha256sum on ${instance1} failed"
+hash1="$(awk '{print $1}' "$RUN_OUT")"
+[ "$hash1" = "$expected_hash" ] || die "large GET ${instance1} <- ${ip2} sha256 ${hash1} != ${expected_hash}"
+guest "$instance2" curl -4 -fsS --connect-timeout 5 --max-time 60 -w 'bytes=%{size_download} seconds=%{time_total} bytes_per_second=%{speed_download}\n' -o /tmp/ovn-large.bin "http://${ip1}:8080/large.bin" ||
+	die "large GET ${instance2} <- ${ip1} failed"
+guest "$instance2" sha256sum /tmp/ovn-large.bin || die "sha256sum on ${instance2} failed"
+hash2="$(awk '{print $1}' "$RUN_OUT")"
+[ "$hash2" = "$expected_hash" ] || die "large GET ${instance2} <- ${ip1} sha256 ${hash2} != ${expected_hash}"
+printf 'large_transfer bytes=100000000 sha256=%s both_directions=ok\n' "$expected_hash"
 
 printf 'probe passed placement=%s:%s ipv4=%s:%s\n' "$location1" "$location2" "$ip1" "$ip2"
