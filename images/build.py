@@ -746,7 +746,7 @@ def build(work_dir: Path, output_dir: Path, image: str = "router") -> dict[str, 
     if image not in IMAGE_NAMES:
         raise Error(f"unknown image {image}")
     if image != "router":
-        for name in ("qemu-img", "sgdisk", "mkfs.ext4", "mkfs.vfat", "losetup", "rsync", "blkid", "mount", "dpkg-deb"):
+        for name in ("btrfs", "qemu-img", "sgdisk", "mkfs.ext4", "mkfs.vfat", "losetup", "rsync", "blkid", "mount", "dpkg-deb"):
             require_command(name)
         tools["qemu-img"] = first_line(["qemu-img", "--version"])
         tools["dpkg-deb"] = first_line(["dpkg-deb", "--version"])
