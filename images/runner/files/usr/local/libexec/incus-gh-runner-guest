@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+payload_root="${PAYLOAD_ROOT:-/run/incus-gh-runner}"
+payload_path="${PAYLOAD_PATH:-${payload_root}/payload.json}"
+ready_path="${READY_PATH:-${payload_root}/payload.ready}"
+status_path="${STATUS_PATH:-${payload_root}/status.json}"
+runner_root="${RUNNER_ROOT:-/opt/actions-runner}"
+runner_user="${RUNNER_USER-actions-runner}"
+runuser_bin="${RUNUSER_BIN:-/usr/sbin/runuser}"
+poweroff_bin="${POWER_OFF_BIN:-/usr/bin/systemctl}"
+diagnostics_grace_seconds="${DIAGNOSTICS_GRACE_SECONDS:-30}"
+console_path="${CONSOLE_PATH:-/dev/ttyS0}"
+
+write_console() {
+  printf '%s\n' "$1" >>"$console_path" || true
+}
+
+write_status() {
+  local state="$1"
+  local exit_code="${2:-}"
+  local status_tmp="${status_path}.tmp"
+
+  install -d -m 0700 "$payload_root"
+  if [[ -n "$exit_code" ]]; then
+    jq --null-input --compact-output \
+      --arg state "$state" \
+      --argjson exit_code "$exit_code" \
+      '{version: 1, state: $state, exit_code: $exit_code}' >"$status_tmp"
+  else
+    jq --null-input --compact-output \
+      --arg state "$state" \
+      '{version: 1, state: $state}' >"$status_tmp"
+  fi
+
+  chmod 0600 "$status_tmp"
+  mv -f "$status_tmp" "$status_path"
+  write_console "incus-gh-runner-guest state=${state}"
+}
+
+cleanup_payload() {
+  rm -f -- "$payload_path" "$ready_path"
+}
+
+finish() {
+  local exit_code="$?"
+
+  trap - EXIT
+  cleanup_payload
+  unset jit_config || true
+  write_status exited "$exit_code" || true
+  write_console "incus-gh-runner-guest action=poweroff exit_code=${exit_code} grace_seconds=${diagnostics_grace_seconds}"
+  sleep "$diagnostics_grace_seconds" || true
+  "$poweroff_bin" poweroff || true
+  exit "$exit_code"
+}
+
+trap finish EXIT
+
+[[ -f "$ready_path" ]] || {
+  write_console 'incus-gh-runner-guest error=missing-ready-marker'
+  printf 'incus-gh-runner-guest error=missing-ready-marker\n' >&2
+  exit 1
+}
+
+[[ -f "$payload_path" ]] || {
+  write_console 'incus-gh-runner-guest error=missing-payload'
+  printf 'incus-gh-runner-guest error=missing-payload\n' >&2
+  exit 1
+}
+
+jit_config="$({
+  jq --exit-status --raw-output '
+    if type == "object"
+      and ((keys | sort) == ["jit_config", "version"])
+      and .version == 1
+      and (.jit_config | type == "string" and length > 0)
+    then .jit_config
+    else error("invalid runtime payload")
+    end
+  ' "$payload_path"
+})"
+
+write_status starting
+cleanup_payload
+write_status running
+
+set +e
+if [[ -n "$runner_user" ]]; then
+  "$runuser_bin" -u "$runner_user" -- \
+    "$runner_root/run.sh" --jitconfig "$jit_config"
+else
+  "$runner_root/run.sh" --jitconfig "$jit_config"
+fi
+runner_exit_code="$?"
+set -e
+
+unset jit_config
+exit "$runner_exit_code"

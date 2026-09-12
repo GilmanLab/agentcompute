@@ -1,0 +1,160 @@
+#!/bin/sh
+# Root-only image builder. The job user may invoke this binary via sudo and
+# nothing else. It ignores the caller's environment (PATH, proxy, PYTHONPATH,
+# GIT_*, LD_*), clones public GilmanLab/agentcompute into a root-owned tree,
+# refuses to execute source unless the SHA is an ancestor of origin/master,
+# and runs images/build.py with system /usr/bin/python3 and distro PyYAML.
+#
+# stdout is exactly one JSON object: {"output_dir":"<absolute>"}.
+# Diagnostics and the build script's metrics go to stderr.
+#
+# Publisher-only: the guest service must NOT set NoNewPrivileges (or
+# RestrictSUIDSGID). Those flags inherit through runuser into the Actions
+# Runner process and block setuid sudo. The general runner image sets
+# NoNewPrivileges=true and has no sudoers; this image omits that drop-in
+# so this allowlisted command can run. Do not weaken the general image.
+set -eu
+
+err() {
+	printf 'agentcompute-build: %s\n' "$*" >&2
+	exit 1
+}
+
+log() {
+	printf 'agentcompute-build: %s\n' "$*" >&2
+}
+
+[ "$(id -u)" -eq 0 ] || err "must run as root"
+[ "$#" -eq 2 ] || err "usage: agentcompute-build <40-hex-sha> <router|runner|runner-publisher>"
+
+sha=$1
+image=$2
+
+case $sha in
+*[!0-9a-f]*) err "source SHA must be 40 lowercase hexadecimal characters" ;;
+esac
+[ "${#sha}" -eq 40 ] || err "source SHA must be 40 lowercase hexadecimal characters"
+
+case $image in
+router | runner | runner-publisher) ;;
+*) err "image must be router, runner, or runner-publisher" ;;
+esac
+
+for bin in /usr/bin/git /usr/bin/python3 /bin/chmod /bin/chown /bin/rm /bin/mkdir; do
+	[ -x "$bin" ] || err "missing $bin"
+done
+/usr/bin/python3 -c 'import yaml' 2>/dev/null || err "system PyYAML missing (python3-yaml)"
+
+umask 022
+
+root=/var/lib/agentcompute-build
+src=$root/$sha/src
+work=$root/$sha/$image/work
+out=$root/$sha/$image/out
+parent=$root/$sha/$image
+
+mkdir -p "$root" "$parent"
+chmod 0755 "$root" "$parent"
+
+# Fixed lab proxy. Never take proxy (or anything else) from the job environment.
+# Presence of the root-owned file means we are on the publisher image; absence
+# means direct egress (sandbox01 bootstrap). Values are pinned, not sourced.
+proxy_file=/etc/agentcompute-build/proxy.env
+proxy_url=http://10.10.10.14:3128
+no_proxy=10.10.10.14,127.0.0.1,localhost
+use_proxy=0
+if [ -e "$proxy_file" ]; then
+	[ -f "$proxy_file" ] || err "$proxy_file is not a regular file"
+	[ "$(stat -c '%u:%g' "$proxy_file")" = "0:0" ] || err "$proxy_file must be root:root"
+	mode=$(stat -c '%a' "$proxy_file")
+	case $mode in
+	644 | 640 | 600 | 444 | 440 | 400) ;;
+	*) err "$proxy_file mode $mode is too permissive" ;;
+	esac
+	expected=$(printf '%s\n' \
+		"HTTP_PROXY=${proxy_url}" \
+		"HTTPS_PROXY=${proxy_url}" \
+		"http_proxy=${proxy_url}" \
+		"https_proxy=${proxy_url}" \
+		"NO_PROXY=${no_proxy}" \
+		"no_proxy=${no_proxy}")
+	actual=$(grep -v '^#' "$proxy_file" | grep -v '^$' | tr -d '\r')
+	[ "$actual" = "$expected" ] || err "$proxy_file does not match the baked proxy endpoint"
+	use_proxy=1
+fi
+
+run_clean() {
+	# env -i drops job PATH, LD_*, PYTHON*, GIT_*, GITHUB_*, and any proxy the
+	# workflow exported. Only this allowlisted set is restored.
+	set -- PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+		HOME=/root \
+		LANG=C.UTF-8 \
+		LC_ALL=C.UTF-8 \
+		DEBIAN_FRONTEND=noninteractive \
+		PYTHONDONTWRITEBYTECODE=1 \
+		PYTHONNOUSERSITE=1 \
+		GIT_CONFIG_NOSYSTEM=1 \
+		GIT_CONFIG_GLOBAL=/dev/null \
+		GIT_TERMINAL_PROMPT=0 \
+		SOURCE_DATE_EPOCH=1 "$@"
+	if [ "$use_proxy" -eq 1 ]; then
+		set -- HTTP_PROXY=$proxy_url HTTPS_PROXY=$proxy_url \
+			http_proxy=$proxy_url https_proxy=$proxy_url \
+			NO_PROXY=$no_proxy no_proxy=$no_proxy "$@"
+	fi
+	/usr/bin/env -i "$@"
+}
+
+if [ -d "$src/.git" ]; then
+	current=$(run_clean /usr/bin/git -C "$src" rev-parse HEAD) || err "cannot read existing checkout"
+	[ "$current" = "$sha" ] || err "existing checkout $current does not match $sha"
+	log "reusing root-owned checkout $src"
+else
+	rm -rf "$src"
+	mkdir -p "$src"
+	chmod 0755 "$src"
+	log "cloning GilmanLab/agentcompute"
+	run_clean /usr/bin/git clone --filter=blob:none --origin origin \
+		https://github.com/GilmanLab/agentcompute.git "$src" >&2
+	run_clean /usr/bin/git -C "$src" fetch --no-tags origin master >&2
+	run_clean /usr/bin/git -C "$src" merge-base --is-ancestor "$sha" origin/master \
+		|| err "$sha is not an ancestor of origin/master"
+	run_clean /usr/bin/git -C "$src" checkout --detach "$sha" >&2
+	chown -R root:root "$src"
+	chmod -R u+rwX,go-w "$src"
+fi
+
+head=$(run_clean /usr/bin/git -C "$src" rev-parse HEAD)
+[ "$head" = "$sha" ] || err "checkout HEAD $head does not match $sha"
+run_clean /usr/bin/git -C "$src" merge-base --is-ancestor "$sha" origin/master \
+	|| err "$sha is not an ancestor of origin/master"
+
+[ -f "$src/images/build.py" ] || err "checkout is missing images/build.py"
+[ -f "$src/images/pins.yaml" ] || err "checkout is missing images/pins.yaml"
+
+rm -rf "$work" "$out"
+
+log "building $image"
+# Metrics and distrobuilder logs must not touch wrapper stdout.
+if ! run_clean /usr/bin/python3 "$src/images/build.py" build \
+	--image "$image" --work-dir "$work" --output-dir "$out" >&2; then
+	err "images/build.py failed for $image"
+fi
+
+[ -f "$out/metrics.json" ] || err "build produced no metrics.json"
+case $image in
+router)
+	[ -f "$out/router.tar.xz" ] || err "build produced no router.tar.xz"
+	;;
+*)
+	[ -f "$out/incus.tar.xz" ] || err "build produced no incus.tar.xz"
+	[ -f "$out/disk.qcow2" ] || err "build produced no disk.qcow2"
+	;;
+esac
+
+chmod -R a+rX "$out"
+if getent passwd actions-runner >/dev/null 2>&1; then
+	chown -R actions-runner:actions-runner "$out"
+fi
+
+printf '{"output_dir":"%s"}\n' "$out"

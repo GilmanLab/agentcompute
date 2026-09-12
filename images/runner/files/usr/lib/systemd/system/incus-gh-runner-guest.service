@@ -1,0 +1,15 @@
+[Unit]
+Description=Run one ephemeral GitHub Actions job
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/run/incus-gh-runner/payload.ready
+
+[Service]
+Type=oneshot
+Environment=ACTIONS_RUNNER_DISABLEUPDATE=1
+Environment=RUNNER_USER=actions-runner
+ExecStart=/usr/local/libexec/incus-gh-runner-guest
+TimeoutStartSec=infinity
+UMask=0077
+StandardOutput=journal
+StandardError=journal

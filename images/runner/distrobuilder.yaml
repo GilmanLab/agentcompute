@@ -1,0 +1,248 @@
+image:
+  distribution: ubuntu
+  release: noble
+  architecture: amd64
+  name: runner
+  description: GitHub Actions runner VM (Ubuntu 24.04)
+  variant: runner
+  serial: phase4
+  expiry: 3650d
+source:
+  downloader: rootfs-http
+  url: file:///build/seed.tar
+targets:
+  incus:
+    vm:
+      size: 8589934592
+      filesystem: ext4
+packages:
+  manager: apt
+  update: true
+  cleanup: true
+  sets:
+  - action: install
+    flags:
+    - --no-install-recommends
+    packages:
+    - systemd
+    - systemd-sysv
+    - systemd-resolved
+    - dbus
+    - linux-virtual
+    - grub-efi-amd64-signed
+    - shim-signed
+    - efibootmgr
+    - acpid
+    - netplan.io
+    - cloud-initramfs-growroot
+    - tzdata
+    - libicu74
+    - libkrb5-3
+    - liblttng-ust1t64
+    - libssl3t64
+    - zlib1g
+    - ca-certificates
+    - git
+    - curl
+    - jq
+    - util-linux
+  - action: install
+    variants:
+    - publisher
+    flags:
+    - --no-install-recommends
+    packages:
+    - sudo
+    - python3
+    - python3-yaml
+    - gh
+    - qemu-utils
+    - gdisk
+    - e2fsprogs
+    - dosfstools
+    - rsync
+    - gcc
+    - libc6-dev
+    - xz-utils
+    - udev
+files:
+- path: /etc/hostname
+  generator: hostname
+- path: /etc/hosts
+  generator: hosts
+- path: /etc/machine-id
+  generator: dump
+  content: uninitialized
+- path: /var/lib/dbus/machine-id
+  generator: remove
+- name: incus-agent
+  generator: incus-agent
+  types:
+  - vm
+- path: /etc/fstab
+  generator: dump
+  types:
+  - vm
+  content: |-
+    LABEL=rootfs  /         ext4  defaults,x-systemd.growfs  0 1
+    LABEL=UEFI    /boot/efi vfat  umask=0077  0 1
+- path: /etc/netplan/10-incus.yaml
+  generator: dump
+  mode: "0600"
+  types:
+  - vm
+  content: |-
+    network:
+      version: 2
+      ethernets:
+        id0:
+          match:
+            name: "en*"
+          dhcp4: true
+          dhcp-identifier: mac
+- path: /etc/default/grub.d/50-incus.cfg
+  generator: dump
+  types:
+  - vm
+  content: |-
+    GRUB_RECORDFAIL_TIMEOUT=0
+    GRUB_TIMEOUT=0
+    GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} console=tty1 console=ttyS0"
+    GRUB_TERMINAL=console
+- generator: copy
+  source: files/usr/local/libexec/incus-gh-runner-guest
+  path: /usr/local/libexec/incus-gh-runner-guest
+  mode: "0755"
+- generator: copy
+  source: files/usr/local/bin/incus-gh-runner-proof
+  path: /usr/local/bin/incus-gh-runner-proof
+  mode: "0755"
+- generator: copy
+  source: files/usr/lib/systemd/system/incus-gh-runner-guest.service
+  path: /usr/lib/systemd/system/incus-gh-runner-guest.service
+  mode: "0644"
+- generator: copy
+  source: files/usr/lib/systemd/system/incus-gh-runner-guest.path
+  path: /usr/lib/systemd/system/incus-gh-runner-guest.path
+  mode: "0644"
+- generator: copy
+  source: files/usr/lib/tmpfiles.d/incus-gh-runner.conf
+  path: /usr/lib/tmpfiles.d/incus-gh-runner.conf
+  mode: "0644"
+- path: /etc/systemd/system/incus-gh-runner-guest.service.d/no-new-privileges.conf
+  generator: dump
+  mode: "0644"
+  variants:
+  - runner
+  content: |-
+    [Service]
+    NoNewPrivileges=true
+- path: /etc/systemd/system/incus-gh-runner-guest.service.d/proxy.conf
+  generator: dump
+  mode: "0644"
+  variants:
+  - publisher
+  content: |-
+    [Service]
+    EnvironmentFile=/etc/agentcompute-build/proxy.env
+- generator: copy
+  source: files/usr/local/sbin/agentcompute-build
+  path: /usr/local/sbin/agentcompute-build
+  mode: "0755"
+  variants:
+  - publisher
+- generator: copy
+  source: files/etc/sudoers.d/agentcompute-build
+  path: /etc/sudoers.d/agentcompute-build
+  mode: "0440"
+  variants:
+  - publisher
+- generator: copy
+  source: files/etc/agentcompute-build/proxy.env
+  path: /etc/agentcompute-build/proxy.env
+  mode: "0644"
+  variants:
+  - publisher
+actions:
+- trigger: post-unpack
+  action: |-
+    #!/bin/sh
+    set -eux
+    [ -d /run/systemd ] || exit 0
+    command -v chattr >/dev/null 2>&1 || exit 0
+    rm -Rf /run/systemd/system
+    chattr +i /run/systemd
+- trigger: post-packages
+  action: |-
+    #!/bin/sh
+    set -eux
+    [ -d /run/systemd ] || exit 0
+    command -v chattr >/dev/null 2>&1 || exit 0
+    chattr -i /run/systemd
+- trigger: post-packages
+  action: |-
+    #!/bin/sh
+    set -eux
+    umount -l /etc/resolv.conf || true
+    rm -f /etc/resolv.conf
+    ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+    systemctl enable systemd-networkd
+    systemctl enable systemd-resolved
+    systemctl mask ua-auto-attach || true
+    systemctl mask snapd.service snapd.socket snapd.seeded.service || true
+    systemctl mask cloud-init.service cloud-init-local.service cloud-config.service cloud-final.service || true
+    systemctl mask ssh.service ssh.socket || true
+    for pkg in os-prober snapd cloud-init openssh-server; do
+      if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
+        apt-get purge -y "$pkg"
+      fi
+    done
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+    echo UTC > /etc/timezone
+    rm -f /etc/*-
+- trigger: post-packages
+  action: |-
+    #!/bin/sh
+    set -eux
+    install -d -m 0755 /opt/actions-runner
+    if ! getent passwd actions-runner >/dev/null; then
+      useradd --system --home-dir /opt/actions-runner --shell /usr/sbin/nologin actions-runner
+    fi
+    tar --extract --gzip --file /var/cache/agentcompute/actions-runner.tar.gz --directory /opt/actions-runner
+    chown -R actions-runner:actions-runner /opt/actions-runner
+    rm -f /var/cache/agentcompute/actions-runner.tar.gz
+    rmdir /var/cache/agentcompute 2>/dev/null || true
+    echo uninitialized > /etc/machine-id
+    rm -f /var/lib/dbus/machine-id
+    rm -f /etc/apt/apt.conf.d/99agentcompute-build-proxy
+- trigger: post-files
+  action: |-
+    #!/bin/sh
+    set -eu
+    systemctl enable incus-gh-runner-guest.path
+- trigger: post-files
+  action: |-
+    #!/bin/sh
+    set -eux
+    chown root:root /usr/local/sbin/agentcompute-build
+    chmod 0755 /usr/local/sbin/agentcompute-build
+    chown root:root /etc/sudoers.d/agentcompute-build
+    chmod 0440 /etc/sudoers.d/agentcompute-build
+    chown root:root /etc/agentcompute-build /etc/agentcompute-build/proxy.env
+    chmod 0755 /etc/agentcompute-build
+    chmod 0644 /etc/agentcompute-build/proxy.env
+  variants:
+  - publisher
+- trigger: post-files
+  action: |-
+    #!/bin/sh
+    set -eux
+    update-grub
+    grub-install --uefi-secure-boot --target=x86_64-efi --no-nvram --removable
+    grub-install --uefi-secure-boot --target=x86_64-efi --no-nvram
+    update-grub
+    sed -i "s#root=[^ ]*#root=${DISTROBUILDER_ROOT_UUID}#g" /boot/grub/grub.cfg
+  types:
+  - vm
+mappings:
+  architecture_map: debian

@@ -5,16 +5,21 @@
 #   "PyYAML==6.0.3",
 # ]
 # ///
-"""Validate pins and assemble the router Incus image.
+"""Validate pins and assemble Incus images.
 
 Usage:
   uv run --locked --script images/build.py validate
   sudo env PATH="$PATH" uv run --locked --script images/build.py build \\
+    --image router|runner|runner-publisher \\
     --work-dir <new-dir> --output-dir <new-dir>
+
+--image defaults to router (unified tar.xz). runner and runner-publisher
+emit split incus.tar.xz + disk.qcow2.
 """
 
 from __future__ import annotations
 
+import re
 import argparse
 import hashlib
 import json
@@ -34,8 +39,11 @@ import yaml
 
 IMAGES = Path(__file__).resolve().parent
 PINS_PATH = IMAGES / "pins.yaml"
-RECIPE_PATH = IMAGES / "router" / "distrobuilder.yaml"
 CATALOG_PATH = IMAGES / "catalog.yaml"
+RECIPE_PATH = IMAGES / "router" / "distrobuilder.yaml"
+RUNNER_DIR = IMAGES / "runner"
+RUNNER_RECIPE_PATH = RUNNER_DIR / "distrobuilder.yaml"
+IMAGE_NAMES = ("router", "runner", "runner-publisher")
 PYYAML_VERSION = "6.0.3"
 DISTROBUILDER_TAGS = (
     "containers_image_storage_stub,containers_image_docker_daemon_stub,"
@@ -50,7 +58,11 @@ PINS_KEYS = {
     "alpine",
     "imgoci",
     "pyyaml",
+    "runner",
 }
+SNAPSHOT_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z$")
+PROXY_HTTP = "http://10.10.10.14:3128"
+PROXY_NO = "10.10.10.14,127.0.0.1,localhost"
 CATALOG_KEYS = {"schema_version", "images"}
 SHA256_LEN = 64
 
@@ -179,7 +191,132 @@ def load_pins() -> dict[str, Any]:
     extra_keys(pyyaml, {"version"}, "pyyaml")
     if pyyaml.get("version") != PYYAML_VERSION:
         raise Error(f"pyyaml.version must be {PYYAML_VERSION}")
+    load_runner_pins(pins)
     return pins
+
+def load_runner_pins(pins: dict[str, Any]) -> None:
+    runner = require_mapping(pins.get("runner"), "runner")
+    extra_keys(runner, {"ubuntu", "actions_runner", "ca_certificates", "guest", "proxy"}, "runner")
+    ubuntu = require_mapping(runner.get("ubuntu"), "runner.ubuntu")
+    extra_keys(ubuntu, {"version", "release", "url", "sha256", "snapshot"}, "runner.ubuntu")
+    require_str(ubuntu.get("version"), "runner.ubuntu.version")
+    if ubuntu.get("release") != "noble":
+        raise Error("runner.ubuntu.release must be noble")
+    require_https(require_str(ubuntu.get("url"), "runner.ubuntu.url"), "runner.ubuntu.url")
+    require_sha256(ubuntu.get("sha256"), "runner.ubuntu.sha256")
+    snapshot = require_str(ubuntu.get("snapshot"), "runner.ubuntu.snapshot")
+    if SNAPSHOT_RE.match(snapshot) is None:
+        raise Error("runner.ubuntu.snapshot must be YYYYMMDDTHHMMSSZ")
+    ca_certs = require_mapping(runner.get("ca_certificates"), "runner.ca_certificates")
+    extra_keys(ca_certs, {"version", "url", "sha256"}, "runner.ca_certificates")
+    ca_version = require_str(ca_certs.get("version"), "runner.ca_certificates.version")
+    ca_url = require_https(
+        require_str(ca_certs.get("url"), "runner.ca_certificates.url"),
+        "runner.ca_certificates.url",
+    )
+    require_sha256(ca_certs.get("sha256"), "runner.ca_certificates.sha256")
+    ca_filename = ca_url.rsplit("/", 1)[-1]
+    expected_ca = f"ca-certificates_{ca_version}_all.deb"
+    if ca_filename != expected_ca:
+        raise Error(f"runner.ca_certificates.url filename {ca_filename} does not match {expected_ca}")
+    if f"/{snapshot}/" not in ca_url:
+        raise Error("runner.ca_certificates.url must be from the pinned Ubuntu snapshot")
+    actions = require_mapping(runner.get("actions_runner"), "runner.actions_runner")
+    extra_keys(actions, {"version", "url", "sha256"}, "runner.actions_runner")
+    require_str(actions.get("version"), "runner.actions_runner.version")
+    url = require_https(
+        require_str(actions.get("url"), "runner.actions_runner.url"),
+        "runner.actions_runner.url",
+    )
+    require_sha256(actions.get("sha256"), "runner.actions_runner.sha256")
+    expected = f"actions-runner-linux-x64-{actions['version']}.tar.gz"
+    if url.rsplit("/", 1)[-1] != expected:
+        raise Error(f"runner.actions_runner.url filename must be {expected}")
+    guest = require_mapping(runner.get("guest"), "runner.guest")
+    extra_keys(guest, {"version", "origin", "tag", "files"}, "runner.guest")
+    if guest.get("version") != "2.0.0" or guest.get("tag") != "v2.0.0":
+        raise Error("runner.guest must pin incus-gh-runner v2.0.0")
+    origin = require_https(require_str(guest.get("origin"), "runner.guest.origin"), "runner.guest.origin")
+    if origin != "https://github.com/meigma/incus-gh-runner":
+        raise Error("runner.guest.origin must be https://github.com/meigma/incus-gh-runner")
+    files = require_list(guest.get("files"), "runner.guest.files")
+    if len(files) != 5:
+        raise Error("runner.guest.files must list the five v2.0.0 guest assets")
+    seen: set[str] = set()
+    for index, item in enumerate(files):
+        entry = require_mapping(item, f"runner.guest.files[{index}]")
+        extra_keys(entry, {"source", "path", "sha256"}, f"runner.guest.files[{index}]")
+        source = require_str(entry.get("source"), f"runner.guest.files[{index}].source")
+        path = require_str(entry.get("path"), f"runner.guest.files[{index}].path")
+        require_sha256(entry.get("sha256"), f"runner.guest.files[{index}].sha256")
+        if not source.startswith("guest/") or ".." in source or ".." in path:
+            raise Error(f"invalid guest path {source} -> {path}")
+        if not path.startswith("files/") or path in seen:
+            raise Error(f"duplicate or invalid guest dest {path}")
+        seen.add(path)
+    proxy = require_mapping(runner.get("proxy"), "runner.proxy")
+    extra_keys(proxy, {"http", "no_proxy"}, "runner.proxy")
+    if proxy.get("http") != PROXY_HTTP:
+        raise Error(f"runner.proxy.http must be {PROXY_HTTP}")
+    if proxy.get("no_proxy") != PROXY_NO:
+        raise Error(f"runner.proxy.no_proxy must be {PROXY_NO}")
+
+
+def load_runner_recipe() -> dict[str, Any]:
+    recipe = require_mapping(load_yaml(RUNNER_RECIPE_PATH), str(RUNNER_RECIPE_PATH))
+    source = require_mapping(recipe.get("source"), "runner source")
+    url = require_str(source.get("url"), "runner source.url")
+    parsed = urlparse(url)
+    if parsed.scheme != "file" or not parsed.path:
+        raise Error("runner source.url must be a file:// seed path")
+    packages = require_mapping(recipe.get("packages"), "runner packages")
+    if packages.get("manager") != "apt":
+        raise Error("runner packages.manager must be apt")
+    if not require_bool(packages.get("update"), "runner packages.update"):
+        raise Error("runner packages.update must be true")
+    files = require_list(recipe.get("files"), "runner files")
+    generators = {item.get("generator") for item in files if isinstance(item, dict)}
+    if "incus-agent" not in generators:
+        raise Error("runner recipe must include the incus-agent generator")
+    fstab = next(
+        (
+            item
+            for item in files
+            if isinstance(item, dict) and item.get("path") == "/etc/fstab"
+        ),
+        None,
+    )
+    if not isinstance(fstab, dict) or "x-systemd.growfs" not in str(fstab.get("content") or ""):
+        raise Error("runner /etc/fstab must set x-systemd.growfs")
+    return recipe
+
+
+def validate_guest_files(pins: dict[str, Any]) -> None:
+    for entry in pins["runner"]["guest"]["files"]:
+        path = RUNNER_DIR / entry["path"]
+        if not path.is_file():
+            raise Error(f"missing vendored guest file {path}")
+        digest = sha256_file(path)
+        if digest != entry["sha256"]:
+            raise Error(f"sha256 mismatch for {path}: got {digest} want {entry['sha256']}")
+    wrapper = RUNNER_DIR / "files/usr/local/sbin/agentcompute-build"
+    sudoers = RUNNER_DIR / "files/etc/sudoers.d/agentcompute-build"
+    proxy = RUNNER_DIR / "files/etc/agentcompute-build/proxy.env"
+    for path in (wrapper, sudoers, proxy):
+        if not path.is_file():
+            raise Error(f"missing publisher file {path}")
+    text = proxy.read_text(encoding="utf-8")
+    expected = (
+        f"HTTP_PROXY={PROXY_HTTP}\n"
+        f"HTTPS_PROXY={PROXY_HTTP}\n"
+        f"http_proxy={PROXY_HTTP}\n"
+        f"https_proxy={PROXY_HTTP}\n"
+        f"NO_PROXY={PROXY_NO}\n"
+        f"no_proxy={PROXY_NO}\n"
+    )
+    if text != expected:
+        raise Error("publisher proxy.env does not match runner.proxy pins")
+
 
 
 def recipe_package_filenames(recipe: dict[str, Any]) -> list[str]:
@@ -247,6 +384,8 @@ def validate() -> dict[str, Any]:
     pins = load_pins()
     recipe = load_recipe()
     validate_package_closure(pins, recipe)
+    load_runner_recipe()
+    validate_guest_files(pins)
     validate_catalog()
     return pins
 
@@ -340,7 +479,254 @@ def extract_tar(archive: Path, dest: Path) -> None:
     run_checked(["tar", "-xzf", str(archive), "-C", str(dest)])
 
 
-def build(work_dir: Path, output_dir: Path) -> dict[str, Any]:
+def require_command(name: str) -> None:
+    if shutil.which(name) is None:
+        raise Error(f"missing command: {name}")
+
+
+def compile_distrobuilder(pins: dict[str, Any], work: Path, downloads: Path) -> tuple[Path, float, int]:
+    go_archive = downloads / pins["go"]["url"].rsplit("/", 1)[-1]
+    distro_archive = downloads / pins["distrobuilder"]["url"].rsplit("/", 1)[-1]
+    if not go_archive.is_file() or not distro_archive.is_file():
+        raise Error("go/distrobuilder archives missing from downloads")
+    compile_started = time.monotonic()
+    extract_tar(go_archive, work)
+    extract_tar(distro_archive, work)
+    go_bin = work / "go" / "bin"
+    distro_src = work / f"distrobuilder-{pins['distrobuilder']['version']}"
+    distro_bin = work / "distrobuilder"
+    if not (go_bin / "go").is_file():
+        raise Error("go toolchain extract did not produce go/bin/go")
+    if not distro_src.is_dir():
+        raise Error(f"distrobuilder extract did not produce {distro_src.name}")
+    env = os.environ.copy()
+    env["PATH"] = f"{go_bin}{os.pathsep}{env.get('PATH', '')}"
+    env["GOTOOLCHAIN"] = "local"
+    env["GOCACHE"] = str(work / "gocache")
+    env["GOMODCACHE"] = str(work / "gomod")
+    (work / "gocache").mkdir(mode=0o700)
+    (work / "gomod").mkdir(mode=0o700)
+    run_checked(
+        [
+            str(go_bin / "go"),
+            "build",
+            "-mod=vendor",
+            "-trimpath",
+            f"-tags={DISTROBUILDER_TAGS}",
+            "-o",
+            str(distro_bin),
+            "./distrobuilder",
+        ],
+        cwd=distro_src,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    if not distro_bin.is_file():
+        raise Error("distrobuilder compile did not produce a binary")
+    return distro_bin, round(time.monotonic() - compile_started, 3), rss_kib()
+
+
+def inject_seed_ca_certificates(deb: Path, seed: Path, work: Path) -> None:
+    extracted = work / "ca-certificates"
+    if extracted.exists():
+        shutil.rmtree(extracted)
+    extracted.mkdir(mode=0o700)
+    run_checked(["dpkg-deb", "-x", str(deb), str(extracted)])
+    mozilla = extracted / "usr" / "share" / "ca-certificates" / "mozilla"
+    if not mozilla.is_dir():
+        raise Error("ca-certificates deb has no Mozilla cert directory")
+    certs = sorted(path for path in mozilla.iterdir() if path.is_file() and path.suffix == ".crt")
+    if not certs:
+        raise Error("ca-certificates deb has no Mozilla .crt files")
+    dest_mozilla = seed / "usr" / "share" / "ca-certificates" / "mozilla"
+    dest_mozilla.mkdir(parents=True, exist_ok=True)
+    parts: list[str] = []
+    for cert in certs:
+        target = dest_mozilla / cert.name
+        shutil.copyfile(cert, target, follow_symlinks=False)
+        if sha256_file(target) != sha256_file(cert):
+            raise Error(f"seed copy changed bytes: {cert.name}")
+        text = target.read_text(encoding="utf-8")
+        if "BEGIN CERTIFICATE" not in text:
+            raise Error(f"Mozilla cert {cert.name} is not a PEM certificate")
+        if not text.endswith("\n"):
+            text += "\n"
+        parts.append(text)
+    dest_bundle = seed / "etc" / "ssl" / "certs"
+    dest_bundle.mkdir(parents=True, exist_ok=True)
+    (dest_bundle / "ca-certificates.crt").write_text("".join(parts), encoding="utf-8")
+
+
+def host_proxy() -> str | None:
+    for key in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
+        value = os.environ.get(key)
+        if value:
+            return value
+    return None
+
+
+def build_vm(
+    pins: dict[str, Any], work: Path, output: Path, tools: dict[str, str], image: str
+) -> dict[str, Any]:
+    variant = "publisher" if image == "runner-publisher" else "runner"
+    downloads = work / "downloads"
+    downloads.mkdir(mode=0o700)
+    download_started = time.monotonic()
+    ubuntu = pins["runner"]["ubuntu"]
+    actions = pins["runner"]["actions_runner"]
+    ca_certs = pins["runner"]["ca_certificates"]
+    ubuntu_archive = downloads / ubuntu["url"].rsplit("/", 1)[-1]
+    runner_archive = downloads / actions["url"].rsplit("/", 1)[-1]
+    go_archive = downloads / pins["go"]["url"].rsplit("/", 1)[-1]
+    distro_archive = downloads / pins["distrobuilder"]["url"].rsplit("/", 1)[-1]
+    ca_deb = downloads / ca_certs["url"].rsplit("/", 1)[-1]
+    download(pins["go"]["url"], go_archive, pins["go"]["sha256"])
+    download(pins["distrobuilder"]["url"], distro_archive, pins["distrobuilder"]["sha256"])
+    download(ubuntu["url"], ubuntu_archive, ubuntu["sha256"])
+    download(ca_certs["url"], ca_deb, ca_certs["sha256"])
+    download(actions["url"], runner_archive, actions["sha256"])
+    download_wall = round(time.monotonic() - download_started, 3)
+    distro_bin, compile_wall, compile_rss = compile_distrobuilder(pins, work, downloads)
+
+    # Guest files need normal modes; their host work directory remains private.
+    os.umask(0o022)
+    seed = work / "seed"
+    seed.mkdir()
+    run_checked(["tar", "-xzf", str(ubuntu_archive), "-C", str(seed)])
+    # This directory becomes guest /, which service users must traverse.
+    seed.chmod(0o755)
+    inject_seed_ca_certificates(ca_deb, seed, work)
+    apt_dir = seed / "etc" / "apt" / "apt.conf.d"
+    apt_dir.mkdir(parents=True, exist_ok=True)
+    (apt_dir / "50agentcompute-snapshot").write_text(
+        'Acquire::Check-Valid-Until "false";\n'
+        'Acquire::Languages "none";\n',
+        encoding="utf-8",
+    )
+    sources_dir = seed / "etc" / "apt" / "sources.list.d"
+    sources_dir.mkdir(parents=True, exist_ok=True)
+    (sources_dir / "ubuntu.sources").write_text(
+        "Types: deb\n"
+        f"URIs: https://snapshot.ubuntu.com/ubuntu/{ubuntu['snapshot']}\n"
+        "Suites: noble noble-updates noble-security\n"
+        "Components: main universe restricted\n"
+        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n",
+        encoding="utf-8",
+    )
+    sources_list = seed / "etc" / "apt" / "sources.list"
+    if sources_list.exists() or sources_list.is_symlink():
+        sources_list.unlink()
+    sources_list.write_text("", encoding="utf-8")
+    proxy = host_proxy()
+    if proxy:
+        (apt_dir / "99agentcompute-build-proxy").write_text(
+            f'Acquire::http::Proxy "{proxy}";\nAcquire::https::Proxy "{proxy}";\n',
+            encoding="utf-8",
+        )
+    cache = seed / "var" / "cache" / "agentcompute"
+    cache.mkdir(parents=True, exist_ok=True)
+    seeded_runner = cache / "actions-runner.tar.gz"
+    try:
+        os.link(runner_archive, seeded_runner)
+    except OSError:
+        shutil.copyfile(runner_archive, seeded_runner, follow_symlinks=False)
+    if sha256_file(seeded_runner) != sha256_file(runner_archive):
+        raise Error("seed copy changed actions-runner archive bytes")
+    seed_tar = work / "seed.tar"
+    run_checked(["tar", "-cf", str(seed_tar), "-C", str(seed), "."])
+    shutil.rmtree(seed)
+
+    cache_dir = work / "cache"
+    cache_dir.mkdir(mode=0o700)
+    command = [
+        str(distro_bin),
+        "build-incus",
+        str(RUNNER_RECIPE_PATH),
+        str(output),
+        "--vm",
+        "--type=split",
+        "--compression=xz",
+        "--disable-overlay",
+        f"--cache-dir={cache_dir}",
+        "-o",
+        f"source.url={seed_tar.resolve().as_uri()}",
+        "-o",
+        f"image.variant={variant}",
+        "-o",
+        f"image.name={image}",
+    ]
+    assemble_started = time.monotonic()
+    peak_scratch = scratch_bytes(work)
+    log_path = work / "build.log"
+    with log_path.open("w", encoding="utf-8") as log:
+        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, cwd=RUNNER_DIR)
+        while process.poll() is None:
+            peak_scratch = max(peak_scratch, scratch_bytes(work))
+            time.sleep(0.1)
+        peak_scratch = max(peak_scratch, scratch_bytes(work))
+    assemble_wall = round(time.monotonic() - assemble_started, 3)
+    assemble_rss = rss_kib()
+    if process.returncode:
+        sys.stderr.write(log_path.read_text(encoding="utf-8", errors="replace"))
+        raise Error(f"distrobuilder exited {process.returncode}")
+
+    metadata = output / "incus.tar.xz"
+    disk = output / "disk.qcow2"
+    if not metadata.is_file() or not disk.is_file():
+        raise Error(f"missing split VM artifacts in {output}")
+    try:
+        info = json.loads(
+            run_checked(["qemu-img", "info", "--output=json", str(disk)], capture_output=True).stdout
+        )
+    except Error:
+        raise
+    virtual = int(info.get("virtual-size") or 0)
+    if virtual <= 0:
+        raise Error(f"{disk} has no virtual size")
+    metrics = {
+        "image": image,
+        "variant": variant,
+        "download_wall_seconds": download_wall,
+        "compile_wall_seconds": compile_wall,
+        "assemble_wall_seconds": assemble_wall,
+        "download_includes": (
+            "https fetch and sha256 of go, vendored distrobuilder source, "
+            "ubuntu-base, snapshot ca-certificates, and the Actions Runner archive"
+        ),
+        "compile_includes": (
+            "extract go+distrobuilder and go build -mod=vendor "
+            f"-tags={DISTROBUILDER_TAGS}; excludes download and assemble"
+        ),
+        "assemble_includes": (
+            "ubuntu-base seed plus distrobuilder build-incus --vm --type=split "
+            "--compression=xz --disable-overlay; excludes download and compile"
+        ),
+        "peak_rss_kib": assemble_rss,
+        "compile_peak_rss_kib": compile_rss,
+        "scratch_high_water_bytes": peak_scratch,
+        "scratch_sampling_seconds": 0.1,
+        "artifacts": {
+            "incus.tar.xz": {
+                "bytes": metadata.stat().st_size,
+                "sha256": sha256_file(metadata),
+            },
+            "disk.qcow2": {
+                "bytes": disk.stat().st_size,
+                "sha256": sha256_file(disk),
+                "virtual_bytes": virtual,
+            },
+        },
+        "tools": tools,
+        "ubuntu_snapshot": ubuntu["snapshot"],
+        "actions_runner_version": actions["version"],
+        "guest_version": pins["runner"]["guest"]["version"],
+    }
+    (output / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(metrics, indent=2))
+    return metrics
+
+def build(work_dir: Path, output_dir: Path, image: str = "router") -> dict[str, Any]:
     pins = validate()
     info = os.uname()
     if info.sysname != "Linux" or info.machine not in {"x86_64", "amd64"}:
@@ -357,6 +743,14 @@ def build(work_dir: Path, output_dir: Path) -> dict[str, Any]:
         "xz": first_line(["xz", "--version"]),
         "gcc": first_line(["gcc", "--version"]),
     }
+    if image not in IMAGE_NAMES:
+        raise Error(f"unknown image {image}")
+    if image != "router":
+        for name in ("qemu-img", "sgdisk", "mkfs.ext4", "mkfs.vfat", "losetup", "rsync", "blkid", "mount", "dpkg-deb"):
+            require_command(name)
+        tools["qemu-img"] = first_line(["qemu-img", "--version"])
+        tools["dpkg-deb"] = first_line(["dpkg-deb", "--version"])
+        return build_vm(pins, work, output, tools, image)
     downloads = work / "downloads"
     packages_dir = work / "packages"
     downloads.mkdir(mode=0o700)
@@ -508,7 +902,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("validate", help="check pins, recipe closure, and catalog keys")
-    build_cmd = sub.add_parser("build", help="download, compile, and assemble router.tar.xz")
+    build_cmd = sub.add_parser("build", help="download, compile, and assemble an image")
+    build_cmd.add_argument("--image", choices=IMAGE_NAMES, default="router")
     build_cmd.add_argument("--work-dir", type=Path, required=True)
     build_cmd.add_argument("--output-dir", type=Path, required=True)
     return parser.parse_args(argv)
@@ -520,7 +915,7 @@ def main(argv: list[str]) -> int:
         if args.command == "validate":
             validate()
         else:
-            build(args.work_dir, args.output_dir)
+            build(args.work_dir, args.output_dir, args.image)
     except Error as exc:
         print(f"images/build.py: {exc}", file=sys.stderr)
         return 1
