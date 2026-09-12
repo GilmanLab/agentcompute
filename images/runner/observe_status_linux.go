@@ -26,8 +26,14 @@ func observe() error {
 	if _, err := syscall.InotifyAddWatch(fd, "/run/incus-gh-runner", syscall.IN_MOVED_TO); err != nil {
 		return err
 	}
-	fmt.Println(`{"observer":"ready"}`)
-	buffer := make([]byte, 4096)
+	if _, err := fmt.Fprintln(os.Stdout, `{"observer":"ready"}`); err != nil {
+		return err
+	}
+	return observeUpdates(fd)
+}
+
+func observeUpdates(fd int) error {
+	buffer := make([]byte, os.Getpagesize())
 	previous := ""
 	for {
 		if _, err := syscall.Read(fd, buffer); err != nil {
@@ -50,10 +56,13 @@ func observe() error {
 			return err
 		}
 		if status.State != previous {
-			fmt.Print(string(data))
+			if _, err := os.Stdout.Write(data); err != nil {
+				return err
+			}
 			previous = status.State
 		}
-		if status.State == "exited" || status.State == "failed" {
+		switch status.State {
+		case "exited", "failed":
 			return nil
 		}
 	}
