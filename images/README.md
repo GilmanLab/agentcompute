@@ -37,8 +37,10 @@ distrobuilder needs root and loop devices, not KVM. macOS cannot run it;
 `sandbox01` can.
 
 For a runner VM, add `--image runner` or `--image runner-publisher`. Install
-the VM assembly tools (`qemu-img`, `mkfs.vfat`, `mkfs.ext4`, `resize2fs`,
-`losetup`, `mount`, and `rsync`) first. Output is `incus.tar.xz`,
+the VM assembly tools (`btrfs`, `qemu-img`, `sgdisk`, `mkfs.vfat`, `mkfs.ext4`,
+`resize2fs`, `losetup`, `mount`, `rsync`, `blkid`, and `dpkg-deb`) first.
+Distrobuilder requires `btrfs` even for an ext4 image; the publisher variant
+bakes `btrfs-progs` alongside its other assembly tools. Output is `incus.tar.xz`,
 `disk.qcow2`, and `metrics.json`; no nested virtualization is used.
 
 The guest files are copied byte-for-byte from the pinned incus-gh-runner
