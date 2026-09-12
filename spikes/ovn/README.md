@@ -610,7 +610,10 @@ These rules are also recorded in session 019's `ARCHITECTURE_GO.md` and
 the parent conflict explains the attachment failure, but selecting that
 unusable gateway without an actionable API error remains the reported behavior.
 The northbound creation issue [#3985](https://github.com/lxc/incus/issues/3985)
-is independent and remains open.
+is independent. Both #3985 and #3986 were automatically closed by the
+repository's web-interface-only issue submission policy, not a technical
+resolution. The root-cause update was posted to the existing #3986 as
+requested; neither report has been resubmitted or reopened.
 
 ### Ownership check and final verification
 
