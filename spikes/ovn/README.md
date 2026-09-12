@@ -1,6 +1,14 @@
 # OVN mechanism spike
 
-**2026-09-12 — NOT SMOOTH.** Step 6 did not fail cleanly with central down:
+**Current verdict: PROCEED.** Removing the conflicting `default/soak01`
+macvlan fixture restored lab01's uplink. The first post-removal lab01-gateway
+cycle passed every check in **31.018 s**, with successful OVS parent attachment
+and no EBUSY retries. The two operating requirements are exclusive
+`fast40-uplink` ownership of `fast40` and central availability for OVN
+control-plane operations. See the parent-conflict recovery section at the end
+and its [evidence](parent-recovery-2026-09-12/).
+
+**Initial 2026-09-12 verdict — NOT SMOOTH (superseded below).** Step 6 did not fail cleanly with central down:
 network creation timed out and left an `Errored` network. Step 7 recreated
 cross-member connectivity, but gateway and internet egress failed without
 manual repair. The first pass's dataplane worked. This verdict uses steps
@@ -11,13 +19,13 @@ manual repair. The first pass's dataplane worked. This verdict uses steps
 - [Report and probe PR #15](https://github.com/GilmanLab/agentcompute/pull/15)
 - [Northbound-unset reproduction](https://github.com/lxc/incus/issues/3948#issuecomment-5642832127)
 
-The owner decides whether to use the documented bridge alternative. This
-experiment does not change the design draft or choose another architecture.
+The owner authorized proceeding with OVN after the parent-conflict recovery.
+Historical failed runs remain recorded below; no bridge alternative was implemented.
 
 ## Retained state and Phase 5 handoff
 
-The resume instruction supersedes the original rollback requirement. These
-resources remain deliberately enabled despite the negative verdict:
+The resume instruction superseded the original rollback requirement. These
+resources remain enabled for Phase 5 under the current PROCEED requirements:
 
 | Resource | Retained configuration |
 | --- | --- |
@@ -522,3 +530,84 @@ Ruff passed for the new fleet deploy and both Python probe helpers; Bash syntax,
 Python compilation, and the actual cycle CLI help passed. The companion
 address-plan site built successfully with `moon run docs:build`. No additional
 live cycle was run after the owner's FALLBACK condition was established.
+
+## 2026-09-12 — parent conflict resolved
+
+**PROCEED** under the owner's final decision rule. `soak01` was an authorized
+03c fixture, not a durable workload. Its raw macvlan `eth1` and OVS competed for
+the same `fast40` RX handler. Fleet stopped and deleted only `default/soak01`
+on lab01. Graceful stop reached its 30-second deadline; a fleet force-stop
+then succeeded, followed by deletion of the stopped VM. The API returned
+`Instance not found`, and `fast40.used_by` then contained only
+`/1.0/networks/fast40-uplink`.
+
+No reboot, central restart, chassis change, or neighbor clear accompanied this
+recovery. Lab01 kept boot ID `b5e39bb2a73f421c9b89a935f9f116b2`.
+
+### Attachment and qualification evidence
+
+The first new cycle selected **lab01** as gateway:
+
+| Field | Observed value |
+| --- | --- |
+| NB router | `incus-net39-lr` |
+| Router external address | `10.10.40.64` |
+| Router MAC | `10:66:6a:66:eb:74` |
+| Network creation | 0.669 s |
+| Complete create/probe/diagnose/destroy cycle | **31.018 s** |
+| Probe, capture, and cleanup failures | None |
+
+All checks passed: cross-member ping, both 100 MB SHA-256 transfers, both guests'
+gateway ping, DNS and HTTPS egress, and the workstation forward. The cycle
+destroyed its disposable project and network normally.
+
+Lab01's OVS journal records:
+
+```text
+ovs|00218|bridge|INFO|bridge incusovn16: added interface fast40 on port 1
+```
+
+There were **zero `Device or resource busy` messages** in the captured
+post-removal interval. After the successful workload checks, normal
+last-consumer teardown logged:
+
+```text
+ovs|00227|bridge|INFO|bridge incusovn16: deleted interface fast40 on port 1
+```
+
+Thus the port was present for the active OVN topology, not left artificially
+attached after teardown. The earlier gateway failure was fixture-induced
+parent contention, not a demonstrated OVN recreate regression.
+
+See [cycle output](parent-recovery-2026-09-12/cycle-1/cycle.json),
+[probe transcript](parent-recovery-2026-09-12/cycle-1/probe.stdout.txt),
+[attachment journal](parent-recovery-2026-09-12/lab01-attachment-journal.json),
+and [fleet command transcript](parent-recovery-2026-09-12/execution.jsonl).
+The temporary fixture-removal deploy is retained as evidence text, not a
+permanent deploy that could delete a future instance with the same name.
+
+### Required operating rules
+
+1. **Exclusive parent ownership.** Only default-project `fast40-uplink` may
+   attach to `fast40` on any member. No instance or profile may attach a raw
+   macvlan/physical NIC to that parent, and no competing managed network may
+   claim it. Sandbox projects use `restricted.devices.nic=managed`; this is
+   already set by both the production sandbox adapter and spike helper.
+   Fleet checks default-project instances (including expanded devices),
+   profiles, and member-specific network configuration before OVN convergence.
+   The check reports conflicts and refuses to proceed; it never deletes them.
+   Default-project administrator changes must pass that fleet check.
+2. **Central-up control plane.** OVN create/update/delete operations require
+   central to be available. A timed-out create may leave an `Errored` network
+   and an external address reservation. After central recovers, the reaper
+   can delete that network and retry cleanup; the experiment demonstrated
+   deletion-only recovery. Existing forwarding during an outage is a separate
+   dataplane property, not permission to perform control-plane operations.
+
+These rules are also recorded in session 019's `ARCHITECTURE_GO.md` and
+`prompts/05-durable-ovn.md`. Incus
+[#3986](https://github.com/lxc/incus/issues/3986) remains a legitimate report:
+the parent conflict explains the attachment failure, but selecting that
+unusable gateway without an actionable API error remains the reported behavior.
+The northbound creation issue [#3985](https://github.com/lxc/incus/issues/3985)
+is independent and remains open.
