@@ -611,3 +611,27 @@ the parent conflict explains the attachment failure, but selecting that
 unusable gateway without an actionable API error remains the reported behavior.
 The northbound creation issue [#3985](https://github.com/lxc/incus/issues/3985)
 is independent and remains open.
+
+### Ownership check and final verification
+
+The fleet OVN deploy now runs the read-only ownership check before any
+convergence. It also rejects direct physical-uplink NICs and
+`bridge.external_interfaces` claims, not only raw NIC `parent` fields.
+Run the check independently from `fleet/cluster`:
+
+```sh
+uv run --locked pyinfra inventory.py src/fleet_cluster/deploys/ovn_parent_check.py -v --yes
+```
+
+The final live check passed without changes in **2.434 s**. The full fleet OVN
+dry-run passed with **11 unchanged operations** in **4.514 s**. Fleet pytest
+passed **47 tests**; mypy passed **18 source files**; Ruff passed. Regression
+cases cover inherited/stopped-instance NICs, profile NICs, member-specific
+network parents, direct physical-uplink NICs, bridge external interfaces,
+allowed logical OVN NICs, and missing inspection data. The bridge-interface
+case failed before the guard covered that attachment path and passed afterward.
+
+All four members remain ONLINE. Central's four units are active; no disposable
+NB topology, keeper, or `soak01` remains. The address-plan site built with
+`moon run docs:build`. Architecture and Phase 5 requirements were committed
+to the personal journal branch without changing other session files.
