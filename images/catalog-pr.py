@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Open a catalog-only PR from qualified releases without changing public master."""
+
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import tempfile
+
+import yaml
+
+REPO = "GilmanLab/agentcompute"
+NAMESPACE = "ghcr.io/gilmanlab/agentcompute"
+
+
+def capture(*args: str, cwd: Path | None = None) -> str:
+    return subprocess.check_output(args, cwd=cwd, text=True).strip()
+
+
+def run(*args: str, cwd: Path) -> None:
+    subprocess.run(args, cwd=cwd, check=True)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sha", required=True)
+    parser.add_argument("--releases", required=True, type=Path)
+    args = parser.parse_args()
+    if not re.fullmatch(r"[0-9a-f]{40}", args.sha):
+        raise ValueError("invalid source SHA")
+    releases = json.loads(args.releases.read_text())
+    if {item["name"] for item in releases} != {"router", "runner", "runner-publisher"} or len(releases) != 3:
+        raise ValueError("all three qualified image releases are required")
+    for item in releases:
+        if item["source_sha"] != args.sha or not re.fullmatch(r"sha256:[0-9a-f]{64}", item["digest"]):
+            raise ValueError("invalid qualified release identity")
+    branch = f"images/catalog-{args.sha}"
+    existing = json.loads(capture("gh", "pr", "list", "--repo", REPO, "--head", branch,
+                                  "--state", "open", "--json", "url"))
+    if existing:
+        print(existing[0]["url"])
+        return
+    with tempfile.TemporaryDirectory(prefix="image-catalog-") as temporary:
+        root = Path(temporary)
+        run("git", "clone", "--branch", "master", f"https://github.com/{REPO}.git", str(root / "source"), cwd=root)
+        source = root / "source"
+        expected_head = capture("git", "for-each-ref", "--format=%(objectname)",
+                                f"refs/remotes/origin/{branch}", cwd=source)
+        run("git", "merge-base", "--is-ancestor", args.sha, "origin/master", cwd=source)
+        run("git", "diff", "--exit-code", args.sha, "origin/master", "--", "images", "cmd/image-publish",
+            "go.mod", "go.sum", ":(exclude)images/catalog.yaml", ":(exclude)images/README.md", cwd=source)
+        path = source / "images/catalog.yaml"
+        original = path.read_text()
+        catalog = yaml.safe_load(original)
+        entries = {entry["name"]: entry for entry in catalog["images"]}
+        changed = False
+        for item in releases:
+            name = item["name"]
+            entry = entries.get(name)
+            if entry is None:
+                if name == "router":
+                    raise ValueError("router catalog entry is missing")
+                entry = {"name": name, "os": "ubuntu", "version": "24.04", "kinds": ["vm"],
+                         "kind": "vm", "cpus": 4, "memory_mb": 8192, "disk_gb": 40}
+                catalog["images"].append(entry)
+            reference = f"{NAMESPACE}/{name}@{item['digest']}"
+            changed |= entry.get("reference") != reference
+            entry["reference"] = reference
+        if not changed:
+            print("Catalog already records every qualified digest; no PR needed")
+            return
+        # Keep the contract header; the new PR supplies current per-entry provenance.
+        header = re.match(r"(?:#[^\n]*\n|\n)*", original).group(0)
+        path.write_text(header + yaml.safe_dump(catalog, sort_keys=False))
+        run("git", "switch", "--create", branch, cwd=source)
+        run("git", "add", "--", "images/catalog.yaml", cwd=source)
+        bot = os.environ["IMAGES_APP_SLUG"] + "[bot]"
+        run("git", "-c", f"user.name={bot}", "-c", f"user.email={bot}@users.noreply.github.com",
+            "commit", "--only", "-m", "feat(images): promote qualified lab image digests", "--", "images/catalog.yaml", cwd=source)
+        run("git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential",
+            "push", f"--force-with-lease=refs/heads/{branch}:{expected_head}",
+            "origin", f"HEAD:refs/heads/{branch}", cwd=source)
+        body = f"Images built from public master commit `{args.sha}`.\n\n"
+        body += "\n".join(f"- `{item['name']}`: `{item['digest']}`" for item in releases)
+        body += f"\n\nBake evidence: https://github.com/GilmanLab/agentcompute-images/actions/runs/{os.environ['GITHUB_RUN_ID']}\n"
+        print(capture("gh", "pr", "create", "--repo", REPO, "--base", "master", "--head", branch,
+                      "--title", "feat(images): promote qualified lab image digests", "--body", body, cwd=source))
+
+
+if __name__ == "__main__":
+    main()

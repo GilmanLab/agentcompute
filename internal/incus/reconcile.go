@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -33,6 +34,7 @@ const (
 	imgociRepresentation = "x-gilmanlab-incus-container"
 	imgociRole           = "x-gilmanlab-unified"
 	imgociCompression    = "none"
+	imgociVMDiskRole     = "disk"
 	unifiedFilename      = "router.tar.xz"
 	digestPrefix         = "sha256:"
 	digestHexLen         = 64
@@ -110,11 +112,17 @@ func (c *Client) ensureDigestImage(ctx context.Context, image compute.CatalogIma
 		return fingerprint, nil
 	}
 
-	fingerprint, err := importVerifiedImage(ctx, server, image.Reference, digest)
+	var fingerprint string
+	var err error
+	if image.Kind == kindVM {
+		fingerprint, err = importVerifiedVM(ctx, server, image.Reference, digest)
+	} else {
+		fingerprint, err = importVerifiedImage(ctx, server, image.Reference, digest)
+	}
 	if err != nil {
 		return "", fmt.Errorf("catalog image %q: %w", image.Name, err)
 	}
-	if err := smokeLaunch(ctx, server, image.Name, fingerprint); err != nil {
+	if err := smokeLaunch(ctx, server, image.Name, fingerprint, image.Kind == kindVM); err != nil {
 		return "", fmt.Errorf("catalog image %q: %w", image.Name, err)
 	}
 	if err := recordDigest(server, fingerprint, digest); err != nil {
@@ -218,6 +226,100 @@ func importUnifiedTarball(ctx context.Context, server incusclient.InstanceServer
 	return fingerprintFromOp(op)
 }
 
+func importVerifiedVM(
+	ctx context.Context,
+	server incusclient.InstanceServer,
+	reference, digest string,
+) (string, error) {
+	if fingerprint, found, err := imageWithDigest(server, digest); err != nil || found {
+		return fingerprint, err
+	}
+	client, err := imgociClientFromEnv()
+	if err != nil {
+		return "", err
+	}
+	release, err := client.Fetch(ctx, imgoci.Reference(reference))
+	if err != nil {
+		return "", err
+	}
+	selected, err := client.Resolve(release, imgoci.ResolveQuery{
+		Architecture: imgociArchitecture, Target: imgociTarget,
+		Representation: "incus-vm", Roles: []string{"metadata", imgociVMDiskRole},
+		Compressions: []string{imgociCompression},
+	})
+	if err != nil {
+		return "", err
+	}
+	dir, err := os.MkdirTemp("", "agentcompute-vm-")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(dir)
+	metadataPath, diskPath := filepath.Join(dir, "incus.tar.xz"), filepath.Join(dir, "disk.qcow2")
+	if fetchErr := client.FetchFiles(ctx, release, selected, imgoci.ToFiles(map[string]string{
+		"metadata": metadataPath, imgociVMDiskRole: diskPath,
+	})); fetchErr != nil {
+		return "", fetchErr
+	}
+	return importSplitVM(ctx, server, metadataPath, diskPath)
+}
+
+func importSplitVM(
+	ctx context.Context,
+	server incusclient.InstanceServer,
+	metadataPath, diskPath string,
+) (string, error) {
+	metadata, err := os.Open(metadataPath)
+	if err != nil {
+		return "", err
+	}
+	defer metadata.Close()
+	disk, err := os.Open(diskPath)
+	if err != nil {
+		return "", err
+	}
+	defer disk.Close()
+	hasher := sha256.New()
+	if _, copyErr := io.Copy(hasher, io.MultiReader(metadata, disk)); copyErr != nil {
+		return "", copyErr
+	}
+	contentFP := hex.EncodeToString(hasher.Sum(nil))
+	if existing, _, getErr := server.GetImage(contentFP); getErr == nil {
+		return existing.Fingerprint, nil
+	} else if !isNotFound(getErr) {
+		return "", getErr
+	}
+	if _, seekErr := metadata.Seek(0, io.SeekStart); seekErr != nil {
+		return "", seekErr
+	}
+	if _, seekErr := disk.Seek(0, io.SeekStart); seekErr != nil {
+		return "", seekErr
+	}
+	op, err := server.CreateImage(api.ImagesPost{}, &incusclient.ImageCreateArgs{
+		MetaFile: metadata, MetaName: "incus.tar.xz",
+		RootfsFile: disk, RootfsName: "disk.qcow2", Type: string(api.InstanceTypeVM),
+	})
+	if err == nil {
+		err = op.WaitContext(ctx)
+	}
+	if err != nil {
+		if isConflict(err) {
+			if existing, _, getErr := server.GetImage(contentFP); getErr == nil {
+				return existing.Fingerprint, nil
+			}
+		}
+		return "", err
+	}
+	fingerprint, err := fingerprintFromOp(op)
+	if err != nil {
+		return "", err
+	}
+	if fingerprint != contentFP {
+		return "", fmt.Errorf("imported VM fingerprint %s differs from verified files %s", fingerprint, contentFP)
+	}
+	return fingerprint, nil
+}
+
 func recordDigest(server incusclient.InstanceServer, fingerprint, digest string) error {
 	image, etag, err := server.GetImage(fingerprint)
 	if err != nil {
@@ -242,20 +344,27 @@ func smokeLaunch(
 	ctx context.Context,
 	server incusclient.InstanceServer,
 	imageName, fingerprint string,
+	vm bool,
 ) (err error) {
 	name, err := smokeInstanceName(imageName)
 	if err != nil {
 		return err
 	}
 	req := api.InstancesPost{
-		Name: name,
-		Type: api.InstanceTypeContainer,
-		Source: api.InstanceSource{
-			Type:        sourceTypeImage,
-			Fingerprint: fingerprint,
-		},
+		Name:   name,
+		Type:   api.InstanceTypeContainer,
+		Source: api.InstanceSource{Type: sourceTypeImage, Fingerprint: fingerprint},
 	}
 	req.Profiles = []string{imageBuildProfile}
+	checks := routerChecks()
+	if vm {
+		req.Type = api.InstanceTypeVM
+		req.Profiles = []string{"runner-smoke"}
+		checks = [][]string{
+			{"systemctl", "is-active", "incus-gh-runner-guest.path"},
+			{"test", "-x", "/opt/actions-runner/bin/Runner.Listener"},
+		}
+	}
 	op, err := server.CreateInstance(req)
 	if err != nil {
 		return err
@@ -268,12 +377,10 @@ func smokeLaunch(
 	if err = op.WaitContext(ctx); err != nil {
 		return err
 	}
-
 	smokeCtx, cancel := context.WithTimeout(ctx, smokeTimeout)
 	defer cancel()
 	startOp, err := server.UpdateInstanceState(name, api.InstanceStatePut{
-		Action:  startAction,
-		Timeout: stateTimeoutSec,
+		Action: startAction, Timeout: stateTimeoutSec,
 	}, "")
 	if err != nil {
 		return err
@@ -284,7 +391,7 @@ func smokeLaunch(
 	if err = waitGuestReady(smokeCtx, server, name); err != nil {
 		return err
 	}
-	for _, command := range routerChecks() {
+	for _, command := range checks {
 		if err = execCommand(smokeCtx, server, name, command); err != nil {
 			return fmt.Errorf("smoke check %s: %w", strings.Join(command, " "), err)
 		}

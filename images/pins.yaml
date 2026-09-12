@@ -286,3 +286,41 @@ incus:
   sha256: 2fa9b2699672225dde5290962f4087b426b5ecbd4fed0df8e430687d3b76b500
 pyyaml:
   version: 6.0.3
+runner:
+  ubuntu:
+    version: "24.04.5"
+    release: noble
+    url: https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-amd64.tar.gz
+    sha256: e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86
+    snapshot: "20260911T000000Z"
+  ca_certificates:
+    version: "20260601~24.04.1"
+    url: https://snapshot.ubuntu.com/ubuntu/20260911T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~24.04.1_all.deb
+    sha256: 6bac2a01979e210d9eac1d4d56747ec709ea60654744d66705dc3c36e7629e50
+  actions_runner:
+    version: "2.337.0"
+    url: https://github.com/actions/runner/releases/download/v2.337.0/actions-runner-linux-x64-2.337.0.tar.gz
+    sha256: 70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613
+  guest:
+    version: "2.0.0"
+    origin: https://github.com/meigma/incus-gh-runner
+    tag: v2.0.0
+    files:
+    - source: guest/incus-gh-runner-guest
+      path: files/usr/local/libexec/incus-gh-runner-guest
+      sha256: 4accb2d6e2569ad328aeaeda0c161f34db5ef617e5754a72dcb0ee50079db705
+    - source: guest/incus-gh-runner-proof
+      path: files/usr/local/bin/incus-gh-runner-proof
+      sha256: ff2c453aebf92883f76f0a75cc19c81b6fedcd8defb93d9cf932d0dec2ad053c
+    - source: guest/incus-gh-runner-guest.service
+      path: files/usr/lib/systemd/system/incus-gh-runner-guest.service
+      sha256: 4a276eca986940ba76d0f21f6a0bd4807857a2581bfb928f79866047c063471d
+    - source: guest/incus-gh-runner-guest.path
+      path: files/usr/lib/systemd/system/incus-gh-runner-guest.path
+      sha256: ff05ece6698a71167620be8ae4b2a11c932f7298ab50990bdcc3fb3d04c57194
+    - source: guest/incus-gh-runner.conf
+      path: files/usr/lib/tmpfiles.d/incus-gh-runner.conf
+      sha256: 796337602bc9627b7bebb64078998754e74b4755e965b613b26f63f24232435c
+  proxy:
+    http: http://10.10.10.14:3128
+    no_proxy: 10.10.10.14,127.0.0.1,localhost

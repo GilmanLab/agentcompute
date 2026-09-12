@@ -24,6 +24,7 @@ const (
 	sourceAnnotation     = "https://github.com/GilmanLab/agentcompute"
 	digestPrefix         = "sha256:"
 	digestHexLen         = 64
+	digestKey            = "digest"
 )
 
 const transferTimeout = 15 * time.Minute
@@ -37,14 +38,18 @@ func newRootCommand() *cobra.Command {
 	}
 	root.AddCommand(newPublishCommand())
 	root.AddCommand(newFetchCommand())
+	root.AddCommand(newInspectCommand())
 	return root
 }
 
 func newPublishCommand() *cobra.Command {
 	var (
-		ref     string
-		version string
-		file    string
+		ref      string
+		version  string
+		file     string
+		name     string
+		metadata string
+		disk     string
 	)
 	cmd := &cobra.Command{
 		Use:           "publish",
@@ -53,15 +58,29 @@ func newPublishCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return publishRelease(cmd, ref, version, file)
+			files := []imgoci.FileSpec{{
+				Source: imgoci.FromFile(file), Filename: unifiedFilename, Selector: unifiedSelector(),
+			}}
+			if metadata != "" {
+				files = []imgoci.FileSpec{
+					{Source: imgoci.FromFile(metadata), Filename: "incus.tar.xz", Selector: vmSelector("metadata")},
+					{Source: imgoci.FromFile(disk), Filename: "disk.qcow2", Selector: vmSelector("disk")},
+				}
+			}
+			return publishRelease(cmd, ref, version, name, files)
 		},
 	}
 	cmd.Flags().StringVar(&ref, "ref", "", "GHCR tag reference to publish")
 	cmd.Flags().StringVar(&version, "version", "", "immutable release version")
 	cmd.Flags().StringVar(&file, "file", "", "unified router tarball to publish")
+	cmd.Flags().StringVar(&name, "name", "router", "image release name")
+	cmd.Flags().StringVar(&metadata, "metadata", "", "split VM metadata archive")
+	cmd.Flags().StringVar(&disk, "disk", "", "split VM qcow2 disk")
 	_ = cmd.MarkFlagRequired("ref")
 	_ = cmd.MarkFlagRequired("version")
-	_ = cmd.MarkFlagRequired("file")
+	cmd.MarkFlagsOneRequired("file", "metadata")
+	cmd.MarkFlagsMutuallyExclusive("file", "metadata")
+	cmd.MarkFlagsRequiredTogether("metadata", "disk")
 	return cmd
 }
 
@@ -70,6 +89,7 @@ func newFetchCommand() *cobra.Command {
 		ref    string
 		output string
 	)
+	var vm bool
 	cmd := &cobra.Command{
 		Use:           "fetch",
 		Short:         "Fetch and verify an imgoci release by digest",
@@ -77,17 +97,21 @@ func newFetchCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if vm {
+				return fetchVMRelease(cmd, ref, output)
+			}
 			return fetchRelease(cmd, ref, output)
 		},
 	}
 	cmd.Flags().StringVar(&ref, "ref", "", "GHCR digest reference to fetch")
-	cmd.Flags().StringVar(&output, "output", "", "destination tarball")
+	cmd.Flags().StringVar(&output, "output", "", "destination tarball, or new directory with --vm")
+	cmd.Flags().BoolVar(&vm, "vm", false, "fetch split VM metadata and disk")
 	_ = cmd.MarkFlagRequired("ref")
 	_ = cmd.MarkFlagRequired("output")
 	return cmd
 }
 
-func publishRelease(cmd *cobra.Command, ref, version, file string) error {
+func publishRelease(cmd *cobra.Command, ref, version, name string, files []imgoci.FileSpec) error {
 	if err := requireGHCRRef(ref); err != nil {
 		return err
 	}
@@ -98,7 +122,6 @@ func publishRelease(cmd *cobra.Command, ref, version, file string) error {
 	ctx, cancel := context.WithTimeout(cmd.Context(), transferTimeout)
 	defer cancel()
 
-	// Immutable means this tool refuses to replace an existing reference.
 	if _, fetchErr := client.Fetch(ctx, imgoci.Reference(ref)); fetchErr == nil {
 		return fmt.Errorf("release already exists: %s", ref)
 	} else if !errors.Is(fetchErr, imgoci.ErrNotFound) {
@@ -106,26 +129,15 @@ func publishRelease(cmd *cobra.Command, ref, version, file string) error {
 	}
 
 	digest, err := client.Publish(ctx, imgoci.Reference(ref), imgoci.ReleaseSpec{
-		Name:    "router",
-		Version: version,
-		Annotations: map[string]string{
-			"org.opencontainers.image.source": sourceAnnotation,
-		},
-		Files: []imgoci.FileSpec{
-			{
-				Source:   imgoci.FromFile(file),
-				Filename: unifiedFilename,
-				Selector: unifiedSelector(),
-			},
-		},
+		Name: name, Version: version,
+		Annotations: map[string]string{"org.opencontainers.image.source": sourceAnnotation},
+		Files:       files,
 	})
 	if err != nil {
 		return err
 	}
-
 	return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]string{
-		"reference": ref,
-		"digest":    digest.String(),
+		"reference": ref, digestKey: digest.String(),
 	})
 }
 
@@ -155,7 +167,7 @@ func fetchRelease(cmd *cobra.Command, ref, output string) error {
 	}
 
 	return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
-		"digest":      release.Digest(),
+		digestKey:     release.Digest(),
 		"fingerprint": contentFingerprint(entries[0]),
 		"bytes":       entries[0].ContentSize,
 		"file":        output,
@@ -241,6 +253,74 @@ func unifiedSelector() imgoci.Selector {
 		Role:           imgociRole,
 		Compression:    imgociCompression,
 	}
+}
+
+func vmSelector(role string) imgoci.Selector {
+	return imgoci.Selector{
+		Architecture: imgociArchitecture, Target: imgociTarget,
+		Representation: "incus-vm", Role: role, Compression: imgociCompression,
+	}
+}
+
+func fetchVMRelease(cmd *cobra.Command, ref, output string) error {
+	if err := requireGHCRDigestRef(ref); err != nil {
+		return err
+	}
+	client, err := imgociClientFromEnv()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(cmd.Context(), transferTimeout)
+	defer cancel()
+	release, err := client.Fetch(ctx, imgoci.Reference(ref))
+	if err != nil {
+		return err
+	}
+	selected, err := client.Resolve(release, imgoci.ResolveQuery{
+		Architecture: imgociArchitecture, Target: imgociTarget,
+		Representation: "incus-vm", Roles: []string{"metadata", "disk"},
+		Compressions: []string{imgociCompression},
+	})
+	if err != nil {
+		return err
+	}
+	if err := client.FetchFiles(ctx, release, selected, imgoci.ToDir(output)); err != nil {
+		return err
+	}
+	return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
+		digestKey: release.Digest(), "directory": output,
+	})
+}
+
+func newInspectCommand() *cobra.Command {
+	var ref string
+	cmd := &cobra.Command{
+		Use: "inspect", Short: "Report whether an immutable release exists", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := requireGHCRRef(ref); err != nil {
+				return err
+			}
+			client, err := imgociClientFromEnv()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), transferTimeout)
+			defer cancel()
+			release, err := client.Fetch(ctx, imgoci.Reference(ref))
+			if errors.Is(err, imgoci.ErrNotFound) {
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{"exists": false})
+			}
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
+				"exists": true, digestKey: release.Digest(),
+			})
+		},
+	}
+	cmd.Flags().StringVar(&ref, "ref", "", "GHCR tag reference to inspect")
+	_ = cmd.MarkFlagRequired("ref")
+	return cmd
 }
 
 func contentFingerprint(entry imgoci.FileEntry) string {

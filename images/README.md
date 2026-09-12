@@ -1,16 +1,21 @@
 # images
 
-Lab-built Incus images for agentcompute. Phase 1 ships one: the `router`
-system container (Alpine 3.22.5 with `nftables`, `frr`, `iproute2` + `tc`,
-`dnsmasq`, `wireguard-tools`, `tcpdump`, nothing else).
+Lab-built Incus images for agentcompute: the Alpine `router` system container
+and two minimal Ubuntu 24.04 runner VMs. `runner` has no sudo grant;
+`runner-publisher` permits only the root-owned image-build wrapper.
 
 | Path | Role |
 | --- | --- |
-| `pins.yaml` | Reproducibility root: distrobuilder 3.3.1 and Go 1.26.6 source URLs + SHA-256, the Alpine minirootfs, every APK in the package closure by URL + SHA-256, the Incus client used by CI, the imgoci Go module version. |
+| `pins.yaml` | Checksummed build tools, Alpine package closure, Ubuntu base and CA bootstrap package, fixed Ubuntu snapshot, Actions Runner, and upstream guest files. |
 | `router/distrobuilder.yaml` | The recipe. Installs only the pinned APKs from an offline seed (`--no-network`, empty `/etc/apk/repositories`), enables OpenRC `lxc` mode, and emits a unified tarball. |
+| `runner/distrobuilder.yaml` | Split VM recipe with `runner` and `publisher` variants, signed shim/GRUB, growroot, incus-agent generator, and `ttyS0` output. |
 | `build.py` | `validate` (schema and pin checks, no credentials) and `build` (download-verify, compile distrobuilder from vendored source, assemble). PEP 723 script with `build.py.lock`. |
 | `catalog.yaml` | Startup catalog: image name → digest-pinned GHCR reference or upstream Incus `remote:alias`, kind, OS, defaults. |
 | `smoke.sh` | Shared six-tool router boot smoke used by image CI. |
+| `runner/smoke.py` | Guest-contract qualification: disk growth, bogus payload, status transitions, serial lifecycle, poweroff, and owned-resource cleanup. |
+| `publish.py` | Protected-source gate, immutable-tag lookup, assembly, qualification, publication, and verified fetch-back. |
+| `catalog-pr.py` | Opens the public catalog digest PR from verified release evidence. |
+| `ci-incus.py` | Configures the pinned Incus CLI and restricted HTTPS identity. |
 | `../cmd/image-publish` | Immutable imgoci publication and verified fetch-back CLI. |
 
 ## Build locally
@@ -31,22 +36,43 @@ deletes anything it did not create.
 distrobuilder needs root and loop devices, not KVM. macOS cannot run it;
 `sandbox01` can.
 
+For a runner VM, add `--image runner` or `--image runner-publisher`. Install
+the VM assembly tools (`qemu-img`, `mkfs.vfat`, `mkfs.ext4`, `resize2fs`,
+`losetup`, `mount`, and `rsync`) first. Output is `incus.tar.xz`,
+`disk.qcow2`, and `metrics.json`; no nested virtualization is used.
+
+The guest files are copied byte-for-byte from the pinned incus-gh-runner
+v2.0.0 release and checked during validation. General runners inherit
+`NoNewPrivileges=true`. The publisher omits that restriction so its sole
+sudo command can run:
+
+```sudoers
+actions-runner ALL=(root) NOPASSWD: /usr/local/sbin/agentcompute-build
+```
+
+The wrapper accepts only a full lowercase commit SHA and one of the three
+image names. It discards job-supplied environment variables, uses a root-owned
+checkout, and refuses source outside public `origin/master` ancestry. It
+does not grant direct sudo access to shells, mount tools, or `qemu-img`.
+
 ## Publication and import
 
-`images-publish.yml` (protected `master` only) builds, boot-tests the tarball
-in the cluster's restricted `image-build` project over the Incus API, publishes
-an immutable imgoci release to `ghcr.io/gilmanlab/agentcompute/router`, fetches
-it back by digest, and attests the release-index digest through the isolated
-`attest.yml` workflow. The immutable tag is `tree-<12 hex>` of the `images/`
-git tree, so an unchanged tree cannot be republished.
+The public `images-publish.yml` validates on a GitHub-hosted runner and
+dispatches an exact SHA to private `GilmanLab/agentcompute-images`. Its
+`agentcompute-publisher` scale set performs the builds, boot-tests candidates
+in the restricted `image-build` project, publishes to the existing
+`ghcr.io/gilmanlab/agentcompute/<image>` namespace, and fetches each digest
+back independently before opening a public catalog PR.
 
-Verify a release:
+The immutable tag hashes definition inputs under `images/`, excluding
+`catalog.yaml` and Markdown. An existing release skips assembly and
+publication but is still fetched and boot-qualified. Registry or
+authentication errors fail the job rather than being treated as absent tags.
 
-```sh
-gh attestation verify oci://ghcr.io/gilmanlab/agentcompute/router:<tag> \
-  --repo GilmanLab/agentcompute \
-  --signer-workflow GilmanLab/agentcompute/.github/workflows/attest.yml
-```
+The previous hosted pipeline's `attest.yml` attestation step is **not**
+carried into the private bake. Older releases can retain their original
+attestations; new private bakes must not be described as carrying that
+provenance. Digest verification and boot tests establish different properties.
 
 The server's startup reconciler imports catalog digest references into `image-build`, verifies bytes, smoke-launches the image, and moves the alias only after success. It records the imgoci digest in image properties; the Incus fingerprint is derived, not a stable identity across rebuilds.
 
@@ -59,6 +85,50 @@ go run ./cmd/image-publish fetch \
 ```
 
 Upstream references such as `images:alpine/3.22` are fetched when an instance first uses them. Container creation copies lab-built images from `image-build` into the sandbox project before using a local fingerprint.
+
+### Public repository threat review
+
+`agentcompute` is public. Fork workflow approval and a variable-held runner
+label are not sufficient isolation: workflow code can request a literal
+self-hosted label. No self-hosted runner is registered with this repository,
+and `IMAGES_RUNNER` is removed rather than repurposed.
+
+The deployment requires all of these controls:
+
+- Public PR validation remains GitHub-hosted. The publisher has only
+  protected-`master` push and manual-dispatch triggers, never `pull_request`
+  or `pull_request_target`.
+- Public Actions settings require approval for **all** outside contributors
+  and full commit SHAs for actions. The protected source branch and the
+  `image-publish` environment remain the dispatch gate.
+- The scale set is repository-scoped to private `agentcompute-images`, in
+  the `default` runner group. Confirm that binding before activation; do
+  not expose it through the public repository or an organization runner group.
+- A dedicated contents-write App token dispatches to the private repository.
+  The private workflow and the root build wrapper independently require the
+  source SHA to be an ancestor of public `origin/master`.
+- A separately scoped token from that App writes only the public catalog
+  branch and PR. The controller uses its own administration-write App.
+
+Check the public boundary with:
+
+```sh
+gh api repos/GilmanLab/agentcompute/actions/permissions
+gh api repos/GilmanLab/agentcompute/actions/permissions/fork-pr-contributor-approval
+gh api repos/GilmanLab/agentcompute/actions/runners
+gh variable list --repo GilmanLab/agentcompute
+```
+
+Trusted source maintainers and the private workflow can authorize root image
+assembly. Repository scoping does not remove that trust or the supply-chain
+risk of tools executed by the publisher. Runner VMs retain
+`security.nesting=false` and `security.secureboot=true`; network egress and
+Incus authority are restricted independently.
+
+Deployment, credential escrow, package access, rollback, and live acceptance
+checks are in the
+[central runbook](https://jmgilman.github.io/root/runbooks/private-image-runners/).
+Do not enable the private bake until those checks pass.
 
 ## imgoci representation decision
 
@@ -80,6 +150,11 @@ image format (`incus image import` consumes it as-is); the content digest is
 the digest of `router.tar.xz`, which equals the Incus fingerprint. The image
 is not labelled `incus-vm`. Proposing a public `incus-container`
 representation upstream is future work.
+
+Runner releases use the standard `incus-vm` representation, with `metadata`
+and `disk` roles and `none` compression. Their Incus fingerprint is SHA-256
+over the metadata bytes followed by disk bytes. The release-index digest,
+not that derived fingerprint, is the catalog's durable identity.
 
 ## Measured builds
 
@@ -122,9 +197,9 @@ generates, because `build.py` assembled under umask 077; that is fixed. The
 catalog points at `tree-05771e889f6c`
 (`sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889`,
 fingerprint `6e3183fe052e…`, run 34650677380), which differs from the local
-build only in `metadata.yaml`. A master run on an unchanged `images/` tree
-stops at the publish step with `release already exists`: the immutability
-guard working (run 34650303253).
+build only in `metadata.yaml`. The old pipeline failed an unchanged-tree
+master run with `release already exists` (run 34650303253). The private
+bake now checks the immutable tag before assembly.
 
 ## Implementation
 

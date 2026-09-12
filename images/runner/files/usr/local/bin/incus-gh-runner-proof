@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+proof_root="${PROOF_ROOT:-/run/incus-gh-runner-proof}"
+proof_path="${PROOF_PATH:-${proof_root}/job-proof.dsse.json}"
+ready_path="${PROOF_READY_PATH:-${proof_root}/job-proof.ready}"
+timeout_seconds=60
+output_path=''
+
+usage() {
+  printf 'usage: %s --output <path> [--timeout <seconds>s]\n' "$0" >&2
+}
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --output)
+      [[ "$#" -ge 2 ]] || { usage; exit 2; }
+      output_path="$2"
+      shift 2
+      ;;
+    --timeout)
+      [[ "$#" -ge 2 ]] || { usage; exit 2; }
+      [[ "$2" =~ ^[1-9][0-9]*s$ ]] || {
+        printf 'timeout must be a positive whole number of seconds\n' >&2
+        exit 2
+      }
+      timeout_seconds="${2%s}"
+      shift 2
+      ;;
+    *)
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+[[ -n "$output_path" ]] || { usage; exit 2; }
+
+deadline=$((SECONDS + timeout_seconds))
+while [[ ! -e "$ready_path" ]]; do
+  if (( SECONDS >= deadline )); then
+    printf 'timed out waiting for job machine proof\n' >&2
+    exit 1
+  fi
+  sleep 0.1
+done
+
+[[ -f "$ready_path" ]] || {
+  printf 'job machine proof ready marker is not a regular file\n' >&2
+  exit 1
+}
+[[ -s "$proof_path" ]] || {
+  printf 'committed job machine proof is missing or empty\n' >&2
+  exit 1
+}
+
+jq --exit-status '
+  type == "object"
+  and (.payloadType | type == "string" and length > 0)
+  and (.payload | type == "string" and length > 0)
+  and (.signatures | type == "array" and length > 0)
+  and all(.signatures[];
+    type == "object"
+    and (.keyid | type == "string" and length > 0)
+    and (.sig | type == "string" and length > 0)
+  )
+' "$proof_path" >/dev/null || {
+  printf 'committed job machine proof is not a DSSE-shaped JSON document\n' >&2
+  exit 1
+}
+
+umask 077
+install -m 0600 -- "$proof_path" "$output_path"

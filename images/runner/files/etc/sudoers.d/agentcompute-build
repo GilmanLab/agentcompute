@@ -1,0 +1,11 @@
+# Allowlisted root wrapper only. No NOPASSWD: ALL, no wildcards, no SETENV.
+# The binary is root-owned 0755; arguments are validated inside it.
+#
+# Do not set NoNewPrivileges=true on incus-gh-runner-guest.service in this
+# image: that flag is inherited by the Actions Runner and blocks setuid sudo.
+# The general runner image sets NoNewPrivileges and has no sudoers file.
+actions-runner ALL=(root) NOPASSWD: /usr/local/sbin/agentcompute-build
+Defaults:actions-runner env_reset
+Defaults:actions-runner !requiretty
+Defaults:actions-runner !setenv
+Defaults:actions-runner secure_path="/usr/sbin:/usr/bin:/sbin:/bin"

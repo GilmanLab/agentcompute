@@ -32,6 +32,7 @@ image.tar
 
 # Go
 bin/
+!images/runner/files/usr/local/bin/
 # Stray `go build` output at the proxy module root (canonical output is tools/proxy/bin/).
 /tools/proxy/mcp-devproxy
 cover.out
