@@ -9,11 +9,19 @@ destroy requires the ownership tag, deletes project images, and does not
 treat HTTP 404/not-found as a failed GET. create-network is one bounded
 attempt with no retries or hidden cleanup.
 """
+
 import argparse
+import hashlib
+import io
 import json
+import re
 import subprocess
 import sys
+import tarfile
+import tempfile
 import time
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 REMOTE = "nas01"
@@ -53,6 +61,7 @@ WAIT_IP_SECONDS = 90
 WAIT_IP_POLL = 2
 
 LOG = None
+TOOLS_BUNDLE = None
 
 
 class TopologyError(Exception):
@@ -81,12 +90,23 @@ def incus(*args, check=True, timeout=COMMAND_TIMEOUT):
     started = time.monotonic()
     try:
         result = subprocess.run(
-            ["incus", *args], capture_output=True, text=True, timeout=timeout
+            ["incus", *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            stdin=subprocess.DEVNULL,
         )
-        error = None
     except subprocess.TimeoutExpired as exc:
-        stdout = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode("utf-8", "replace")
-        stderr = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode("utf-8", "replace")
+        stdout = (
+            exc.stdout
+            if isinstance(exc.stdout, str)
+            else (exc.stdout or b"").decode("utf-8", "replace")
+        )
+        stderr = (
+            exc.stderr
+            if isinstance(exc.stderr, str)
+            else (exc.stderr or b"").decode("utf-8", "replace")
+        )
         event = {
             "args": args,
             "code": None,
@@ -105,7 +125,13 @@ def incus(*args, check=True, timeout=COMMAND_TIMEOUT):
         "seconds": round(time.monotonic() - started, 3),
         "stdout": result.stdout,
         "stderr": result.stderr,
-        "error": None if result.returncode == 0 else (result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"),
+        "error": None
+        if result.returncode == 0
+        else (
+            result.stderr.strip()
+            or result.stdout.strip()
+            or f"exit {result.returncode}"
+        ),
     }
     log_event(event)
     if check and result.returncode:
@@ -140,21 +166,29 @@ def query(path, method="GET", data=None, check=True, timeout=COMMAND_TIMEOUT):
 
 
 def get_existing(path):
-    result = incus("query", remote_prefix() + path, "--request", "GET", "--wait", check=False)
+    result = incus(
+        "query", remote_prefix() + path, "--request", "GET", "--wait", check=False
+    )
     if result.returncode == 0:
         return json.loads(result.stdout) if result.stdout.strip() else {}
     if is_absent(result):
         return None
-    raise TopologyError(f"GET {path} failed: {result.stderr.strip() or result.stdout.strip() or f'exit {result.returncode}'}")
+    raise TopologyError(
+        f"GET {path} failed: {result.stderr.strip() or result.stdout.strip() or f'exit {result.returncode}'}"
+    )
 
 
 def list_or_absent(path):
-    result = incus("query", remote_prefix() + path, "--request", "GET", "--wait", check=False)
+    result = incus(
+        "query", remote_prefix() + path, "--request", "GET", "--wait", check=False
+    )
     if result.returncode == 0:
         return json.loads(result.stdout) if result.stdout.strip() else []
     if is_absent(result):
         return []
-    raise TopologyError(f"GET {path} failed: {result.stderr.strip() or result.stdout.strip() or f'exit {result.returncode}'}")
+    raise TopologyError(
+        f"GET {path} failed: {result.stderr.strip() or result.stdout.strip() or f'exit {result.returncode}'}"
+    )
 
 
 def emit(payload, code=0):
@@ -199,7 +233,9 @@ def require_owned_project():
         return None
     config = found.get("config") or {}
     if config.get(OWNER_KEY) != OWNER_VALUE:
-        raise TopologyError(f"project {PROJECT} exists without {OWNER_KEY}={OWNER_VALUE}; refusing")
+        raise TopologyError(
+            f"project {PROJECT} exists without {OWNER_KEY}={OWNER_VALUE}; refusing"
+        )
     return found
 
 
@@ -231,7 +267,9 @@ def wait_router_external():
         network = get_existing(f"/1.0/networks/{NETWORK}?project={PROJECT}")
         external = router_external_ipv4(network)
         if not external:
-            state = get_existing(f"/1.0/networks/{NETWORK}/state?project={PROJECT}") or {}
+            state = (
+                get_existing(f"/1.0/networks/{NETWORK}/state?project={PROJECT}") or {}
+            )
             external = router_external_ipv4(state)
         last = external
         if external:
@@ -247,12 +285,18 @@ def wait_ipv4(name):
         state = get_existing(f"/1.0/instances/{name}/state?project={PROJECT}")
         last = state
         if state:
-            nic = ((state.get("network") or {}).get("eth0") or {})
+            nic = (state.get("network") or {}).get("eth0") or {}
             for addr in nic.get("addresses") or []:
-                if addr.get("family") == "inet" and addr.get("scope") == "global" and addr.get("address"):
+                if (
+                    addr.get("family") == "inet"
+                    and addr.get("scope") == "global"
+                    and addr.get("address")
+                ):
                     return addr["address"]
         time.sleep(WAIT_IP_POLL)
-    raise TopologyError(f"instance {name} got no global eth0 IPv4 within {WAIT_IP_SECONDS}s: {last}")
+    raise TopologyError(
+        f"instance {name} got no global eth0 IPv4 within {WAIT_IP_SECONDS}s: {last}"
+    )
 
 
 def wait_ping(name, address):
@@ -267,7 +311,9 @@ def wait_ping(name, address):
     detail = ""
     if last is not None:
         detail = (last.stderr or last.stdout or f"exit {last.returncode}").strip()
-    raise TopologyError(f"ping {name} -> {address} failed within {WAIT_IP_SECONDS}s: {detail}")
+    raise TopologyError(
+        f"ping {name} -> {address} failed within {WAIT_IP_SECONDS}s: {detail}"
+    )
 
 
 def guest(name, command, check=True):
@@ -284,9 +330,92 @@ def guest(name, command, check=True):
     )
 
 
+def prepare_tools_bundle(directory):
+    """Fetch the probe tools without depending on the datapath under test."""
+    repository = f"{ALPINE_MAIN}/x86_64"
+    with urllib.request.urlopen(
+        f"{repository}/APKINDEX.tar.gz", timeout=30
+    ) as response:
+        index_bytes = response.read()
+    with tarfile.open(fileobj=io.BytesIO(index_bytes), mode="r:gz") as archive:
+        index = archive.extractfile("APKINDEX").read().decode()
+    packages = [
+        dict(line.split(":", 1) for line in block.splitlines() if ":" in line)
+        for block in index.strip().split("\n\n")
+    ]
+    by_name = {package["P"]: package for package in packages}
+    providers = {}
+    for package in packages:
+        for capability in package.get("p", "").split():
+            providers.setdefault(re.split(r"[<>=~]", capability, 1)[0], []).append(
+                package["P"]
+            )
+    selected = {}
+    pending = ["curl", "busybox-extras"]
+    while pending:
+        dependency = pending.pop()
+        if dependency.startswith("!"):
+            continue
+        name = re.split(r"[<>=~]", dependency, 1)[0]
+        candidates = [name] if name in by_name else providers.get(name, [])
+        if len(candidates) != 1:
+            raise TopologyError(
+                f"cannot resolve one provider for {dependency}: {candidates}"
+            )
+        name = candidates[0]
+        if name not in selected:
+            selected[name] = by_name[name]
+            pending.extend(by_name[name].get("D", "").split())
+
+    def fetch(package):
+        filename = f"{package['P']}-{package['V']}.apk"
+        if not re.fullmatch(r"[A-Za-z0-9+_.-]+", filename):
+            raise TopologyError(f"invalid APK filename: {filename}")
+        with urllib.request.urlopen(f"{repository}/{filename}", timeout=30) as response:
+            return filename, response.read()
+
+    bundle = Path(directory) / "probe-tools.tar"
+    manifest = []
+    with (
+        ThreadPoolExecutor(max_workers=8) as pool,
+        tarfile.open(bundle, "w") as archive,
+    ):
+        for filename, data in pool.map(
+            fetch, [selected[name] for name in sorted(selected)]
+        ):
+            info = tarfile.TarInfo(filename)
+            info.size = len(data)
+            info.mode = 0o644
+            archive.addfile(info, io.BytesIO(data))
+            manifest.append(
+                {"file": filename, "sha256": hashlib.sha256(data).hexdigest()}
+            )
+    log_event(
+        {
+            "phase": "prepare-probe-tools",
+            "repository": repository,
+            "index_sha256": hashlib.sha256(index_bytes).hexdigest(),
+            "packages": manifest,
+            "signature_check": "apk verifies signatures with the guest's trusted Alpine keys",
+        }
+    )
+    return bundle
+
+
 def install_curl(name):
-    guest(name, f"printf '%s\\n' '{ALPINE_MAIN}' > /etc/apk/repositories")
-    guest(name, "apk add --no-cache curl busybox-extras")
+    incus(
+        "file",
+        "push",
+        str(TOOLS_BUNDLE),
+        f"{remote_prefix()}{name}/tmp/probe-tools.tar",
+        "--project",
+        PROJECT,
+    )
+    guest(
+        name,
+        "mkdir -p /tmp/probe-tools && tar -xf /tmp/probe-tools.tar -C /tmp/probe-tools",
+    )
+    guest(name, "apk add --no-network /tmp/probe-tools/*.apk")
 
 
 def start_httpd(name):
@@ -379,7 +508,9 @@ def cmd_create():
     loc_one = (inst_one or {}).get("location") or ""
     loc_two = (inst_two or {}).get("location") or ""
     if loc_one != MEMBER_ONE or loc_two != MEMBER_TWO:
-        raise TopologyError(f"placement {loc_one}/{loc_two} != {MEMBER_ONE}/{MEMBER_TWO}")
+        raise TopologyError(
+            f"placement {loc_one}/{loc_two} != {MEMBER_ONE}/{MEMBER_TWO}"
+        )
 
     wait_ping(INSTANCE_ONE, ip_two)
     first_cross_member_ping_seconds = round(time.monotonic() - network_created_at, 3)
@@ -449,7 +580,11 @@ def cmd_create_network():
     uplink = get_existing(f"/1.0/networks/{OVN_UPLINK}?project=default")
     if uplink is None:
         raise TopologyError(f"uplink {OVN_UPLINK} is absent in default project")
-    payload = {"name": AUX_NETWORK, "type": "ovn", "config": ovn_network_config(AUX_SUBNET)}
+    payload = {
+        "name": AUX_NETWORK,
+        "type": "ovn",
+        "config": ovn_network_config(AUX_SUBNET),
+    }
     started = time.monotonic()
     result = incus(
         "query",
@@ -472,20 +607,29 @@ def cmd_create_network():
         "seconds": seconds,
         "stdout": result.stdout,
         "stderr": result.stderr,
-        "error": None if result.returncode == 0 else (result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"),
+        "error": None
+        if result.returncode == 0
+        else (
+            result.stderr.strip()
+            or result.stdout.strip()
+            or f"exit {result.returncode}"
+        ),
     }
     emit(body, 0 if result.returncode == 0 else 1)
 
 
 def delete_named_network(name):
-    forwards = list_or_absent(f"/1.0/networks/{name}/forwards?project={PROJECT}&recursion=1")
+    forwards = list_or_absent(
+        f"/1.0/networks/{name}/forwards?project={PROJECT}&recursion=1"
+    )
     for forward in forwards:
         listen = forward.get("listen_address")
         if not listen:
             continue
         result = incus(
             "query",
-            remote_prefix() + f"/1.0/networks/{name}/forwards/{listen}?project={PROJECT}",
+            remote_prefix()
+            + f"/1.0/networks/{name}/forwards/{listen}?project={PROJECT}",
             "--request",
             "DELETE",
             "--wait",
@@ -541,7 +685,14 @@ def delete_project_images():
         fingerprint = image.get("fingerprint")
         if not fingerprint:
             continue
-        result = incus("image", "delete", remote_prefix() + fingerprint, "--project", PROJECT, check=False)
+        result = incus(
+            "image",
+            "delete",
+            remote_prefix() + fingerprint,
+            "--project",
+            PROJECT,
+            check=False,
+        )
         if result.returncode and not is_absent(result):
             yield f"image {fingerprint}: {result.stderr.strip() or result.stdout.strip()}"
 
@@ -550,10 +701,14 @@ def cmd_destroy():
     projects = list_or_absent("/1.0/projects?recursion=1")
     found = next((p for p in projects if p.get("name") == PROJECT), None)
     if found is None:
-        emit({"project": PROJECT, "destroyed": False, "reason": "absent", "failures": []})
+        emit(
+            {"project": PROJECT, "destroyed": False, "reason": "absent", "failures": []}
+        )
     config = found.get("config") or {}
     if config.get(OWNER_KEY) != OWNER_VALUE:
-        raise TopologyError(f"project {PROJECT} is not owned ({OWNER_KEY}!={OWNER_VALUE}); refusing destroy")
+        raise TopologyError(
+            f"project {PROJECT} is not owned ({OWNER_KEY}!={OWNER_VALUE}); refusing destroy"
+        )
 
     failures = []
     instances = list_or_absent(f"/1.0/instances?project={PROJECT}&recursion=1")
@@ -561,9 +716,13 @@ def cmd_destroy():
         name = instance.get("name")
         if not name:
             continue
-        result = incus("delete", "-f", remote_prefix() + name, "--project", PROJECT, check=False)
+        result = incus(
+            "delete", "-f", remote_prefix() + name, "--project", PROJECT, check=False
+        )
         if result.returncode and not is_absent(result):
-            failures.append(f"instance {name}: {result.stderr.strip() or result.stdout.strip()}")
+            failures.append(
+                f"instance {name}: {result.stderr.strip() or result.stdout.strip()}"
+            )
 
     networks = list_or_absent(f"/1.0/networks?project={PROJECT}&recursion=1")
     for network in networks:
@@ -586,13 +745,17 @@ def cmd_destroy():
             check=False,
         )
         if result.returncode and not is_absent(result):
-            failures.append(f"profile {name}: {result.stderr.strip() or result.stdout.strip()}")
+            failures.append(
+                f"profile {name}: {result.stderr.strip() or result.stdout.strip()}"
+            )
 
     failures.extend(delete_project_images())
 
     result = incus("project", "delete", remote_prefix() + PROJECT, check=False)
     if result.returncode and not is_absent(result):
-        failures.append(f"project {PROJECT}: {result.stderr.strip() or result.stdout.strip()}")
+        failures.append(
+            f"project {PROJECT}: {result.stderr.strip() or result.stdout.strip()}"
+        )
 
     emit(
         {"project": PROJECT, "destroyed": not failures, "failures": failures},
@@ -601,15 +764,22 @@ def cmd_destroy():
 
 
 def main(argv=None):
-    global REMOTE, LOG
+    global REMOTE, LOG, TOOLS_BUNDLE
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
     parser.add_argument("--log", required=True, help="append-only JSONL command log")
     parser.add_argument("--remote", default=REMOTE, help="Incus remote (default nas01)")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("create", help="create owned project, OVN network, guests, forward, HTTP fixture")
+    sub.add_parser(
+        "create",
+        help="create owned project, OVN network, guests, forward, HTTP fixture",
+    )
     sub.add_parser("destroy", help="destroy owned project only, in dependency order")
-    sub.add_parser("create-network", help="create auxiliary recovery network once; no retries")
-    sub.add_parser("delete-network", help="delete auxiliary recovery network if present")
+    sub.add_parser(
+        "create-network", help="create auxiliary recovery network once; no retries"
+    )
+    sub.add_parser(
+        "delete-network", help="delete auxiliary recovery network if present"
+    )
     args = parser.parse_args(argv)
     REMOTE = args.remote
     path = Path(args.log)
@@ -617,7 +787,9 @@ def main(argv=None):
     LOG = path.open("a", encoding="utf-8")
     try:
         if args.command == "create":
-            cmd_create()
+            with tempfile.TemporaryDirectory(prefix="ovn-probe-tools-") as directory:
+                TOOLS_BUNDLE = prepare_tools_bundle(directory)
+                cmd_create()
         elif args.command == "destroy":
             cmd_destroy()
         elif args.command == "create-network":
@@ -626,8 +798,17 @@ def main(argv=None):
             cmd_delete_network()
         else:
             raise TopologyError(f"unknown command {args.command}")
-    except TopologyError as exc:
-        log_event({"args": [args.command], "code": 1, "seconds": 0, "stdout": "", "stderr": str(exc), "error": str(exc)})
+    except (TopologyError, OSError, ValueError) as exc:
+        log_event(
+            {
+                "args": [args.command],
+                "code": 1,
+                "seconds": 0,
+                "stdout": "",
+                "stderr": str(exc),
+                "error": str(exc),
+            }
+        )
         print(str(exc), file=sys.stderr)
         emit({"error": str(exc)}, 1)
     finally:

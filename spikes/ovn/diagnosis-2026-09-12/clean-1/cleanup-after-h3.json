@@ -1,0 +1,29 @@
+{
+  "destroy": {
+    "ok": true,
+    "skipped": false,
+    "exit_code": 0,
+    "result": {
+      "project": "ac-ovn-spike",
+      "destroyed": true,
+      "failures": []
+    },
+    "stderr": ""
+  },
+  "captures": [
+    {
+      "name": "monitor-delete",
+      "ready": true,
+      "pid": 24451,
+      "returncode": -15,
+      "error": null,
+      "log": "/Users/josh/code/lab2/agentcompute/.wt/spike-ovn-recreate-diagnosis/spikes/ovn/diagnosis-2026-09-12/clean-1/monitor-delete.log",
+      "bytes": 37778,
+      "ready_signal": "time=\"2026-09-11T22:53:36-07:00\" level=debug msg=\"Connected to the websocket: wss://10.10.10.14:8443/1.0/events?all-projects=true\"",
+      "started_at": "2026-09-12T05:53:36.622460+00:00",
+      "stopped_at": "2026-09-12T05:53:40.097467+00:00"
+    }
+  ],
+  "cleanup_failures": [],
+  "capture_failures": []
+}

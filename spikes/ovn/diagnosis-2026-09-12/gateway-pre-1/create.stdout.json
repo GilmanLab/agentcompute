@@ -1,0 +1,38 @@
+{
+  "project": "ac-ovn-spike",
+  "network": "default",
+  "subnet": "10.253.73.1/24",
+  "uplink": "fast40-uplink",
+  "central": "10.10.40.10",
+  "external_ip": "10.10.40.64",
+  "network_create_seconds": 0.576,
+  "first_cross_member_ping_seconds": 3.515,
+  "instances": {
+    "one": {
+      "location": "lab01",
+      "ipv4": "10.253.73.2"
+    },
+    "two": {
+      "location": "lab03",
+      "ipv4": "10.253.73.3"
+    }
+  },
+  "forward": {
+    "listen": "10.10.40.79",
+    "port": 8080,
+    "target": "one",
+    "target_ipv4": "10.253.73.2",
+    "marker": "ovn-spike-ok",
+    "url": "http://10.10.40.79:8080/index.html"
+  },
+  "large_file": {
+    "path": "/large.bin",
+    "bytes": 100000000,
+    "sha256": "a993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae",
+    "listen_port": 8080,
+    "guest_urls": {
+      "one": "http://10.253.73.2:8080/large.bin",
+      "two": "http://10.253.73.3:8080/large.bin"
+    }
+  }
+}

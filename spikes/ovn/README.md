@@ -350,3 +350,175 @@ resources. Both guests need curl and the HTTP fixture prepared by the helper.
 
 The retained configuration is converged. OVN lifecycle repeatability is not
 qualified by this spike.
+
+## 2026-09-12 — recreate and gateway diagnosis
+
+**Verdict: FALLBACK**, under the owner's follow-up rule. A fresh nas01-gateway
+cycle passed; a lab01-gateway cycle failed before and after one authorized
+reboot. No fallback architecture was implemented. The failed keeper was removed
+through fleet; the uplink, chassis configuration, central, and unrelated
+instances were otherwise left in place as requested.
+
+### One-command cycle
+
+From this repository, with the existing Incus remote and SSH access to
+`sandbox01` and gw01:
+
+```sh
+bash spikes/ovn/probe.sh cycle --evidence-dir "$(mktemp -d)"
+```
+
+This creates, probes, and destroys the owned disposable topology. It records
+commands, elapsed times, network/router identity, NB/SB state, gateway neighbor
+state, OVS journals, Incus debug monitors, and a bounded ARP capture. Monitor
+readiness requires the client's successful `/1.0/events?all-projects=true`
+WebSocket connection, not a sleep or a running PID.
+
+The probe checks both directions of cross-member ping and 100 MB HTTP transfers
+with SHA-256, both guests' gateway ping, DNS and HTTPS, and the workstation's
+exact forward body. Probe-tool packages are downloaded on the workstation and
+installed with signature verification through Incus file transfer: broken guest
+egress must not prevent the remaining datapath checks from running.
+
+There is one create attempt and no automatic recovery. The cycle never stops
+central, creates a keeper, changes chassis configuration, or clears neighbors.
+`--keep-on-failure` explicitly preserves failed resources for diagnosis;
+otherwise teardown runs even after a failed probe.
+
+### Cycle results
+
+[Structured cycle table](diagnosis-2026-09-12/cycle-table.json). External
+addresses below are in `10.10.40.0/24`; router names are NB logical routers.
+Gateway placement comes from SB binding, not the container's member.
+
+| Run | NB router | Gateway | External IP | Router MAC | Result | Seconds |
+| --- | --- | --- | --- | --- | --- | ---: |
+| clean-1 | incus-net24-lr | lab01 | .64 | 10:66:6a:49:f5:82 | Fail; bootstrap blocked by egress | 50.489 |
+| keeper-1 | incus-net26-lr | nas01 | .65 | 10:66:6a:ed:13:7f | Pass | 29.756 |
+| keeper-2 | incus-net27-lr | lab03 | .65 | 10:66:6a:6c:ad:18 | Pass | 32.190 |
+| keeper-3 | incus-net28-lr | lab01 | .65 | 10:66:6a:14:21:7e | Fail; north-south only | 61.306 |
+| outage-fixture | incus-net29-lr | lab01 | .65 | 10:66:6a:ab:ba:f8 | Fail; north-south only | 55.432 |
+| post-outage | incus-net31-lr | nas01 | .65 | 10:66:6a:ea:40:3b | Pass | 31.078 |
+| gateway-pre-1 | incus-net32-lr | lab02 | .64 | 10:66:6a:33:3f:c7 | Pass | 33.092 |
+| gateway-pre-2 | incus-net33-lr | lab02 | .64 | 10:66:6a:74:95:5e | Pass | 29.904 |
+| gateway-pre-3 | incus-net34-lr | lab02 | .64 | 10:66:6a:1f:21:eb | Pass | 31.142 |
+| gateway-pre-4 | incus-net35-lr | lab02 | .64 | 10:66:6a:97:88:42 | Pass | 32.274 |
+| gateway-pre-5 | incus-net36-lr | nas01 | .64 | 10:66:6a:ef:03:ee | Pass | 32.470 |
+| gateway-pre-6 | incus-net37-lr | lab01 | .64 | 10:66:6a:b2:7a:65 | Fail; north-south only | 60.817 |
+| gateway-post-1 | incus-net38-lr | lab01 | .64 | 10:66:6a:43:84:fe | Fail; north-south only | 61.572 |
+
+All full probes after `clean-1` passed east-west ping and both 100 MB hash
+checks, including the failed lab01-gateway cycles. Those failures comprised
+gateway ping, DNS and HTTPS from both guests, plus the workstation forward.
+The first cycle used guest-side package bootstrap; fallback checks established
+cross-member ping but no 100 MB or forward fixture was installed.
+
+Times include capture/setup/probe/cleanup work, except the explicitly retained
+`clean-1` and `outage-fixture`. The former was deleted after the neighbor-clear
+test; the latter after the outage experiment. All other cycles completed their
+own teardown. No disposable topology remains.
+
+### Hypotheses and bounded recovery
+
+- **H3, stale gw01 neighbor state:** clearing only `.64` on gw01 did not restore
+  gateway ping in the unchanged failed clean topology. With the keeper holding
+  `.64`, clearing only the failed router's `.65` entry also did not restore
+  connectivity. Both bounded sandbox01 ARP captures remained empty. A stale
+  gw01 entry is not a sufficient explanation for these failures.
+- **H1, last-consumer uplink teardown:** the keeper kept an OVN consumer alive,
+  but its three cycles were pass/pass/fail. Failure followed lab01 gateway
+  placement even without last-consumer teardown. H1 was not established as a
+  teardown regression; the keeper did not qualify and was removed.
+- **H2, reboot-recoverable chassis corruption:** the requested recovery criterion
+  failed. Lab01 still failed as gateway after reboot. Do not interpret the
+  successful nas01 control as lab01 recovery.
+
+The original OVS journal, before sustained rate limiting, reports:
+
+```text
+system@ovs-system: failed to add fast40 as port: Device or resource busy
+could not add network device fast40 to ofproto (Device or resource busy)
+```
+
+Incus lists `fast40-uplink` and `soak01` as consumers of lab01's `fast40`.
+`soak01` has an active raw macvlan NIC on that parent. Its configuration was
+unchanged, and the NIC was up before and after reboot. The same OVS errors
+recurred in the fresh-boot cycle. **Inference:** the active macvlan is the likely
+competing attachment; IncusOS's supported API does not expose kernel RX-handler
+ownership or an `ovs-vsctl show` equivalent. We did not remove that NIC to test
+the inference and do not claim a confirmed kernel/OVS corruption cause.
+
+Evidence: [parent consumer](diagnosis-2026-09-12/lab01-parent-consumer.json),
+[original journal](diagnosis-2026-09-12/lab01-original-ovs-journal.json),
+[post-reboot errors](diagnosis-2026-09-12/lab01-post-reboot-ovs-conflict.json).
+Persistent gateway failure reported as
+[lxc/incus#3986](https://github.com/lxc/incus/issues/3986), including the
+macvlan precondition and the distinction between unsupported parent sharing and
+silently accepting/selecting an unprogrammable gateway.
+
+### Reboot evidence
+
+Fleet submitted exactly one lab01 reboot, request
+`phase3-recreate-lab01-20260912`. ONLINE status and a different boot ID were both
+required before the post-reboot cycle.
+
+| Observation | Before | After |
+| --- | --- | --- |
+| Boot ID | f9f71dd5a051466283d7da6fb860c528 | b5e39bb2a73f421c9b89a935f9f116b2 |
+| Incus | 7.4 | 7.4 |
+| IncusOS | 202608242359 | 202609100026 |
+| Kernel | 7.1.10-zabbly+ | 7.2.4-zabbly+ |
+| soak01 macvlan eth1 | Up | Up |
+| lab01 gateway probe | Fail | Fail |
+
+Lab01 returned ONLINE after **146.549 s**. The reboot activated an OS/kernel
+update, so this was not a same-software reboot comparison. The failure persisted
+across that change. See [reboot comparison](diagnosis-2026-09-12/reboot-comparison.json)
+and [readiness observation](diagnosis-2026-09-12/reboot-watch/reboot.json).
+
+### Northbound outage
+
+The single follow-up central outage reproduced the creation problem: the client
+deadline expired after **60.019 s**, leaving an `Errored` network reserving `.66`.
+Restarting central did not change that state. Explicit deletion succeeded;
+without a service, chassis, uplink, or neighbor repair, the subsequent fresh
+cycle passed on nas01 in **31.078 s**.
+
+This outage fixture already had broken north-south traffic before central was
+stopped; it is not new evidence of egress surviving an outage. The original
+spike's outage observations remain separate.
+
+Reported as [lxc/incus#3985](https://github.com/lxc/incus/issues/3985).
+See [outage results](diagnosis-2026-09-12/outage/outage.json) and its command and
+monitor logs. The hypothesis that connection initialization escapes the
+transaction timeout remains source-based, not a stack-trace diagnosis.
+
+### Address accounting and final state
+
+A tested sandbox consumes **two external addresses**: one NAT router address
+and one forward listen address. Multiple ports on the same forward address do
+not require additional addresses. The 16-address allocation has capacity for
+eight such sandboxes with no keeper, or seven plus one spare while a keeper
+reserves one address. The keeper was removed and now consumes zero.
+
+After the final failed cycle:
+
+- All four cluster members ONLINE; central's four units active; four SB chassis.
+- No disposable project, keeper, NB logical topology, or Errored network remains.
+- Fleet OVN dry-run: all ten operations unchanged, **3.429 s**.
+- Fleet keeper dry-run: absent and unchanged, **0.696 s**.
+- Uplink/chassis/central retained as the owner requested; `soak01` unchanged
+  apart from its authorized host reboot and automatic restart.
+
+The [execution log](diagnosis-2026-09-12/execution.jsonl) records fleet
+operations and final checks. Per-cycle directories contain the command,
+probe, monitor, ARP, and NB/SB evidence. Published OVS journal responses retain
+timestamp, host, boot ID when available, and message; unrelated journal
+metadata is projected out and marked in command records. Original raw captures
+were preserved privately before this reduction.
+
+Publication checks: fleet pytest **39 passed**; mypy passed **17 source files**;
+Ruff passed for the new fleet deploy and both Python probe helpers; Bash syntax,
+Python compilation, and the actual cycle CLI help passed. The companion
+address-plan site built successfully with `moon run docs:build`. No additional
+live cycle was run after the owner's FALLBACK condition was established.

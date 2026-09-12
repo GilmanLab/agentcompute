@@ -1,0 +1,222 @@
+=== incus network show exit=1 ===
+Error: Failed to load project "ac-ovn-spike": Project not found
+=== incus network list-allocations exit=1 ===
+Error: Failed to load project "ac-ovn-spike": Project not found
+=== sandbox01 nb/sb/neigh exit=0 ===
+=== ovn-nbctl show ===
+=== ovn-sbctl show ===
+Chassis "5ec8d171-fbe4-49cf-9923-9d21f9c5d29b"
+    hostname: lab03.glab.lol
+    Encap geneve
+        ip: "10.10.30.13"
+        options: {csum="true"}
+Chassis "c2919898-1135-4799-80cf-860ae7e7ef9e"
+    hostname: nas01.glab.lol
+    Encap geneve
+        ip: "10.10.30.14"
+        options: {csum="true"}
+Chassis "67314e94-b0b4-4c97-8146-0c67aff4d585"
+    hostname: lab02.glab.lol
+    Encap geneve
+        ip: "10.10.30.12"
+        options: {csum="true"}
+Chassis "2da6738c-78eb-4738-98be-0898402c0eaa"
+    hostname: lab01.glab.lol
+    Encap geneve
+        ip: "10.10.30.11"
+        options: {csum="true"}
+=== ovn-nbctl list Logical_Router_Port ===
+=== ovn-sbctl find Port_Binding type=chassisredirect ===
+=== ip neigh ===
+10.10.40.64 dev enp2s0 lladdr 10:66:6a:48:93:53 STALE 
+=== gateway neigh exit=0 ===
+=== lab01 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192416659910",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02158|poll_loop|INFO|Dropped 12426 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192416659993",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02159|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (99% CPU usage)"
+  },
+  {
+    "at": "1789192417139653",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02160|dpif|WARN|Dropped 2046 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192417174106",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02161|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192417593502",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02162|bridge|INFO|bridge br-int: deleted interface vethcc4bbe23 on port 15"
+  },
+  {
+    "at": "1789192418140011",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02163|dpif|WARN|Dropped 2020 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192418140128",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02164|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192419139537",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02165|dpif|WARN|Dropped 2067 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192419139731",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02166|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192419564686",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02167|bridge|INFO|bridge incusovn16: deleted interface incusovn16 on port 65534"
+  },
+  {
+    "at": "1789192419564821",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02168|bridge|INFO|bridge incusovn16: deleted interface patch-incus-net24-ls-ext-lsp-provider-to-br-int on port 1"
+  },
+  {
+    "at": "1789192419583398",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02169|bridge|INFO|bridge br-int: deleted interface patch-br-int-to-incus-net24-ls-ext-lsp-provider on port 14"
+  },
+  {
+    "at": "1789192419583481",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|00002|ofproto_dpif_monitor(monitor129)|INFO|monitor thread terminated"
+  }
+]
+
+=== lab02 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192419560100",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00115|bridge|INFO|bridge incusovn16: deleted interface incusovn16 on port 65534"
+  },
+  {
+    "at": "1789192419560380",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00116|bridge|INFO|bridge incusovn16: deleted interface patch-incus-net24-ls-ext-lsp-provider-to-br-int on port 2"
+  },
+  {
+    "at": "1789192419560635",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00117|bridge|INFO|bridge incusovn16: deleted interface fast40 on port 1"
+  },
+  {
+    "at": "1789192419578194",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00118|bridge|INFO|bridge br-int: deleted interface patch-br-int-to-incus-net24-ls-ext-lsp-provider on port 10"
+  },
+  {
+    "at": "1789192419578235",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00002|ofproto_dpif_monitor(monitor129)|INFO|monitor thread terminated"
+  }
+]
+
+=== lab03 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192418582244",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00120|bridge|INFO|bridge br-int: deleted interface veth09ee9212 on port 13"
+  },
+  {
+    "at": "1789192419562888",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00121|bridge|INFO|bridge incusovn16: deleted interface incusovn16 on port 65534"
+  },
+  {
+    "at": "1789192419563016",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00122|bridge|INFO|bridge incusovn16: deleted interface patch-incus-net24-ls-ext-lsp-provider-to-br-int on port 2"
+  },
+  {
+    "at": "1789192419563049",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00123|bridge|INFO|bridge incusovn16: deleted interface fast40 on port 1"
+  },
+  {
+    "at": "1789192419583406",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00124|bridge|INFO|bridge br-int: deleted interface patch-br-int-to-incus-net24-ls-ext-lsp-provider on port 12"
+  },
+  {
+    "at": "1789192419583570",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00002|ofproto_dpif_monitor(monitor129)|INFO|monitor thread terminated"
+  }
+]
+
+=== nas01 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192419572538",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00119|bridge|INFO|bridge incusovn16: deleted interface incusovn16 on port 65534"
+  },
+  {
+    "at": "1789192419572753",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00120|bridge|INFO|bridge incusovn16: deleted interface patch-incus-net24-ls-ext-lsp-provider-to-br-int on port 2"
+  },
+  {
+    "at": "1789192419572772",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00121|bridge|INFO|bridge incusovn16: deleted interface fast40 on port 1"
+  },
+  {
+    "at": "1789192419600629",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00002|ofproto_dpif_monitor(monitor129)|INFO|monitor thread terminated"
+  },
+  {
+    "at": "1789192419603517",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00122|bridge|INFO|bridge br-int: deleted interface patch-br-int-to-incus-net24-ls-ext-lsp-provider on port 12"
+  }
+]
+

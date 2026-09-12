@@ -1,0 +1,84 @@
+{
+  "reboot": {
+    "old_boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "new_boot_id": "b5e39bb2a73f421c9b89a935f9f116b2",
+    "status": "Online",
+    "seconds": 146.549,
+    "observed_non_online": true
+  },
+  "before_environment": {
+    "server_name": "lab01",
+    "server_version": "7.4",
+    "os_version": "202608242359",
+    "kernel_version": "7.1.10-zabbly+"
+  },
+  "after_environment": {
+    "server_name": "lab01",
+    "server_version": "7.4",
+    "os_version": "202609100026",
+    "kernel_version": "7.2.4-zabbly+"
+  },
+  "software_version_changed": true,
+  "soak_before": {
+    "name": "soak01",
+    "status": "Running",
+    "location": "lab01",
+    "expanded_devices": {
+      "eth0": {
+        "name": "eth0",
+        "network": "incusbr0",
+        "type": "nic"
+      },
+      "eth1": {
+        "nictype": "macvlan",
+        "parent": "fast40",
+        "type": "nic"
+      },
+      "root": {
+        "path": "/",
+        "pool": "data",
+        "type": "disk"
+      }
+    }
+  },
+  "soak_after": {
+    "name": "soak01",
+    "status": "Running",
+    "location": "lab01",
+    "expanded_devices": {
+      "eth0": {
+        "name": "eth0",
+        "network": "incusbr0",
+        "type": "nic"
+      },
+      "eth1": {
+        "nictype": "macvlan",
+        "parent": "fast40",
+        "type": "nic"
+      },
+      "root": {
+        "path": "/",
+        "pool": "data",
+        "type": "disk"
+      }
+    }
+  },
+  "soak_nic_before": {
+    "status": "Running",
+    "eth1": {
+      "state": "up",
+      "host_name": "fast40",
+      "mtu": 1500,
+      "type": "broadcast"
+    }
+  },
+  "soak_nic_after": {
+    "status": "Running",
+    "eth1": {
+      "state": "up",
+      "host_name": "fast40",
+      "mtu": 1500,
+      "type": "broadcast"
+    }
+  }
+}

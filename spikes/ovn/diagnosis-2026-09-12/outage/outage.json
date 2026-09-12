@@ -1,0 +1,196 @@
+{
+  "networks-before": {
+    "exit_code": 0,
+    "stdout": [
+      {
+        "config": {
+          "bridge.mtu": "1442",
+          "dns.nameservers": "10.10.40.1",
+          "ipv4.address": "10.253.73.1/24",
+          "ipv4.dhcp": "true",
+          "ipv4.nat": "true",
+          "ipv6.address": "none",
+          "network": "fast40-uplink",
+          "volatile.network.ipv4.address": "10.10.40.65"
+        },
+        "description": "",
+        "locations": [
+          "lab02",
+          "lab03",
+          "nas01",
+          "lab01"
+        ],
+        "managed": true,
+        "name": "default",
+        "project": "ac-ovn-spike",
+        "status": "Created",
+        "type": "ovn",
+        "used_by": [
+          "/1.0/instances/one?project=ac-ovn-spike",
+          "/1.0/instances/two?project=ac-ovn-spike"
+        ]
+      }
+    ],
+    "stderr": ""
+  },
+  "central-stopped": {
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "--> Loading config...\n--> Loading inventory...\n--> Connecting to hosts...\n    [sandbox01] Connected\n\n--> Preparing operation files...\n    Loading: src/fleet_cluster/deploys/ovn_central.py\n    [sandbox01] Loaded fact server.Hostname\n    [sandbox01] Loaded fact files.File (path=/var/lib/fleet-ovn-spike)\n    [sandbox01] Loaded fact deb.DebPackages\n    [sandbox01] Ready: src/fleet_cluster/deploys/ovn_central.py\n\n--> Skipping change detection\n--> Beginning operation run...\n--> Starting operation: Record central spike ownership \n    [sandbox01] Loaded fact files.File (path=/var/lib/fleet-ovn-spike)\n    [sandbox01] Loaded fact files.Directory (path=/var/lib)\n    [sandbox01] Loaded fact files.Sha1File (path=/var/lib/fleet-ovn-spike)\n    [sandbox01] noop: file /var/lib/fleet-ovn-spike is already uploaded\n    [sandbox01] No changes\n\n--> Starting operation: Install temporary OVN central without recommends \n    [sandbox01] Loaded fact deb.DebPackages\n    [sandbox01] noop: package ovn-central is installed (26.03.0-2)\n    [sandbox01] No changes\n\n--> Starting operation: Bind temporary NB and SB databases to VLAN 40 only \n    [sandbox01] Loaded fact files.File (path=/etc/default/ovn-central)\n    [sandbox01] Loaded fact files.Directory (path=/etc/default)\n    [sandbox01] Loaded fact files.Sha1File (path=/etc/default/ovn-central)\n    [sandbox01] noop: file /etc/default/ovn-central is already uploaded\n    [sandbox01] No changes\n\n--> Starting operation: Ensure temporary central is stopped \n    [sandbox01] Loaded fact systemd.SystemdStatus (machine=None, services=['ovn-central.service'], user_mode=False, user_name=None)\n    [sandbox01] Loaded fact systemd.SystemdEnabled (machine=None, services=['ovn-central.service'], user_mode=False, user_name=None)\n    [sandbox01] Success\n\n--> Results:\n    Operation                                            Hosts   Success   Error   No Change   \n    Record central spike ownership                       1       -         -       1           \n    Install temporary OVN central without recommends     1       -         -       1           \n    Bind temporary NB and SB databases to VLAN 40 only   1       -         -       1           \n    Ensure temporary central is stopped                  1       1         -       -           \n    Grand total                                          4       1         -       3           \n\n--> Disconnecting from hosts...\n"
+  },
+  "central-inactive": {
+    "exit_code": 3,
+    "stdout": "inactive\ndeactivating\ninactive\ndeactivating\n",
+    "stderr": ""
+  },
+  "create-network": {
+    "exit_code": 1,
+    "stdout": {
+      "network": "recovery",
+      "subnet": "10.253.74.1/24",
+      "created": false,
+      "code": 124,
+      "timeout_seconds": 60,
+      "seconds": 60.019,
+      "stdout": "",
+      "stderr": "",
+      "error": "exit 124"
+    },
+    "stderr": ""
+  },
+  "errored-before-recovery": {
+    "exit_code": 0,
+    "stdout": {
+      "config": {
+        "bridge.mtu": "1442",
+        "dns.nameservers": "10.10.40.1",
+        "ipv4.address": "10.253.74.1/24",
+        "ipv4.dhcp": "true",
+        "ipv4.nat": "true",
+        "ipv6.address": "none",
+        "network": "fast40-uplink",
+        "volatile.network.ipv4.address": "10.10.40.66"
+      },
+      "description": "",
+      "locations": [
+        "nas01",
+        "lab01",
+        "lab02",
+        "lab03"
+      ],
+      "managed": true,
+      "name": "recovery",
+      "project": "ac-ovn-spike",
+      "status": "Errored",
+      "type": "ovn",
+      "used_by": []
+    },
+    "stderr": ""
+  },
+  "central-running": {
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "--> Loading config...\n--> Loading inventory...\n--> Connecting to hosts...\n    [sandbox01] Connected\n\n--> Preparing operation files...\n    Loading: src/fleet_cluster/deploys/ovn_central.py\n    [sandbox01] Loaded fact server.Hostname\n    [sandbox01] Loaded fact files.File (path=/var/lib/fleet-ovn-spike)\n    [sandbox01] Loaded fact deb.DebPackages\n    [sandbox01] Ready: src/fleet_cluster/deploys/ovn_central.py\n\n--> Skipping change detection\n--> Beginning operation run...\n--> Starting operation: Record central spike ownership \n    [sandbox01] Loaded fact files.File (path=/var/lib/fleet-ovn-spike)\n    [sandbox01] Loaded fact files.Directory (path=/var/lib)\n    [sandbox01] Loaded fact files.Sha1File (path=/var/lib/fleet-ovn-spike)\n    [sandbox01] noop: file /var/lib/fleet-ovn-spike is already uploaded\n    [sandbox01] No changes\n\n--> Starting operation: Install temporary OVN central without recommends \n    [sandbox01] Loaded fact deb.DebPackages\n    [sandbox01] noop: package ovn-central is installed (26.03.0-2)\n    [sandbox01] No changes\n\n--> Starting operation: Bind temporary NB and SB databases to VLAN 40 only \n    [sandbox01] Loaded fact files.File (path=/etc/default/ovn-central)\n    [sandbox01] Loaded fact files.Directory (path=/etc/default)\n    [sandbox01] Loaded fact files.Sha1File (path=/etc/default/ovn-central)\n    [sandbox01] noop: file /etc/default/ovn-central is already uploaded\n    [sandbox01] No changes\n\n--> Starting operation: Ensure temporary central is running \n    [sandbox01] Loaded fact systemd.SystemdStatus (machine=None, services=['ovn-central.service'], user_mode=False, user_name=None)\n    [sandbox01] Loaded fact systemd.SystemdEnabled (machine=None, services=['ovn-central.service'], user_mode=False, user_name=None)\n    [sandbox01] Success\n\n--> Starting operation: Reload changed central options \n    [sandbox01] No changes\n\n--> Results:\n    Operation                                            Hosts   Success   Error   No Change   \n    Record central spike ownership                       1       -         -       1           \n    Install temporary OVN central without recommends     1       -         -       1           \n    Bind temporary NB and SB databases to VLAN 40 only   1       -         -       1           \n    Ensure temporary central is running                  1       1         -       -           \n    Reload changed central options                       1       -         -       1           \n    Grand total                                          5       1         -       4           \n\n--> Disconnecting from hosts...\n"
+  },
+  "central-active": {
+    "exit_code": 0,
+    "stdout": "active\nactive\nactive\nactive\n",
+    "stderr": ""
+  },
+  "errored-after-recovery": {
+    "exit_code": 0,
+    "stdout": {
+      "config": {
+        "bridge.mtu": "1442",
+        "dns.nameservers": "10.10.40.1",
+        "ipv4.address": "10.253.74.1/24",
+        "ipv4.dhcp": "true",
+        "ipv4.nat": "true",
+        "ipv6.address": "none",
+        "network": "fast40-uplink",
+        "volatile.network.ipv4.address": "10.10.40.66"
+      },
+      "description": "",
+      "locations": [
+        "nas01",
+        "lab01",
+        "lab02",
+        "lab03"
+      ],
+      "managed": true,
+      "name": "recovery",
+      "project": "ac-ovn-spike",
+      "status": "Errored",
+      "type": "ovn",
+      "used_by": []
+    },
+    "stderr": ""
+  },
+  "delete-network": {
+    "exit_code": 0,
+    "stdout": {
+      "network": "recovery",
+      "deleted": true,
+      "failures": []
+    },
+    "stderr": ""
+  },
+  "networks-after-delete": {
+    "exit_code": 0,
+    "stdout": [
+      {
+        "config": {
+          "bridge.mtu": "1442",
+          "dns.nameservers": "10.10.40.1",
+          "ipv4.address": "10.253.73.1/24",
+          "ipv4.dhcp": "true",
+          "ipv4.nat": "true",
+          "ipv6.address": "none",
+          "network": "fast40-uplink",
+          "volatile.network.ipv4.address": "10.10.40.65"
+        },
+        "description": "",
+        "locations": [
+          "nas01",
+          "lab01",
+          "lab02",
+          "lab03"
+        ],
+        "managed": true,
+        "name": "default",
+        "project": "ac-ovn-spike",
+        "status": "Created",
+        "type": "ovn",
+        "used_by": [
+          "/1.0/instances/one?project=ac-ovn-spike",
+          "/1.0/instances/two?project=ac-ovn-spike"
+        ]
+      }
+    ],
+    "stderr": ""
+  },
+  "destroy": {
+    "exit_code": 0,
+    "stdout": {
+      "project": "ac-ovn-spike",
+      "destroyed": true,
+      "failures": []
+    },
+    "stderr": ""
+  },
+  "captures": [
+    {
+      "name": "monitor-outage",
+      "ready": true,
+      "pid": 79943,
+      "returncode": -15,
+      "error": null,
+      "log": "/Users/josh/code/lab2/agentcompute/.wt/spike-ovn-recreate-diagnosis/spikes/ovn/diagnosis-2026-09-12/outage/monitor-outage.log",
+      "bytes": 70721,
+      "ready_signal": "time=\"2026-09-11T23:09:47-07:00\" level=debug msg=\"Connected to the websocket: wss://10.10.10.14:8443/1.0/events?all-projects=true\"",
+      "started_at": "2026-09-12T06:09:47.190814+00:00",
+      "stopped_at": "2026-09-12T06:10:57.185227+00:00"
+    }
+  ],
+  "capture_failures": []
+}

@@ -1,0 +1,119 @@
+{
+  "ok": true,
+  "datapath_ok": true,
+  "captures_ok": true,
+  "cleanup_ok": true,
+  "exit_code": 0,
+  "keep_on_failure": false,
+  "teardown": "done",
+  "started_at": "2026-09-12T15:49:01.262086+00:00",
+  "ended_at": "2026-09-12T15:49:33.732060+00:00",
+  "seconds": 32.47,
+  "external_ip": "10.10.40.64",
+  "router_mac": "10:66:6a:ef:03:ee",
+  "create": {
+    "ok": true,
+    "exit_code": 0,
+    "result": {
+      "project": "ac-ovn-spike",
+      "network": "default",
+      "subnet": "10.253.73.1/24",
+      "uplink": "fast40-uplink",
+      "central": "10.10.40.10",
+      "external_ip": "10.10.40.64",
+      "network_create_seconds": 0.56,
+      "first_cross_member_ping_seconds": 2.868,
+      "instances": {
+        "one": {
+          "location": "lab01",
+          "ipv4": "10.253.73.2"
+        },
+        "two": {
+          "location": "lab03",
+          "ipv4": "10.253.73.3"
+        }
+      },
+      "forward": {
+        "listen": "10.10.40.79",
+        "port": 8080,
+        "target": "one",
+        "target_ipv4": "10.253.73.2",
+        "marker": "ovn-spike-ok",
+        "url": "http://10.10.40.79:8080/index.html"
+      },
+      "large_file": {
+        "path": "/large.bin",
+        "bytes": 100000000,
+        "sha256": "a993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae",
+        "listen_port": 8080,
+        "guest_urls": {
+          "one": "http://10.253.73.2:8080/large.bin",
+          "two": "http://10.253.73.3:8080/large.bin"
+        }
+      }
+    },
+    "stderr": ""
+  },
+  "probe": {
+    "ok": true,
+    "exit_code": 0,
+    "stdout": "+ incus network list nas01: --project ac-ovn-spike\n+---------+------+---------+----------------+------+-------------+---------+---------+\n|  NAME   | TYPE | MANAGED |      IPV4      | IPV6 | DESCRIPTION | USED BY |  STATE  |\n+---------+------+---------+----------------+------+-------------+---------+---------+\n| default | ovn  | YES     | 10.253.73.1/24 | none |             | 2       | CREATED |\n+---------+------+---------+----------------+------+-------------+---------+---------+\nelapsed_seconds=0.084 exit=0\n+ incus network show nas01:default --project ac-ovn-spike\nconfig:\n  bridge.mtu: \"1442\"\n  dns.nameservers: 10.10.40.1\n  ipv4.address: 10.253.73.1/24\n  ipv4.dhcp: \"true\"\n  ipv4.nat: \"true\"\n  ipv6.address: none\n  network: fast40-uplink\n  volatile.network.ipv4.address: 10.10.40.64\ndescription: \"\"\nname: default\ntype: ovn\nused_by:\n  - /1.0/instances/one?project=ac-ovn-spike\n  - /1.0/instances/two?project=ac-ovn-spike\nmanaged: true\nstatus: Created\nlocations:\n  - nas01\n  - lab01\n  - lab02\n  - lab03\nproject: ac-ovn-spike\nelapsed_seconds=0.084 exit=0\ndns.nameservers=10.10.40.1\n+ incus list nas01: --project ac-ovn-spike --format json\n[{\"architecture\":\"x86_64\",\"config\":{\"image.agentcompute.digest\":\"sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889\",\"image.architecture\":\"x86_64\",\"image.description\":\"Router system container (Alpine 3.22.5)\",\"image.name\":\"router\",\"image.os\":\"alpinelinux\",\"image.release\":\"3.22.5\",\"image.serial\":\"phase1\",\"image.variant\":\"router\",\"volatile.base_image\":\"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f\",\"volatile.cloud-init.instance-id\":\"6f1bca4c-008f-4747-b440-da094863ef53\",\"volatile.eth0.host_name\":\"veth4081215f\",\"volatile.eth0.hwaddr\":\"10:66:6a:fa:34:71\",\"volatile.eth0.last_state.ip_addresses\":\"10.253.73.2\",\"volatile.idmap.base\":\"0\",\"volatile.idmap.current\":\"[{\\\"Isuid\\\":true,\\\"Isgid\\\":false,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000},{\\\"Isuid\\\":false,\\\"Isgid\\\":true,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000}]\",\"volatile.idmap.next\":\"[{\\\"Isuid\\\":true,\\\"Isgid\\\":false,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000},{\\\"Isuid\\\":false,\\\"Isgid\\\":true,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000}]\",\"volatile.last_state.idmap\":\"[]\",\"volatile.last_state.power\":\"RUNNING\",\"volatile.uuid\":\"1500421f-eae8-4703-a5ad-36cccc32d607\",\"volatile.uuid.generation\":\"1500421f-eae8-4703-a5ad-36cccc32d607\"},\"devices\":{\"eth0\":{\"name\":\"eth0\",\"network\":\"default\",\"type\":\"nic\"},\"root\":{\"path\":\"/\",\"pool\":\"data\",\"size\":\"2GiB\",\"type\":\"disk\"}},\"ephemeral\":false,\"profiles\":[],\"stateful\":false,\"description\":\"\",\"created_at\":\"2026-09-12T15:49:04.83508965Z\",\"expanded_config\":{\"image.agentcompute.digest\":\"sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889\",\"image.architecture\":\"x86_64\",\"image.description\":\"Router system container (Alpine 3.22.5)\",\"image.name\":\"router\",\"image.os\":\"alpinelinux\",\"image.release\":\"3.22.5\",\"image.serial\":\"phase1\",\"image.variant\":\"router\",\"volatile.base_image\":\"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f\",\"volatile.cloud-init.instance-id\":\"6f1bca4c-008f-4747-b440-da094863ef53\",\"volatile.eth0.host_name\":\"veth4081215f\",\"volatile.eth0.hwaddr\":\"10:66:6a:fa:34:71\",\"volatile.eth0.last_state.ip_addresses\":\"10.253.73.2\",\"volatile.idmap.base\":\"0\",\"volatile.idmap.current\":\"[{\\\"Isuid\\\":true,\\\"Isgid\\\":false,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000},{\\\"Isuid\\\":false,\\\"Isgid\\\":true,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000}]\",\"volatile.idmap.next\":\"[{\\\"Isuid\\\":true,\\\"Isgid\\\":false,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000},{\\\"Isuid\\\":false,\\\"Isgid\\\":true,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000}]\",\"volatile.last_state.idmap\":\"[]\",\"volatile.last_state.power\":\"RUNNING\",\"volatile.uuid\":\"1500421f-eae8-4703-a5ad-36cccc32d607\",\"volatile.uuid.generation\":\"1500421f-eae8-4703-a5ad-36cccc32d607\"},\"expanded_devices\":{\"eth0\":{\"name\":\"eth0\",\"network\":\"default\",\"type\":\"nic\"},\"root\":{\"path\":\"/\",\"pool\":\"data\",\"size\":\"2GiB\",\"type\":\"disk\"}},\"name\":\"one\",\"status\":\"Running\",\"status_code\":103,\"last_used_at\":\"2026-09-12T15:49:05.45788577Z\",\"location\":\"lab01\",\"type\":\"container\",\"project\":\"ac-ovn-spike\",\"backups\":null,\"state\":{\"status\":\"Running\",\"status_code\":103,\"disk\":{\"root\":{\"usage\":192512,\"total\":2147483648}},\"memory\":{\"usage\":9502720,\"usage_peak\":0,\"total\":65256732000,\"swap_usage\":0,\"swap_usage_peak\":0},\"network\":{\"eth0\":{\"addresses\":[{\"family\":\"inet\",\"address\":\"10.253.73.2\",\"netmask\":\"24\",\"scope\":\"global\"},{\"family\":\"inet6\",\"address\":\"fe80::1266:6aff:fefa:3471\",\"netmask\":\"64\",\"scope\":\"link\"}],\"counters\":{\"bytes_received\":968,\"bytes_sent\":1410,\"packets_received\":6,\"packets_sent\":11,\"errors_received\":0,\"errors_sent\":0,\"packets_dropped_outbound\":0,\"packets_dropped_inbound\":0},\"hwaddr\":\"10:66:6a:fa:34:71\",\"host_name\":\"veth4081215f\",\"mtu\":1442,\"state\":\"up\",\"type\":\"broadcast\"},\"lo\":{\"addresses\":[{\"family\":\"inet\",\"address\":\"127.0.0.1\",\"netmask\":\"8\",\"scope\":\"local\"},{\"family\":\"inet6\",\"address\":\"::1\",\"netmask\":\"128\",\"scope\":\"local\"}],\"counters\":{\"bytes_received\":0,\"bytes_sent\":0,\"packets_received\":0,\"packets_sent\":0,\"errors_received\":0,\"errors_sent\":0,\"packets_dropped_outbound\":0,\"packets_dropped_inbound\":0},\"hwaddr\":\"\",\"host_name\":\"\",\"mtu\":65536,\"state\":\"up\",\"type\":\"loopback\"}},\"pid\":4179249,\"processes\":4,\"cpu\":{\"usage\":525006000,\"allocated_time\":24000000000},\"started_at\":\"2026-09-12T15:49:04.480000019Z\",\"os_info\":null},\"snapshots\":null},{\"architecture\":\"x86_64\",\"config\":{\"image.agentcompute.digest\":\"sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889\",\"image.architecture\":\"x86_64\",\"image.description\":\"Router system container (Alpine 3.22.5)\",\"image.name\":\"router\",\"image.os\":\"alpinelinux\",\"image.release\":\"3.22.5\",\"image.serial\":\"phase1\",\"image.variant\":\"router\",\"volatile.base_image\":\"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f\",\"volatile.cloud-init.instance-id\":\"2a85b9cc-2a71-4735-8327-c1dfca20700f\",\"volatile.eth0.host_name\":\"veth44cf6ffb\",\"volatile.eth0.hwaddr\":\"10:66:6a:b5:a6:1d\",\"volatile.eth0.last_state.ip_addresses\":\"10.253.73.3\",\"volatile.idmap.base\":\"0\",\"volatile.idmap.current\":\"[{\\\"Isuid\\\":true,\\\"Isgid\\\":false,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000},{\\\"Isuid\\\":false,\\\"Isgid\\\":true,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000}]\",\"volatile.idmap.next\":\"[{\\\"Isuid\\\":true,\\\"Isgid\\\":false,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000},{\\\"Isuid\\\":false,\\\"Isgid\\\":true,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000}]\",\"volatile.last_state.idmap\":\"[]\",\"volatile.last_state.power\":\"RUNNING\",\"volatile.uuid\":\"7494d1d7-f784-4978-abd8-d8e3cae1414c\",\"volatile.uuid.generation\":\"7494d1d7-f784-4978-abd8-d8e3cae1414c\"},\"devices\":{\"eth0\":{\"name\":\"eth0\",\"network\":\"default\",\"type\":\"nic\"},\"root\":{\"path\":\"/\",\"pool\":\"data\",\"size\":\"2GiB\",\"type\":\"disk\"}},\"ephemeral\":false,\"profiles\":[],\"stateful\":false,\"description\":\"\",\"created_at\":\"2026-09-12T15:49:05.659809306Z\",\"expanded_config\":{\"image.agentcompute.digest\":\"sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889\",\"image.architecture\":\"x86_64\",\"image.description\":\"Router system container (Alpine 3.22.5)\",\"image.name\":\"router\",\"image.os\":\"alpinelinux\",\"image.release\":\"3.22.5\",\"image.serial\":\"phase1\",\"image.variant\":\"router\",\"volatile.base_image\":\"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f\",\"volatile.cloud-init.instance-id\":\"2a85b9cc-2a71-4735-8327-c1dfca20700f\",\"volatile.eth0.host_name\":\"veth44cf6ffb\",\"volatile.eth0.hwaddr\":\"10:66:6a:b5:a6:1d\",\"volatile.eth0.last_state.ip_addresses\":\"10.253.73.3\",\"volatile.idmap.base\":\"0\",\"volatile.idmap.current\":\"[{\\\"Isuid\\\":true,\\\"Isgid\\\":false,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000},{\\\"Isuid\\\":false,\\\"Isgid\\\":true,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000}]\",\"volatile.idmap.next\":\"[{\\\"Isuid\\\":true,\\\"Isgid\\\":false,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000},{\\\"Isuid\\\":false,\\\"Isgid\\\":true,\\\"Hostid\\\":1000000,\\\"Nsid\\\":0,\\\"Maprange\\\":1000000000}]\",\"volatile.last_state.idmap\":\"[]\",\"volatile.last_state.power\":\"RUNNING\",\"volatile.uuid\":\"7494d1d7-f784-4978-abd8-d8e3cae1414c\",\"volatile.uuid.generation\":\"7494d1d7-f784-4978-abd8-d8e3cae1414c\"},\"expanded_devices\":{\"eth0\":{\"name\":\"eth0\",\"network\":\"default\",\"type\":\"nic\"},\"root\":{\"path\":\"/\",\"pool\":\"data\",\"size\":\"2GiB\",\"type\":\"disk\"}},\"name\":\"two\",\"status\":\"Running\",\"status_code\":103,\"last_used_at\":\"2026-09-12T15:49:06.209740211Z\",\"location\":\"lab03\",\"type\":\"container\",\"project\":\"ac-ovn-spike\",\"backups\":null,\"state\":{\"status\":\"Running\",\"status_code\":103,\"disk\":{\"root\":{\"usage\":192512,\"total\":2147483648}},\"memory\":{\"usage\":12464128,\"usage_peak\":0,\"total\":65256532000,\"swap_usage\":0,\"swap_usage_peak\":0},\"network\":{\"eth0\":{\"addresses\":[{\"family\":\"inet\",\"address\":\"10.253.73.3\",\"netmask\":\"24\",\"scope\":\"global\"},{\"family\":\"inet6\",\"address\":\"fe80::1266:6aff:feb5:a61d\",\"netmask\":\"64\",\"scope\":\"link\"}],\"counters\":{\"bytes_received\":968,\"bytes_sent\":1410,\"packets_received\":6,\"packets_sent\":11,\"errors_received\":0,\"errors_sent\":0,\"packets_dropped_outbound\":0,\"packets_dropped_inbound\":0},\"hwaddr\":\"10:66:6a:b5:a6:1d\",\"host_name\":\"veth44cf6ffb\",\"mtu\":1442,\"state\":\"up\",\"type\":\"broadcast\"},\"lo\":{\"addresses\":[{\"family\":\"inet\",\"address\":\"127.0.0.1\",\"netmask\":\"8\",\"scope\":\"local\"},{\"family\":\"inet6\",\"address\":\"::1\",\"netmask\":\"128\",\"scope\":\"local\"}],\"counters\":{\"bytes_received\":0,\"bytes_sent\":0,\"packets_received\":0,\"packets_sent\":0,\"errors_received\":0,\"errors_sent\":0,\"packets_dropped_outbound\":0,\"packets_dropped_inbound\":0},\"hwaddr\":\"\",\"host_name\":\"\",\"mtu\":65536,\"state\":\"up\",\"type\":\"loopback\"}},\"pid\":36239,\"processes\":4,\"cpu\":{\"usage\":490076000,\"allocated_time\":24000000000},\"started_at\":\"2026-09-12T15:49:06.210000038Z\",\"os_info\":null},\"snapshots\":null}]\nelapsed_seconds=0.094 exit=0\ninstance one status=Running location=lab01 eth0_network=default eth0_ipv4=10.253.73.2\ninstance two status=Running location=lab03 eth0_network=default eth0_ipv4=10.253.73.3\n+ incus exec nas01:one --project ac-ovn-spike -- cat /sys/class/net/eth0/mtu\n1442\nelapsed_seconds=0.230 exit=0\n+ incus exec nas01:two --project ac-ovn-spike -- cat /sys/class/net/eth0/mtu\n1442\nelapsed_seconds=0.224 exit=0\nguest_mtu one=1442 two=1442\n+ incus exec nas01:one --project ac-ovn-spike -- ping -c 3 -W 2 10.253.73.3\nPING 10.253.73.3 (10.253.73.3): 56 data bytes\n64 bytes from 10.253.73.3: seq=0 ttl=64 time=1.089 ms\n64 bytes from 10.253.73.3: seq=1 ttl=64 time=0.698 ms\n64 bytes from 10.253.73.3: seq=2 ttl=64 time=0.393 ms\n\n--- 10.253.73.3 ping statistics ---\n3 packets transmitted, 3 packets received, 0% packet loss\nround-trip min/avg/max = 0.393/0.726/1.089 ms\nelapsed_seconds=2.239 exit=0\n+ incus exec nas01:two --project ac-ovn-spike -- ping -c 3 -W 2 10.253.73.2\nPING 10.253.73.2 (10.253.73.2): 56 data bytes\n64 bytes from 10.253.73.2: seq=0 ttl=64 time=1.342 ms\n64 bytes from 10.253.73.2: seq=1 ttl=64 time=0.964 ms\n64 bytes from 10.253.73.2: seq=2 ttl=64 time=0.364 ms\n\n--- 10.253.73.2 ping statistics ---\n3 packets transmitted, 3 packets received, 0% packet loss\nround-trip min/avg/max = 0.364/0.890/1.342 ms\nelapsed_seconds=2.210 exit=0\n+ incus exec nas01:one --project ac-ovn-spike -- ping -c 3 -W 2 10.10.40.1\nPING 10.10.40.1 (10.10.40.1): 56 data bytes\n64 bytes from 10.10.40.1: seq=0 ttl=63 time=2.471 ms\n64 bytes from 10.10.40.1: seq=1 ttl=63 time=1.704 ms\n64 bytes from 10.10.40.1: seq=2 ttl=63 time=0.980 ms\n\n--- 10.10.40.1 ping statistics ---\n3 packets transmitted, 3 packets received, 0% packet loss\nround-trip min/avg/max = 0.980/1.718/2.471 ms\nelapsed_seconds=2.611 exit=0\n+ incus exec nas01:two --project ac-ovn-spike -- ping -c 3 -W 2 10.10.40.1\nPING 10.10.40.1 (10.10.40.1): 56 data bytes\n64 bytes from 10.10.40.1: seq=0 ttl=63 time=1.555 ms\n64 bytes from 10.10.40.1: seq=1 ttl=63 time=1.698 ms\n64 bytes from 10.10.40.1: seq=2 ttl=63 time=0.959 ms\n\n--- 10.10.40.1 ping statistics ---\n3 packets transmitted, 3 packets received, 0% packet loss\nround-trip min/avg/max = 0.959/1.404/1.698 ms\nelapsed_seconds=2.496 exit=0\n+ incus exec nas01:one --project ac-ovn-spike -- nslookup example.com 10.10.40.1\nServer:\t\t10.10.40.1\nAddress:\t10.10.40.1:53\n\nNon-authoritative answer:\nName:\texample.com\nAddress: 104.20.23.154\nName:\texample.com\nAddress: 172.66.147.243\n\nNon-authoritative answer:\nName:\texample.com\nAddress: 2606:4700:10::ac42:93f3\nName:\texample.com\nAddress: 2606:4700:10::6814:179a\n\nelapsed_seconds=0.368 exit=0\n+ incus exec nas01:two --project ac-ovn-spike -- nslookup example.com 10.10.40.1\nServer:\t\t10.10.40.1\nAddress:\t10.10.40.1:53\n\nName:\texample.com\nAddress: 2606:4700:10::ac42:93f3\nName:\texample.com\nAddress: 2606:4700:10::6814:179a\n\nName:\texample.com\nAddress: 104.20.23.154\nName:\texample.com\nAddress: 172.66.147.243\n\nelapsed_seconds=0.314 exit=0\n+ incus exec nas01:one --project ac-ovn-spike -- curl -4 -fsS --connect-timeout 5 --max-time 15 -o /dev/null https://example.com\nelapsed_seconds=0.436 exit=0\n+ incus exec nas01:two --project ac-ovn-spike -- curl -4 -fsS --connect-timeout 5 --max-time 15 -o /dev/null https://example.com\nelapsed_seconds=0.440 exit=0\n+ curl -4 -fsS --connect-timeout 5 --max-time 15 http://10.10.40.79:8080/index.html\novn-spike-okelapsed_seconds=0.081 exit=0\n+ incus exec nas01:one --project ac-ovn-spike -- curl -4 -fsS --connect-timeout 5 --max-time 60 -w 'bytes=%{size_download} seconds=%{time_total} bytes_per_second=%{speed_download}\\n' -o /tmp/ovn-large.bin http://10.253.73.3:8080/large.bin\nbytes=100000000 seconds=0.110704 bytes_per_second=903309726\nelapsed_seconds=0.892 exit=0\n+ incus exec nas01:one --project ac-ovn-spike -- sha256sum /tmp/ovn-large.bin\na993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae  /tmp/ovn-large.bin\nelapsed_seconds=0.496 exit=0\n+ incus exec nas01:two --project ac-ovn-spike -- curl -4 -fsS --connect-timeout 5 --max-time 60 -w 'bytes=%{size_download} seconds=%{time_total} bytes_per_second=%{speed_download}\\n' -o /tmp/ovn-large.bin http://10.253.73.2:8080/large.bin\nbytes=100000000 seconds=0.106090 bytes_per_second=942595909\nelapsed_seconds=0.367 exit=0\n+ incus exec nas01:two --project ac-ovn-spike -- sha256sum /tmp/ovn-large.bin\na993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae  /tmp/ovn-large.bin\nelapsed_seconds=0.541 exit=0\nlarge_transfer bytes=100000000 sha256=a993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae both_directions=ok\nprobe passed placement=lab01:lab03 ipv4=10.253.73.2:10.253.73.3\n",
+    "stderr": ""
+  },
+  "fallback_checks": null,
+  "destroy": {
+    "ok": true,
+    "skipped": false,
+    "exit_code": 0,
+    "result": {
+      "project": "ac-ovn-spike",
+      "destroyed": true,
+      "failures": []
+    },
+    "stderr": ""
+  },
+  "captures": [
+    {
+      "name": "monitor-create",
+      "ready": true,
+      "pid": 24918,
+      "returncode": -15,
+      "error": null,
+      "log": "/Users/josh/code/lab2/agentcompute/.wt/spike-ovn-recreate-diagnosis/spikes/ovn/diagnosis-2026-09-12/gateway-pre-5/monitor-create.log",
+      "bytes": 174829,
+      "ready_signal": "time=\"2026-09-12T08:49:02-07:00\" level=debug msg=\"Connected to the websocket: wss://10.10.10.14:8443/1.0/events?all-projects=true\"",
+      "started_at": "2026-09-12T15:49:01.944977+00:00",
+      "stopped_at": "2026-09-12T15:49:10.010417+00:00"
+    },
+    {
+      "name": "tcpdump-arp",
+      "ready": true,
+      "pid": 25444,
+      "returncode": 255,
+      "error": null,
+      "log": "/Users/josh/code/lab2/agentcompute/.wt/spike-ovn-recreate-diagnosis/spikes/ovn/diagnosis-2026-09-12/gateway-pre-5/tcpdump-arp.log",
+      "bytes": 482,
+      "ready_signal": "listening on",
+      "started_at": "2026-09-12T15:49:11.523918+00:00",
+      "stopped_at": "2026-09-12T15:49:26.909627+00:00"
+    },
+    {
+      "name": "monitor-delete",
+      "ready": true,
+      "pid": 26443,
+      "returncode": -15,
+      "error": null,
+      "log": "/Users/josh/code/lab2/agentcompute/.wt/spike-ovn-recreate-diagnosis/spikes/ovn/diagnosis-2026-09-12/gateway-pre-5/monitor-delete.log",
+      "bytes": 40222,
+      "ready_signal": "time=\"2026-09-12T08:49:28-07:00\" level=debug msg=\"Connected to the websocket: wss://10.10.10.14:8443/1.0/events?all-projects=true\"",
+      "started_at": "2026-09-12T15:49:28.401222+00:00",
+      "stopped_at": "2026-09-12T15:49:32.327451+00:00"
+    }
+  ],
+  "failures": {
+    "checks": [],
+    "captures": [],
+    "cleanup": []
+  },
+  "evidence_dir": "/Users/josh/code/lab2/agentcompute/.wt/spike-ovn-recreate-diagnosis/spikes/ovn/diagnosis-2026-09-12/gateway-pre-5"
+}

@@ -1,0 +1,135 @@
++ incus network list nas01: --project ac-ovn-spike
++---------+------+---------+----------------+------+-------------+---------+---------+
+|  NAME   | TYPE | MANAGED |      IPV4      | IPV6 | DESCRIPTION | USED BY |  STATE  |
++---------+------+---------+----------------+------+-------------+---------+---------+
+| default | ovn  | YES     | 10.253.73.1/24 | none |             | 2       | CREATED |
++---------+------+---------+----------------+------+-------------+---------+---------+
+elapsed_seconds=0.101 exit=0
++ incus network show nas01:default --project ac-ovn-spike
+config:
+  bridge.mtu: "1442"
+  dns.nameservers: 10.10.40.1
+  ipv4.address: 10.253.73.1/24
+  ipv4.dhcp: "true"
+  ipv4.nat: "true"
+  ipv6.address: none
+  network: fast40-uplink
+  volatile.network.ipv4.address: 10.10.40.65
+description: ""
+name: default
+type: ovn
+used_by:
+  - /1.0/instances/one?project=ac-ovn-spike
+  - /1.0/instances/two?project=ac-ovn-spike
+managed: true
+status: Created
+locations:
+  - nas01
+  - lab01
+  - lab02
+  - lab03
+project: ac-ovn-spike
+elapsed_seconds=0.091 exit=0
+dns.nameservers=10.10.40.1
++ incus list nas01: --project ac-ovn-spike --format json
+[{"architecture":"x86_64","config":{"image.agentcompute.digest":"sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889","image.architecture":"x86_64","image.description":"Router system container (Alpine 3.22.5)","image.name":"router","image.os":"alpinelinux","image.release":"3.22.5","image.serial":"phase1","image.variant":"router","volatile.base_image":"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f","volatile.cloud-init.instance-id":"39ec6cc1-b768-41e7-af61-880f0ed20c8c","volatile.eth0.host_name":"veth010203a2","volatile.eth0.hwaddr":"10:66:6a:b7:f2:39","volatile.eth0.last_state.ip_addresses":"10.253.73.2","volatile.idmap.base":"0","volatile.idmap.current":"[{\"Isuid\":true,\"Isgid\":false,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000},{\"Isuid\":false,\"Isgid\":true,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000}]","volatile.idmap.next":"[{\"Isuid\":true,\"Isgid\":false,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000},{\"Isuid\":false,\"Isgid\":true,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000}]","volatile.last_state.idmap":"[]","volatile.last_state.power":"RUNNING","volatile.uuid":"23118153-0b00-400d-badb-e44ba120d12f","volatile.uuid.generation":"23118153-0b00-400d-badb-e44ba120d12f"},"devices":{"eth0":{"name":"eth0","network":"default","type":"nic"},"root":{"path":"/","pool":"data","size":"2GiB","type":"disk"}},"ephemeral":false,"profiles":[],"stateful":false,"description":"","created_at":"2026-09-12T06:01:18.201764318Z","expanded_config":{"image.agentcompute.digest":"sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889","image.architecture":"x86_64","image.description":"Router system container (Alpine 3.22.5)","image.name":"router","image.os":"alpinelinux","image.release":"3.22.5","image.serial":"phase1","image.variant":"router","volatile.base_image":"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f","volatile.cloud-init.instance-id":"39ec6cc1-b768-41e7-af61-880f0ed20c8c","volatile.eth0.host_name":"veth010203a2","volatile.eth0.hwaddr":"10:66:6a:b7:f2:39","volatile.eth0.last_state.ip_addresses":"10.253.73.2","volatile.idmap.base":"0","volatile.idmap.current":"[{\"Isuid\":true,\"Isgid\":false,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000},{\"Isuid\":false,\"Isgid\":true,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000}]","volatile.idmap.next":"[{\"Isuid\":true,\"Isgid\":false,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000},{\"Isuid\":false,\"Isgid\":true,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000}]","volatile.last_state.idmap":"[]","volatile.last_state.power":"RUNNING","volatile.uuid":"23118153-0b00-400d-badb-e44ba120d12f","volatile.uuid.generation":"23118153-0b00-400d-badb-e44ba120d12f"},"expanded_devices":{"eth0":{"name":"eth0","network":"default","type":"nic"},"root":{"path":"/","pool":"data","size":"2GiB","type":"disk"}},"name":"one","status":"Running","status_code":103,"last_used_at":"2026-09-12T06:01:18.941957555Z","location":"lab01","type":"container","project":"ac-ovn-spike","backups":null,"state":{"status":"Running","status_code":103,"disk":{"root":{"usage":192512,"total":2147483648}},"memory":{"usage":10010624,"usage_peak":0,"total":65256732000,"swap_usage":0,"swap_usage_peak":0},"network":{"eth0":{"addresses":[{"family":"inet","address":"10.253.73.2","netmask":"24","scope":"global"},{"family":"inet6","address":"fe80::1266:6aff:feb7:f239","netmask":"64","scope":"link"}],"counters":{"bytes_received":898,"bytes_sent":1410,"packets_received":5,"packets_sent":11,"errors_received":0,"errors_sent":0,"packets_dropped_outbound":0,"packets_dropped_inbound":0},"hwaddr":"10:66:6a:b7:f2:39","host_name":"veth010203a2","mtu":1442,"state":"up","type":"broadcast"},"lo":{"addresses":[{"family":"inet","address":"127.0.0.1","netmask":"8","scope":"local"},{"family":"inet6","address":"::1","netmask":"128","scope":"local"}],"counters":{"bytes_received":0,"bytes_sent":0,"packets_received":0,"packets_sent":0,"errors_received":0,"errors_sent":0,"packets_dropped_outbound":0,"packets_dropped_inbound":0},"hwaddr":"","host_name":"","mtu":65536,"state":"up","type":"loopback"}},"pid":4072162,"processes":4,"cpu":{"usage":504800000,"allocated_time":24000000000},"started_at":"2026-09-12T06:01:17.960000038Z","os_info":null},"snapshots":null},{"architecture":"x86_64","config":{"image.agentcompute.digest":"sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889","image.architecture":"x86_64","image.description":"Router system container (Alpine 3.22.5)","image.name":"router","image.os":"alpinelinux","image.release":"3.22.5","image.serial":"phase1","image.variant":"router","volatile.base_image":"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f","volatile.cloud-init.instance-id":"fdf20d0e-edee-459d-8e1d-371803c51632","volatile.eth0.host_name":"veth31450499","volatile.eth0.hwaddr":"10:66:6a:6f:4a:91","volatile.eth0.last_state.ip_addresses":"10.253.73.3","volatile.idmap.base":"0","volatile.idmap.current":"[{\"Isuid\":true,\"Isgid\":false,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000},{\"Isuid\":false,\"Isgid\":true,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000}]","volatile.idmap.next":"[{\"Isuid\":true,\"Isgid\":false,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000},{\"Isuid\":false,\"Isgid\":true,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000}]","volatile.last_state.idmap":"[]","volatile.last_state.power":"RUNNING","volatile.uuid":"60f44a7e-701e-4fb8-a297-15c7494f0fbf","volatile.uuid.generation":"60f44a7e-701e-4fb8-a297-15c7494f0fbf"},"devices":{"eth0":{"name":"eth0","network":"default","type":"nic"},"root":{"path":"/","pool":"data","size":"2GiB","type":"disk"}},"ephemeral":false,"profiles":[],"stateful":false,"description":"","created_at":"2026-09-12T06:01:19.257703529Z","expanded_config":{"image.agentcompute.digest":"sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889","image.architecture":"x86_64","image.description":"Router system container (Alpine 3.22.5)","image.name":"router","image.os":"alpinelinux","image.release":"3.22.5","image.serial":"phase1","image.variant":"router","volatile.base_image":"6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f","volatile.cloud-init.instance-id":"fdf20d0e-edee-459d-8e1d-371803c51632","volatile.eth0.host_name":"veth31450499","volatile.eth0.hwaddr":"10:66:6a:6f:4a:91","volatile.eth0.last_state.ip_addresses":"10.253.73.3","volatile.idmap.base":"0","volatile.idmap.current":"[{\"Isuid\":true,\"Isgid\":false,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000},{\"Isuid\":false,\"Isgid\":true,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000}]","volatile.idmap.next":"[{\"Isuid\":true,\"Isgid\":false,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000},{\"Isuid\":false,\"Isgid\":true,\"Hostid\":1000000,\"Nsid\":0,\"Maprange\":1000000000}]","volatile.last_state.idmap":"[]","volatile.last_state.power":"RUNNING","volatile.uuid":"60f44a7e-701e-4fb8-a297-15c7494f0fbf","volatile.uuid.generation":"60f44a7e-701e-4fb8-a297-15c7494f0fbf"},"expanded_devices":{"eth0":{"name":"eth0","network":"default","type":"nic"},"root":{"path":"/","pool":"data","size":"2GiB","type":"disk"}},"name":"two","status":"Running","status_code":103,"last_used_at":"2026-09-12T06:01:19.879984211Z","location":"lab03","type":"container","project":"ac-ovn-spike","backups":null,"state":{"status":"Running","status_code":103,"disk":{"root":{"usage":192512,"total":2147483648}},"memory":{"usage":11890688,"usage_peak":0,"total":65256532000,"swap_usage":0,"swap_usage_peak":0},"network":{"eth0":{"addresses":[{"family":"inet","address":"10.253.73.3","netmask":"24","scope":"global"},{"family":"inet6","address":"fe80::1266:6aff:fe6f:4a91","netmask":"64","scope":"link"}],"counters":{"bytes_received":968,"bytes_sent":1340,"packets_received":6,"packets_sent":10,"errors_received":0,"errors_sent":0,"packets_dropped_outbound":0,"packets_dropped_inbound":0},"hwaddr":"10:66:6a:6f:4a:91","host_name":"veth31450499","mtu":1442,"state":"up","type":"broadcast"},"lo":{"addresses":[{"family":"inet","address":"127.0.0.1","netmask":"8","scope":"local"},{"family":"inet6","address":"::1","netmask":"128","scope":"local"}],"counters":{"bytes_received":0,"bytes_sent":0,"packets_received":0,"packets_sent":0,"errors_received":0,"errors_sent":0,"packets_dropped_outbound":0,"packets_dropped_inbound":0},"hwaddr":"","host_name":"","mtu":65536,"state":"up","type":"loopback"}},"pid":13802,"processes":4,"cpu":{"usage":511866000,"allocated_time":24000000000},"started_at":"2026-09-12T06:01:19.890000104Z","os_info":null},"snapshots":null}]
+elapsed_seconds=0.120 exit=0
+instance one status=Running location=lab01 eth0_network=default eth0_ipv4=10.253.73.2
+instance two status=Running location=lab03 eth0_network=default eth0_ipv4=10.253.73.3
++ incus exec nas01:one --project ac-ovn-spike -- cat /sys/class/net/eth0/mtu
+1442
+elapsed_seconds=0.617 exit=0
++ incus exec nas01:two --project ac-ovn-spike -- cat /sys/class/net/eth0/mtu
+1442
+elapsed_seconds=0.224 exit=0
+guest_mtu one=1442 two=1442
++ incus exec nas01:one --project ac-ovn-spike -- ping -c 3 -W 2 10.253.73.3
+PING 10.253.73.3 (10.253.73.3): 56 data bytes
+64 bytes from 10.253.73.3: seq=0 ttl=64 time=1.112 ms
+64 bytes from 10.253.73.3: seq=1 ttl=64 time=0.767 ms
+64 bytes from 10.253.73.3: seq=2 ttl=64 time=0.447 ms
+
+--- 10.253.73.3 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max = 0.447/0.775/1.112 ms
+elapsed_seconds=2.267 exit=0
++ incus exec nas01:two --project ac-ovn-spike -- ping -c 3 -W 2 10.253.73.2
+PING 10.253.73.2 (10.253.73.2): 56 data bytes
+64 bytes from 10.253.73.2: seq=0 ttl=64 time=1.413 ms
+64 bytes from 10.253.73.2: seq=1 ttl=64 time=0.678 ms
+64 bytes from 10.253.73.2: seq=2 ttl=64 time=0.332 ms
+
+--- 10.253.73.2 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max = 0.332/0.807/1.413 ms
+elapsed_seconds=2.279 exit=0
++ incus exec nas01:one --project ac-ovn-spike -- ping -c 3 -W 2 10.10.40.1
+PING 10.10.40.1 (10.10.40.1): 56 data bytes
+64 bytes from 10.10.40.1: seq=0 ttl=63 time=2.511 ms
+64 bytes from 10.10.40.1: seq=1 ttl=63 time=1.478 ms
+64 bytes from 10.10.40.1: seq=2 ttl=63 time=0.816 ms
+
+--- 10.10.40.1 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max = 0.816/1.601/2.511 ms
+elapsed_seconds=2.792 exit=0
++ incus exec nas01:two --project ac-ovn-spike -- ping -c 3 -W 2 10.10.40.1
+PING 10.10.40.1 (10.10.40.1): 56 data bytes
+64 bytes from 10.10.40.1: seq=0 ttl=63 time=1.465 ms
+64 bytes from 10.10.40.1: seq=1 ttl=63 time=1.049 ms
+64 bytes from 10.10.40.1: seq=2 ttl=63 time=0.687 ms
+
+--- 10.10.40.1 ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max = 0.687/1.067/1.465 ms
+elapsed_seconds=2.329 exit=0
++ incus exec nas01:one --project ac-ovn-spike -- nslookup example.com 10.10.40.1
+Server:		10.10.40.1
+Address:	10.10.40.1:53
+
+Name:	example.com
+Address: 2606:4700:10::ac42:93f3
+Name:	example.com
+Address: 2606:4700:10::6814:179a
+
+Name:	example.com
+Address: 172.66.147.243
+Name:	example.com
+Address: 104.20.23.154
+
+elapsed_seconds=0.492 exit=0
++ incus exec nas01:two --project ac-ovn-spike -- nslookup example.com 10.10.40.1
+Server:		10.10.40.1
+Address:	10.10.40.1:53
+
+Name:	example.com
+Address: 2606:4700:10::ac42:93f3
+Name:	example.com
+Address: 2606:4700:10::6814:179a
+
+Name:	example.com
+Address: 172.66.147.243
+Name:	example.com
+Address: 104.20.23.154
+
+elapsed_seconds=0.296 exit=0
++ incus exec nas01:one --project ac-ovn-spike -- curl -4 -fsS --connect-timeout 5 --max-time 15 -o /dev/null https://example.com
+elapsed_seconds=0.368 exit=0
++ incus exec nas01:two --project ac-ovn-spike -- curl -4 -fsS --connect-timeout 5 --max-time 15 -o /dev/null https://example.com
+elapsed_seconds=0.376 exit=0
++ curl -4 -fsS --connect-timeout 5 --max-time 15 http://10.10.40.79:8080/index.html
+ovn-spike-okelapsed_seconds=0.034 exit=0
++ incus exec nas01:one --project ac-ovn-spike -- curl -4 -fsS --connect-timeout 5 --max-time 60 -w 'bytes=%{size_download} seconds=%{time_total} bytes_per_second=%{speed_download}\n' -o /tmp/ovn-large.bin http://10.253.73.3:8080/large.bin
+bytes=100000000 seconds=0.109130 bytes_per_second=916338312
+elapsed_seconds=0.376 exit=0
++ incus exec nas01:one --project ac-ovn-spike -- sha256sum /tmp/ovn-large.bin
+a993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae  /tmp/ovn-large.bin
+elapsed_seconds=0.528 exit=0
++ incus exec nas01:two --project ac-ovn-spike -- curl -4 -fsS --connect-timeout 5 --max-time 60 -w 'bytes=%{size_download} seconds=%{time_total} bytes_per_second=%{speed_download}\n' -o /tmp/ovn-large.bin http://10.253.73.2:8080/large.bin
+bytes=100000000 seconds=0.115897 bytes_per_second=862835103
+elapsed_seconds=0.402 exit=0
++ incus exec nas01:two --project ac-ovn-spike -- sha256sum /tmp/ovn-large.bin
+a993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae  /tmp/ovn-large.bin
+elapsed_seconds=0.524 exit=0
+large_transfer bytes=100000000 sha256=a993f8c574e0fea8c1cdcbcd9408d9e2e107ee6e4d120edcfa11decd53fa0cae both_directions=ok
+probe passed placement=lab01:lab03 ipv4=10.253.73.2:10.253.73.3
