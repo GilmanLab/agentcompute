@@ -4,15 +4,33 @@
 # and are fetched on first use. Catalog changes do not trigger publication.
 schema_version: 1
 images:
-  - name: router
-    os: alpinelinux
-    version: "3.22.5"
-    kinds: [container]
-    kind: container
-    # ghcr.io/gilmanlab/agentcompute/router:tree-05771e889f6c, published by
-    # https://github.com/GilmanLab/agentcompute/actions/runs/34650677380
-    # Incus fingerprint 6e3183fe052e00d89c806c414cb3ff92f757884894414ea1cf83ecbb9ae20c7f
-    reference: ghcr.io/gilmanlab/agentcompute/router@sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889
-    cpus: 1
-    memory_mb: 512
-    disk_gb: 2
+- name: router
+  os: alpinelinux
+  version: 3.22.5
+  kinds:
+  - container
+  kind: container
+  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:7d0877799aafc04c8a3ce321bfd586969f97c65e91665941455eeb160555df39
+  cpus: 1
+  memory_mb: 512
+  disk_gb: 2
+- name: runner
+  os: ubuntu
+  version: '24.04'
+  kinds:
+  - vm
+  kind: vm
+  cpus: 4
+  memory_mb: 8192
+  disk_gb: 40
+  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:f65fc5afbe5a6b5f0cc6954bfbe5c9761a75f382beaa331aa2179bb1f322be7e
+- name: runner-publisher
+  os: ubuntu
+  version: '24.04'
+  kinds:
+  - vm
+  kind: vm
+  cpus: 4
+  memory_mb: 8192
+  disk_gb: 40
+  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:8ff94bdb69d62be5be6bda4682b15e1a34cfdf2a8c826b9e5f0e1b47104f4770
