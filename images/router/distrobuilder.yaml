@@ -110,6 +110,10 @@ files:
     ::shutdown:/sbin/openrc shutdown
 
     '
+- generator: copy
+  source: nat
+  path: /opt/router/nat
+  mode: "0755"
 actions:
 - trigger: post-unpack
   action: '#!/bin/sh

@@ -40,7 +40,8 @@ import yaml
 IMAGES = Path(__file__).resolve().parent
 PINS_PATH = IMAGES / "pins.yaml"
 CATALOG_PATH = IMAGES / "catalog.yaml"
-RECIPE_PATH = IMAGES / "router" / "distrobuilder.yaml"
+ROUTER_DIR = IMAGES / "router"
+RECIPE_PATH = ROUTER_DIR / "distrobuilder.yaml"
 RUNNER_DIR = IMAGES / "runner"
 RUNNER_RECIPE_PATH = RUNNER_DIR / "distrobuilder.yaml"
 IMAGE_NAMES = ("router", "runner", "runner-publisher")
@@ -847,7 +848,7 @@ def build(work_dir: Path, output_dir: Path, image: str = "router") -> dict[str, 
     # generate files inside the image with normal 0644/0755 modes, not 0600.
     os.umask(0o022)
     with log_path.open("w", encoding="utf-8") as log:
-        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, cwd=ROUTER_DIR)
         while process.poll() is None:
             peak_scratch = max(peak_scratch, scratch_bytes(work))
             time.sleep(0.1)

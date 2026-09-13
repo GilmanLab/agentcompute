@@ -1,0 +1,130 @@
+#!/bin/bash
+# Port-restricted IPv4 NAT for the router image.
+#
+# Representative invocation:
+#   /opt/router/nat --mode port-restricted --inside eth0 --outside eth1
+#
+# Applies IPv4 forwarding, masquerade on the outside interface, and stateful
+# return filtering. Mapping and timeouts are whatever Linux conntrack
+# provides; this helper does not claim full-cone, hairpin, or stable port
+# assignments.
+#
+# Clients on an OVN network still receive the logical router (.1) as their
+# DHCP default gateway. Traffic only transits this instance when a route
+# points at it.
+set -euo pipefail
+
+usage() {
+	printf 'usage: %s --mode port-restricted --inside <if> --outside <if>\n' "${0##*/}"
+}
+
+err() {
+	printf 'nat: %s\n' "$*" >&2
+	exit 1
+}
+
+valid_ifname() {
+	case "$1" in
+	"" | -* | *[!A-Za-z0-9._-]*)
+		return 1
+		;;
+	esac
+	[ "${#1}" -le 15 ]
+}
+
+mode=""
+inside=""
+outside=""
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--mode)
+		[ "$#" -ge 2 ] || err "--mode requires a value"
+		[ -z "$mode" ] || err "--mode specified more than once"
+		mode=$2
+		shift 2
+		;;
+	--inside)
+		[ "$#" -ge 2 ] || err "--inside requires an interface name"
+		[ -z "$inside" ] || err "--inside specified more than once"
+		inside=$2
+		shift 2
+		;;
+	--outside)
+		[ "$#" -ge 2 ] || err "--outside requires an interface name"
+		[ -z "$outside" ] || err "--outside specified more than once"
+		outside=$2
+		shift 2
+		;;
+	--)
+		shift
+		[ "$#" -eq 0 ] || err "unexpected argument: $1"
+		break
+		;;
+	-*)
+		err "unknown option: $1"
+		;;
+	*)
+		err "unexpected argument: $1"
+		;;
+	esac
+done
+
+[ -n "$mode" ] && [ -n "$inside" ] && [ -n "$outside" ] || {
+	usage >&2
+	err "required flags: --mode, --inside, --outside"
+}
+
+[ "$mode" = "port-restricted" ] || err "unsupported mode: $mode (only port-restricted)"
+
+valid_ifname "$inside" || err "invalid inside interface name: $inside"
+valid_ifname "$outside" || err "invalid outside interface name: $outside"
+[ "$inside" != "$outside" ] || err "inside and outside must be different interfaces"
+
+[ -e "/sys/class/net/$inside" ] || err "inside interface not found: $inside"
+[ -e "/sys/class/net/$outside" ] || err "outside interface not found: $outside"
+
+command -v nft >/dev/null 2>&1 || err "missing required command: nft"
+command -v ip >/dev/null 2>&1 || err "missing required command: ip"
+command -v udhcpc >/dev/null 2>&1 || err "missing required command: udhcpc"
+[ "$(id -u)" -eq 0 ] || err "must run as root"
+
+ip link set dev "$inside" up || err "failed to bring up inside interface: $inside"
+ip link set dev "$outside" up || err "failed to bring up outside interface: $outside"
+
+outside_addrs=$(ip -4 -o addr show dev "$outside" scope global) || err "cannot query addresses on $outside"
+if [ -z "$outside_addrs" ]; then
+	udhcpc -i "$outside" -f -n -q || err "DHCP failed on $outside"
+	outside_addrs=$(ip -4 -o addr show dev "$outside" scope global) || err "cannot query addresses on $outside"
+	[ -n "$outside_addrs" ] || err "no global IPv4 address on $outside after DHCP"
+fi
+
+if [ ! -w /proc/sys/net/ipv4/ip_forward ]; then
+	err "cannot enable IPv4 forwarding (ip_forward is not writable)"
+fi
+printf '1\n' >/proc/sys/net/ipv4/ip_forward || err "cannot enable IPv4 forwarding"
+read -r forwarding </proc/sys/net/ipv4/ip_forward
+[ "$forwarding" = 1 ] || err "IPv4 forwarding did not enable"
+
+# Replace only the helper-owned table. Other nft tables are left untouched.
+nft -f - <<EOF
+destroy table ip router_nat
+table ip router_nat {
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ct state invalid drop
+		ct state established,related accept
+		iifname "${inside}" oifname "${outside}" accept
+	}
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		oifname "${outside}" masquerade persistent
+	}
+}
+EOF
+
+printf 'nat: port-restricted masquerade inside=%s outside=%s\n' "$inside" "$outside" >&2

@@ -4,8 +4,9 @@
 # `cmd/image-publish` publishes a verified GHCR release; the server catalog
 # reconciler imports, boots, and promotes the shared `router` alias.
 # This script covers the gap those tools leave open — proving a
-# freshly built router.tar.xz actually boots and carries its router tooling
-# BEFORE anything is pushed to a registry. Consequently it:
+# freshly built router.tar.xz actually boots, carries its router tooling,
+# and ships /opt/router/nat before anything is pushed to a registry.
+# Consequently it:
 #
 #   * never promotes (or touches) the shared `router` alias, and asserts that
 #     the alias target is unchanged when it is done;
@@ -244,14 +245,25 @@ check() {
 	fi
 }
 
+check_rejects() {
+	printf '=== reject %s\n' "$*" >>"$log"
+	if incus_q exec "$remote:$name" -- "$@" 2>&1 | tee -a "$log" >&2; then
+		printf '=== FAILED (expected rejection): %s\n' "$*" >>"$log"
+		die "router nat helper did not reject: $* (log: $log)"
+	fi
+}
+
 check nft --version
 check vtysh --help
 check tc -V
 check dnsmasq --version
 check wg --version
 check tcpdump --version
-note "all six router tool checks passed"
+check test -x /opt/router/nat
+check_rejects /opt/router/nat --mode full-cone --inside eth0 --outside eth1
+check_rejects /opt/router/nat --mode port-restricted --inside eth0 --outside eth0
+note "six router tool checks and nat helper contract passed"
 
-printf '{"fingerprint":"%s","file":"%s","remote":"%s","project":"%s","instance":"%s","image_imported":%s,"checks":6,"log":"%s"}\n' \
+printf '{"fingerprint":"%s","file":"%s","remote":"%s","project":"%s","instance":"%s","image_imported":%s,"checks":9,"log":"%s"}\n' \
 	"$fingerprint" "$file" "$remote" "$project" "$name" \
 	"$([ "$image_imported" -eq 1 ] && printf true || printf false)" "$log"
