@@ -10,7 +10,7 @@ images:
   kinds:
   - container
   kind: container
-  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:7d0877799aafc04c8a3ce321bfd586969f97c65e91665941455eeb160555df39
+  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:47cc9f058575d398736f45cd696f5613a24af73188df0a154c6284cc3e091960
   cpus: 1
   memory_mb: 512
   disk_gb: 2
@@ -23,7 +23,7 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:f65fc5afbe5a6b5f0cc6954bfbe5c9761a75f382beaa331aa2179bb1f322be7e
+  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:378166f38b399bd4510e8c208f2da455d48deac57ee6007a545632e1db47fba7
 - name: runner-publisher
   os: ubuntu
   version: '24.04'
@@ -33,4 +33,4 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:8ff94bdb69d62be5be6bda4682b15e1a34cfdf2a8c826b9e5f0e1b47104f4770
+  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:e0fb3195a004a7008b24806447e8f55b05d0457823d0544c35fc6bb97dd1ba67
