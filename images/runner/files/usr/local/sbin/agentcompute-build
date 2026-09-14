@@ -25,7 +25,7 @@ log() {
 }
 
 [ "$(id -u)" -eq 0 ] || err "must run as root"
-[ "$#" -eq 2 ] || err "usage: agentcompute-build <40-hex-sha> <router|runner|runner-publisher>"
+[ "$#" -eq 2 ] || err "usage: agentcompute-build <40-hex-sha> <router|runner|runner-publisher|ubuntu-24.04-desktop>"
 
 sha=$1
 image=$2
@@ -36,8 +36,8 @@ esac
 [ "${#sha}" -eq 40 ] || err "source SHA must be 40 lowercase hexadecimal characters"
 
 case $image in
-router | runner | runner-publisher) ;;
-*) err "image must be router, runner, or runner-publisher" ;;
+router | runner | runner-publisher | ubuntu-24.04-desktop) ;;
+*) err "image must be router, runner, runner-publisher, or ubuntu-24.04-desktop" ;;
 esac
 
 for bin in /usr/bin/git /usr/bin/python3 /bin/chmod /bin/chown /bin/rm /bin/mkdir; do
