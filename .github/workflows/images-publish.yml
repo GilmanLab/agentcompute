@@ -7,6 +7,7 @@ on:
       - images/**
       - '!images/catalog.yaml'
       - '!images/README.md'
+      - '!images/windows/**'
       - cmd/image-publish/**
       - .github/workflows/images-publish.yml
   workflow_dispatch:
