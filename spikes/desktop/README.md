@@ -14,8 +14,12 @@ The results use these evidence sources:
 | `internal/desktop/testdata/` | Captured Driver catalog and result fixtures used by the host adapter, including the missing-`pid` diagnostic and successful click response. |
 | `/tmp/agentcompute-desktop-corrected-smoke/` | Corrected image boot: X11, active Driver user service, 234 apps from `list_apps`, and cleanup of smoke-owned resources. |
 | `/tmp/agentcompute-desktop-mcp-evidence/` | Before/after PNGs from the corrected image's real MCP token interaction. The full acceptance run passed in 158.45 s after OVN recovery. |
+| `/tmp/agentcompute-desktop-mcp-final-evidence/` | Post-refactor repeat: fetched PNGs show a single document before the native token click and two document tabs afterward. Full acceptance passed in 160.32 s. |
+| `/tmp/agentcompute-publisher-rollout/result.json` | Approved controller replacement, matching recovered identities, new publisher standby, and no-drift Terraform plan. |
+| `/tmp/agentcompute-desktop-published-evidence/` | Protected bake 34872818589: four immutable releases, desktop build measurements, X11/Driver boot qualification, and verified fetch-back. |
+| `/tmp/agentcompute-desktop-published-mcp-evidence/` | Exact catalog from PR #27, without GHCR credentials: full MCP acceptance passed in 182.26 s. Fetched PNGs show one document before the native token click and two document tabs afterward. |
 
-The first guest did not acquire its network until `/etc/netplan/10-incus.yaml` was repaired with `renderer: networkd`. The current recipe embeds that renderer and enables `systemd-networkd`. The corrected image passed the dedicated boot smoke with fingerprint `9d0da557210766289d59823a540050c3e7f328af66380974cc1ebd08e877bd11`; the token, screenshot, timing, and restart measurements below remain attributed to the repaired first guest.
+The first guest did not acquire its network until `/etc/netplan/10-incus.yaml` was repaired with `renderer: networkd`. The current recipe embeds that renderer and enables `systemd-networkd`. The corrected image passed the dedicated boot smoke with fingerprint `9d0da557210766289d59823a540050c3e7f328af66380974cc1ebd08e877bd11`. Direct native measurements use the repaired first guest; the later MCP runs identify their image separately.
 
 ## Image and session contract
 
@@ -100,6 +104,16 @@ The direct spike reached the management-network VNC endpoint at `10.10.40.65:590
 
 The corrected-image MCP acceptance created a separate viewer on the default OVN network, created a TCP forward, restarted the guest, and observed `desktop.info.ready == true` again. The address reported by `desktop.info.vnc`, `10.10.40.67:5900`, answered with `RFB 003.008\n`. The representative client retained only its private LAN NIC. Its complete create/wait/screenshot/list-apps program took 23.624 s. After shortening sandbox lifetime, the running reaper made the original screenshot URL return 404 at 27.120 s after expiry.
 
+The post-refactor repeat passed the same full scenario in 160.32 s. Its representative program took 22.764 s, and screenshot expiry returned 404 at 26.804 s after sandbox expiry. The reported VNC endpoint again answered at `10.10.40.67:5900`.
+
+The published-image run used the complete catalog from PR #27 without GHCR
+credentials and passed in 182.26 s. Its representative program took
+26.822 s. One native foreground token click changed the editor from a
+single document to two document tabs, confirmed by a fresh accessibility
+tree and the fetched before/after PNGs. Reboot restored Driver readiness
+and the reported VNC endpoint at `10.10.40.67:5900`; the running reaper
+made the screenshot URL return 404 at 21.773 s after sandbox expiry.
+
 ## Build measurements and release status
 
 Both local builds used fresh work and output directories. Download time includes the Go toolchain, vendored distrobuilder source, Ubuntu base, snapshot CA package, and full Cua Driver archive. Compile time excludes downloads and assembly. Scratch usage was sampled every 100 ms, so an interval peak can be missed.
@@ -108,11 +122,30 @@ Both local builds used fresh work and output directories. Download time includes
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | First image | 5.849 s | 31.670 s | 842.017 s | 507,180 KiB | 7,625,043,968 B | 656 B | 744,611,840 B |
 | Corrected rebuild | 5.824 s | 31.834 s | 392.512 s | 517,712 KiB | 7,621,808,128 B | 640 B | 745,013,248 B |
+| Protected published build | 6.624 s | 33.283 s | 403.364 s | 505,216 KiB | 7,620,071,424 B | 628 B | 742,923,264 B |
 
 The first image artifacts were `incus.tar.xz` SHA-256 `3174b0a6e76d6e1b3e601a7ffc761589615205fed0124bd1f300ed52aa612f54` and `disk.qcow2` SHA-256 `ed3cfd45045f459b5b17ac5782a2e8f17f10e06b5805719ccbdf27a04bd22f37`. The corrected artifacts were `incus.tar.xz` SHA-256 `d7e5e20009425f2d2164770797e84e5d99611d0fe0d5a0b0e719032aa5c9cd9d` and `disk.qcow2` SHA-256 `42c8bdd02f8991822ecdb2093d02b760f781ab21e301a15ed1466830c2d36c2c`. Both qcow2 files report a 17,179,869,184-byte virtual size.
 
-Protected bootstrap PR #23 and private bake run 34854323245 completed successfully. The desktop-aware publisher awaits deployment before the four-image bake. Desktop publication and catalog promotion remain pending; no desktop GHCR digest is claimed.
+Protected bootstrap PR #23 and private bake run 34854323245 completed successfully. The approved publisher rollout replaced `ghrunner01` through its existing Terraform module, restored both escrowed identities, and qualified a standby with fingerprint `c6b3815e002e101d256980a1a80e55bfd8053ea3dea324383cd0f8fd43ddc60e`. Squid and scheduling recovered, and the post-apply plan reported no changes.
 
-The original MCP blocker was a Phase 5 OVN outage: 19,307,134,976 bytes of logs filled central's 20 GiB root. The approved fleet recovery preserved complete signature counts and log boundaries before truncation, then recycled only the three Incus daemons retaining stale CA trust. No central database or northd process restarted. Logging limits are now active; details are in [fleet PR #20](https://github.com/GilmanLab/fleet/pull/20) and the central OVN runbook.
+Image PR #25 merged as `e4333f245b4e81c8d7753038f0ddf04a620bd0a2`. [Protected bake 34872818589](https://github.com/GilmanLab/agentcompute-images/actions/runs/34872818589) built, boot-qualified, published, and fetched back all four images. The desktop pipeline took 674.806 s, including those stages. Its immutable reference is:
+
+```text
+ghcr.io/gilmanlab/agentcompute/ubuntu-24.04-desktop@sha256:5dc4e120a79dd06ad6784e69474f0617387f74cb98685af8844170b7165ea8e2
+```
+
+The published desktop artifacts are `incus.tar.xz` SHA-256 `c673c40c973731471f404bd59a8cfebfeb043bdd9a20c2076894b13e48fa75d6` and `disk.qcow2` SHA-256 `40abe7aea48ebe8bb989cbe71afc4b4376a0ecb5dd23ed2630ba73985de7ed0d`; the split-image Incus fingerprint is `cc9ed27aa5cde44aaf075cc78474b038011172c979549ae43cf538fc5ece9a93`. Qualification observed X11, the active automation-user Driver service, and 232 apps including `gnome-text-editor`, then removed its owned VM and image. [Catalog PR #27](https://github.com/GilmanLab/agentcompute/pull/27) contains the real digest and remains unmerged by request.
+
+The first anonymous catalog-backed attempt could not import the new desktop
+package because GitHub created it private. The owner made it public. The
+unfixed server then downloaded the published image but rejected it with
+`smoke check systemctl is-active incus-gh-runner-guest.path: exit 4`; the
+reproduction failed in 68.06 s. Catalog qualification had treated every VM
+as a GitHub runner. The reconciler now selects desktop qualification from
+the catalog capability: X11, the active automation-user Driver unit, and
+native `list_apps` executed as UID/GID 1000 with that user's session
+environment. Router and runner checks are unchanged.
+
+The original MCP blocker was a Phase 5 OVN outage: 19,307,134,976 bytes of logs filled central's 20 GiB root. The approved fleet recovery preserved complete signature counts and log boundaries before truncation, then recycled only the three Incus daemons retaining stale CA trust. No central database or northd process restarted. Logging limits are now active; details are in [fleet PR #20](https://github.com/GilmanLab/fleet/pull/20) and [the central OVN recovery runbook PR](https://github.com/GilmanLab/root/pull/34).
 
 Live acceptance also corrected two adapter boundaries. Native private Incus images need an image-access secret in the create request; the image existed even though the unauthenticated pull reported it missing. VNC forward discovery must use the same DHCP-lease fallback as forward creation because guest NIC state can briefly lack addresses after reboot. The passing run exercised both corrections without publishing the temporary image or delaying Driver readiness for networking.
