@@ -161,7 +161,7 @@ func NewDependencies(svc *compute.Service, driver desktopService) Dependencies {
 		Instance: svc,
 		Network:  svc,
 		Image:    svc,
-		Desktop: driver,
+		Desktop:  driver,
 	}
 }
 

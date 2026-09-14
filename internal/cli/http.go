@@ -70,7 +70,7 @@ type httpConfig struct {
 	// keeping logs on stderr stays consistent with the stdio transport.
 	logger *slog.Logger
 	// deps are constructed once before serving any HTTP session.
-	deps mcpserver.Dependencies
+	deps        mcpserver.Dependencies
 	screenshots *desktop.Store
 }
 
@@ -105,12 +105,12 @@ func newHTTPCommand(options Options) *cobra.Command {
 				return err
 			}
 			runErr := runHTTP(cmd.Context(), httpConfig{
-				build:     options.Build,
-				addr:      options.Viper.GetString(addrFlag),
-				authToken: options.Viper.GetString(authTokenFlag),
-				insecure:  options.Viper.GetBool(insecureFlag),
-				logger:    logger,
-				deps:      rt.deps,
+				build:       options.Build,
+				addr:        options.Viper.GetString(addrFlag),
+				authToken:   options.Viper.GetString(authTokenFlag),
+				insecure:    options.Viper.GetBool(insecureFlag),
+				logger:      logger,
+				deps:        rt.deps,
 				screenshots: rt.screenshots,
 			})
 			return errors.Join(runErr, rt.close())

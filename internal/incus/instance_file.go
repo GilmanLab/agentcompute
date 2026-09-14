@@ -22,7 +22,11 @@ func (c *Client) ReadFile(ctx context.Context, req compute.FileReadRequest) (com
 	body, err := c.ReadBinaryFile(ctx, req.Ref, req.Path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return compute.FileReadResult{}, fileErrorf("file not found on instance %q in sandbox %q", req.Ref.Name, req.Ref.Sandbox)
+			return compute.FileReadResult{}, fileErrorf(
+				"file not found on instance %q in sandbox %q",
+				req.Ref.Name,
+				req.Ref.Sandbox,
+			)
 		}
 		return compute.FileReadResult{}, err
 	}

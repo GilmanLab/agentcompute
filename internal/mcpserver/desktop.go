@@ -87,12 +87,14 @@ func registerDesktop(builder *codemode.Builder, deps Dependencies) {
 		Handler: api.enable,
 	})
 	codemode.Register(builder, codemode.Capability[desktopCallIn, desktopCallOut]{
-		ID: capabilityDesktopCall, Name: capabilityDesktopCall,
+		ID:      capabilityDesktopCall,
+		Name:    capabilityDesktopCall,
 		Summary: "Call a native Driver tool with a JSON object string; decode result with json.decode. Screenshots return URLs only. Linux token clicks also need pid; snapshot again to verify effects.",
 		Handler: api.call,
 	})
 	codemode.Register(builder, codemode.Capability[desktopScreenshotIn, desktopScreenshotOut]{
-		ID: capabilityDesktopScreenshot, Name: capabilityDesktopScreenshot,
+		ID:      capabilityDesktopScreenshot,
+		Name:    capabilityDesktopScreenshot,
 		Summary: "Capture the desktop or a pid/window_id pair without an accessibility tree. Return a PNG URL, dimensions, and image-to-Driver coordinate scale.",
 		Handler: api.screenshot,
 	})
@@ -116,7 +118,12 @@ func (api desktopAPI) enable(ctx context.Context, _ authz.Subject, in desktopIns
 }
 
 func (api desktopAPI) call(ctx context.Context, _ authz.Subject, in desktopCallIn) (desktopCallOut, error) {
-	result, err := api.driver.Call(ctx, compute.Ref{Sandbox: in.Sandbox, Name: in.Instance}, in.Tool, deref(in.Args, "{}"))
+	result, err := api.driver.Call(
+		ctx,
+		compute.Ref{Sandbox: in.Sandbox, Name: in.Instance},
+		in.Tool,
+		deref(in.Args, "{}"),
+	)
 	if err != nil {
 		return desktopCallOut{}, err
 	}
@@ -127,10 +134,25 @@ func (api desktopAPI) call(ctx context.Context, _ authz.Subject, in desktopCallI
 	return out, nil
 }
 
-func (api desktopAPI) screenshot(ctx context.Context, _ authz.Subject, in desktopScreenshotIn) (desktopScreenshotOut, error) {
-	shot, err := api.driver.Screenshot(ctx, compute.Ref{Sandbox: in.Sandbox, Name: in.Instance}, deref(in.PID, 0), deref(in.WindowID, 0), deref(in.MaxDimension, 0))
+func (api desktopAPI) screenshot(
+	ctx context.Context,
+	_ authz.Subject,
+	in desktopScreenshotIn,
+) (desktopScreenshotOut, error) {
+	shot, err := api.driver.Screenshot(
+		ctx,
+		compute.Ref{Sandbox: in.Sandbox, Name: in.Instance},
+		deref(in.PID, 0),
+		deref(in.WindowID, 0),
+		deref(in.MaxDimension, 0),
+	)
 	if err != nil {
 		return desktopScreenshotOut{}, err
 	}
-	return desktopScreenshotOut{URL: shot.URL, Width: int64(shot.Width), Height: int64(shot.Height), Scale: shot.Scale}, nil
+	return desktopScreenshotOut{
+		URL:    shot.URL,
+		Width:  int64(shot.Width),
+		Height: int64(shot.Height),
+		Scale:  shot.Scale,
+	}, nil
 }
