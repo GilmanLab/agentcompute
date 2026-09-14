@@ -1,0 +1,118 @@
+name: Windows Image Bake Dispatch
+
+# Windows images are cluster-local Incus aliases. Nothing in this pipeline
+# uploads a Windows artifact anywhere: no GHCR release, no
+# actions/upload-artifact, no cache entry. Evaluation media grants test rights,
+# not redistribution, so the media, the repacked installer and the captured
+# image never leave the cluster and the repack host.
+#
+# The split mirrors images-publish.yml: this public workflow validates inputs
+# that contain no media and no credentials, then dispatches the exact source
+# commit to the private trigger repository, whose bake job runs on the
+# agentcompute-publisher scale set. That job only calls the Incus API
+# (images/windows/bake.py): Windows Setup runs on the cluster's first-level
+# KVM, so the runner never needs nested virtualization and keeps
+# security.nesting=false.
+#
+# Prerequisite the private job does not create: the pinned installer and
+# payload ISO volumes. They are produced by `images/windows/repack.py stage`
+# plus `... import` on a root host with scratch space (sandbox01) and imported
+# into the build project as ISO storage volumes. Media may not travel through
+# CI, so staging stays an operator step and the bake consumes the volumes.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - images/windows/**
+      - '!images/windows/README.md'
+      - .github/workflows/windows-images.yml
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Which Windows image to bake
+        type: choice
+        default: windows-11-desktop
+        options:
+          - windows-11-desktop
+          - windows-server-2025
+
+permissions: {}
+
+# One Windows bake at a time. Capture and compression are heavy on the
+# cluster's data pool, and the build project caps concurrent virtual machines,
+# so queued runs wait instead of overlapping.
+concurrency:
+  group: windows-image-bake
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: ${{ github.repository == 'GilmanLab/agentcompute' && github.ref == 'refs/heads/master' && github.ref_protected }}
+    runs-on: ubuntu-24.04
+    environment: image-publish
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout protected source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Setup pinned tools
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          cache: false
+      - name: Validate Windows image inputs
+        # Lock file, answer files and guest scripts only. No media is
+        # downloaded here and no credential is used.
+        run: uv run --locked --script images/windows/repack.py validate
+      - name: Check the media gate for the requested image
+        env:
+          IMAGE: ${{ inputs.image || 'windows-11-desktop' }}
+        run: |
+          set -euo pipefail
+          uv run --locked --script - <<'PY'
+          # /// script
+          # requires-python = ">=3.11"
+          # dependencies = ["PyYAML==6.0.3"]
+          # ///
+          import os, sys, yaml
+          image = os.environ["IMAGE"]
+          entry = yaml.safe_load(open("images/windows/pins.lock.yaml"))["media"][image]
+          print(f"{image}: build {entry['build']} provenance {entry['provenance']} gate {entry['gate']}")
+          if entry["gate"] != "cleared":
+              sys.exit(f"media gate is {entry['gate']}: {entry.get('gate_reason')}")
+          PY
+      - name: Mint dispatch-only token
+        id: dispatch-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.IMAGES_APP_CLIENT_ID }}
+          private-key: ${{ secrets.IMAGES_APP_PRIVATE_KEY }}
+          owner: GilmanLab
+          repositories: agentcompute-images
+          permission-contents: write
+      - name: Dispatch exact source commit
+        env:
+          GH_TOKEN: ${{ steps.dispatch-token.outputs.token }}
+          IMAGE: ${{ inputs.image || 'windows-11-desktop' }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api --method POST repos/GilmanLab/agentcompute-images/dispatches \
+            -f event_type=windows-bake \
+            -f "client_payload[sha]=$GITHUB_SHA" \
+            -f "client_payload[image]=$IMAGE"
+          {
+            printf 'Dispatched %s (%s) to private agentcompute-images.\n' "$GITHUB_SHA" "$IMAGE"
+            printf '\nThe private bake job runs, on the publisher scale set:\n'
+            printf '\n```\nbake.py bake --image %s --remote <cluster> --project <disposable> \\\n' "$IMAGE"
+            printf '  --target <member> --pool data --volume-prefix <prefix> --evidence-dir <dir>\n```\n'
+            printf '\nIt creates the build VM from the pre-staged ISO volumes, waits for the\n'
+            printf 'unattended install and the single first-logon bootstrap, seals with Sysprep,\n'
+            printf 'publishes the stopped source, qualifies a fresh clone, and copies the image\n'
+            printf 'into image-build under a candidate alias.\n'
+            printf '\nNo Windows artifact is uploaded: the stable catalog alias moves only through\n'
+            printf '`bake.py promote` with a GUI gate evidence file reporting a pass.\n'
+          } >> "$GITHUB_STEP_SUMMARY"

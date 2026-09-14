@@ -1,0 +1,19 @@
+; UltraVNC 1.8.3.0 unattended setup response file, passed as
+; UltraVNC_1830_x64_Setup.exe /silent /norestart /loadinf=<this file>.
+;
+; Only keys whose behavior is documented by the installer are set here.
+; Component names are deliberately not pinned: a wrong Components= line makes
+; Inno Setup install nothing at all while still exiting 0, which would turn a
+; broken VNC fallback into a silent pass. The default selection is taken
+; instead, and bootstrap.ps1 then verifies winvnc.exe really exists.
+;
+; Tasks is empty on purpose. The installer's own service task is not used;
+; bootstrap.ps1 registers the service explicitly with `winvnc -install` so the
+; fallback console is a boot service that answers at the login screen, and so
+; the outcome is checked rather than assumed.
+[Setup]
+Lang=default
+Dir=C:\Program Files\uvnc bvba\UltraVNC
+Group=UltraVNC
+NoIcons=1
+Tasks=
