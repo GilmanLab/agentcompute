@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 
-IMAGES = ("router", "runner", "runner-publisher")
+IMAGES = ("router", "runner", "runner-publisher", "ubuntu-24.04-desktop")
 REPOSITORY = "ghcr.io/gilmanlab/agentcompute"
 
 
@@ -44,10 +44,17 @@ def qualify(name: str, output: Path, evidence: Path) -> None:
                         "--suffix", f"ci-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}",
                         "--log", str(evidence / "router-smoke.log"))
         (evidence / "router-smoke.json").write_text(smoke + "\n")
-    else:
-        run(sys.executable, "images/runner/smoke.py", "--metadata", str(output / "incus.tar.xz"),
-            "--disk", str(output / "disk.qcow2"), "--remote", "nas01", "--project", "image-build",
+        return
+    metadata = str(output / "incus.tar.xz")
+    disk = str(output / "disk.qcow2")
+    if name == "ubuntu-24.04-desktop":
+        run(sys.executable, "images/ubuntu-24.04-desktop/smoke.py", "--metadata", metadata,
+            "--disk", disk, "--remote", "nas01", "--project", "image-build",
             "--profile", "runner-smoke", "--evidence", str(evidence / f"{name}-smoke"))
+        return
+    run(sys.executable, "images/runner/smoke.py", "--metadata", metadata,
+        "--disk", disk, "--remote", "nas01", "--project", "image-build",
+        "--profile", "runner-smoke", "--evidence", str(evidence / f"{name}-smoke"))
 
 
 def bake(sha: str, evidence: Path, publisher: str) -> None:

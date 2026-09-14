@@ -83,5 +83,7 @@ jobs:
       - name: Build router publisher
         run: go build -o "$RUNNER_TEMP/image-publish" ./cmd/image-publish
 
-      - name: Check the boot smoke script
-        run: bash -n images/smoke.sh
+      - name: Check the boot smoke scripts
+        run: |
+          bash -n images/smoke.sh
+          python3 -m py_compile images/runner/smoke.py images/ubuntu-24.04-desktop/smoke.py images/publish.py images/catalog-pr.py

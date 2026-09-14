@@ -10,11 +10,11 @@
 Usage:
   uv run --locked --script images/build.py validate
   sudo env PATH="$PATH" uv run --locked --script images/build.py build \\
-    --image router|runner|runner-publisher \\
+    --image router|runner|runner-publisher|ubuntu-24.04-desktop \\
     --work-dir <new-dir> --output-dir <new-dir>
 
---image defaults to router (unified tar.xz). runner and runner-publisher
-emit split incus.tar.xz + disk.qcow2.
+--image defaults to router (unified tar.xz). runner, runner-publisher, and
+ubuntu-24.04-desktop emit split incus.tar.xz + disk.qcow2.
 """
 
 from __future__ import annotations
@@ -44,7 +44,11 @@ ROUTER_DIR = IMAGES / "router"
 RECIPE_PATH = ROUTER_DIR / "distrobuilder.yaml"
 RUNNER_DIR = IMAGES / "runner"
 RUNNER_RECIPE_PATH = RUNNER_DIR / "distrobuilder.yaml"
-IMAGE_NAMES = ("router", "runner", "runner-publisher")
+DESKTOP_DIR = IMAGES / "ubuntu-24.04-desktop"
+DESKTOP_RECIPE_PATH = DESKTOP_DIR / "distrobuilder.yaml"
+IMAGE_NAMES = ("router", "runner", "runner-publisher", "ubuntu-24.04-desktop")
+CUA_DRIVER_VERSION = "0.28.1"
+CUA_DRIVER_SHA256 = "a068b6e477893b77ced74bceccf7db7483cf140e8d54150ce5849b6252b90bcf"
 PYYAML_VERSION = "6.0.3"
 DISTROBUILDER_TAGS = (
     "containers_image_storage_stub,containers_image_docker_daemon_stub,"
@@ -60,6 +64,7 @@ PINS_KEYS = {
     "imgoci",
     "pyyaml",
     "runner",
+    "desktop",
 }
 SNAPSHOT_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z$")
 PROXY_HTTP = "http://10.10.10.14:3128"
@@ -193,6 +198,7 @@ def load_pins() -> dict[str, Any]:
     if pyyaml.get("version") != PYYAML_VERSION:
         raise Error(f"pyyaml.version must be {PYYAML_VERSION}")
     load_runner_pins(pins)
+    load_desktop_pins(pins)
     return pins
 
 def load_runner_pins(pins: dict[str, Any]) -> None:
@@ -263,6 +269,28 @@ def load_runner_pins(pins: dict[str, Any]) -> None:
         raise Error(f"runner.proxy.no_proxy must be {PROXY_NO}")
 
 
+def load_desktop_pins(pins: dict[str, Any]) -> None:
+    desktop = require_mapping(pins.get("desktop"), "desktop")
+    extra_keys(desktop, {"cua_driver"}, "desktop")
+    cua = require_mapping(desktop.get("cua_driver"), "desktop.cua_driver")
+    extra_keys(cua, {"version", "url", "sha256"}, "desktop.cua_driver")
+    version = require_str(cua.get("version"), "desktop.cua_driver.version")
+    if version != CUA_DRIVER_VERSION:
+        raise Error(f"desktop.cua_driver.version must be {CUA_DRIVER_VERSION}")
+    url = require_https(
+        require_str(cua.get("url"), "desktop.cua_driver.url"),
+        "desktop.cua_driver.url",
+    )
+    digest = require_sha256(cua.get("sha256"), "desktop.cua_driver.sha256")
+    if digest != CUA_DRIVER_SHA256:
+        raise Error("desktop.cua_driver.sha256 must be the approved 0.28.1 linux-x86_64 archive")
+    expected = f"cua-driver-rs-{version}-linux-x86_64.tar.gz"
+    if url.rsplit("/", 1)[-1] != expected:
+        raise Error(f"desktop.cua_driver.url filename must be {expected}")
+    if f"/cua-driver-rs-v{version}/" not in url:
+        raise Error("desktop.cua_driver.url must be the cua-driver-rs GitHub release tag")
+
+
 def load_runner_recipe() -> dict[str, Any]:
     recipe = require_mapping(load_yaml(RUNNER_RECIPE_PATH), str(RUNNER_RECIPE_PATH))
     source = require_mapping(recipe.get("source"), "runner source")
@@ -292,6 +320,63 @@ def load_runner_recipe() -> dict[str, Any]:
     return recipe
 
 
+def load_desktop_recipe() -> dict[str, Any]:
+    recipe = require_mapping(load_yaml(DESKTOP_RECIPE_PATH), str(DESKTOP_RECIPE_PATH))
+    source = require_mapping(recipe.get("source"), "desktop source")
+    url = require_str(source.get("url"), "desktop source.url")
+    parsed = urlparse(url)
+    if parsed.scheme != "file" or not parsed.path:
+        raise Error("desktop source.url must be a file:// seed path")
+    packages = require_mapping(recipe.get("packages"), "desktop packages")
+    if packages.get("manager") != "apt":
+        raise Error("desktop packages.manager must be apt")
+    if not require_bool(packages.get("update"), "desktop packages.update"):
+        raise Error("desktop packages.update must be true")
+    required = {
+        "ubuntu-desktop-minimal",
+        "ubuntu-session",
+        "gnome-text-editor",
+        "tigervnc-scraping-server",
+        "grub-efi-amd64-signed",
+        "shim-signed",
+        "cloud-initramfs-growroot",
+    }
+    named: set[str] = set()
+    for index, item in enumerate(require_list(packages.get("sets"), "desktop packages.sets")):
+        package_set = require_mapping(item, f"desktop packages.sets[{index}]")
+        for name in require_list(package_set.get("packages"), f"desktop packages.sets[{index}].packages"):
+            named.add(require_str(name, f"desktop packages.sets[{index}].packages[]"))
+    missing = sorted(required - named)
+    if missing:
+        raise Error("desktop recipe missing packages: " + ", ".join(missing))
+    files = require_list(recipe.get("files"), "desktop files")
+    generators = {item.get("generator") for item in files if isinstance(item, dict)}
+    if "incus-agent" not in generators:
+        raise Error("desktop recipe must include the incus-agent generator")
+    fstab = next(
+        (
+            item
+            for item in files
+            if isinstance(item, dict) and item.get("path") == "/etc/fstab"
+        ),
+        None,
+    )
+    if not isinstance(fstab, dict) or "x-systemd.growfs" not in str(fstab.get("content") or ""):
+        raise Error("desktop /etc/fstab must set x-systemd.growfs")
+    gdm = next(
+        (
+            item
+            for item in files
+            if isinstance(item, dict) and item.get("path") == "/etc/gdm3/custom.conf"
+        ),
+        None,
+    )
+    content = str(gdm.get("content") if isinstance(gdm, dict) else "")
+    if "WaylandEnable=false" not in content or "AutomaticLogin=automation" not in content:
+        raise Error("desktop GDM config must disable Wayland and autologin automation")
+    return recipe
+
+
 def validate_guest_files(pins: dict[str, Any]) -> None:
     for entry in pins["runner"]["guest"]["files"]:
         path = RUNNER_DIR / entry["path"]
@@ -317,6 +402,24 @@ def validate_guest_files(pins: dict[str, Any]) -> None:
     )
     if text != expected:
         raise Error("publisher proxy.env does not match runner.proxy pins")
+
+
+def validate_desktop_files() -> None:
+    overlay = (
+        DESKTOP_DIR / "files/usr/local/libexec/agentcompute-desktop-session",
+        DESKTOP_DIR / "files/usr/lib/systemd/user/cua-driver.service",
+        DESKTOP_DIR / "files/usr/lib/systemd/user/x0vncserver.service",
+    )
+    for path in overlay:
+        if not path.is_file():
+            raise Error(f"missing desktop overlay file {path}")
+    wrapper = overlay[0].read_text(encoding="utf-8")
+    if "--socket" not in wrapper or "cua-driver.sock" not in wrapper:
+        raise Error("desktop session wrapper must pass an explicit cua-driver socket")
+    if "--permission-mode" in wrapper or "dangerously-bypass" in wrapper:
+        raise Error("desktop session wrapper must keep default standard Driver permissions")
+    if "-rfbport 5900" not in wrapper or "SecurityTypes None" not in wrapper:
+        raise Error("desktop VNC must use port 5900 on the private guest network")
 
 
 
@@ -387,6 +490,8 @@ def validate() -> dict[str, Any]:
     validate_package_closure(pins, recipe)
     load_runner_recipe()
     validate_guest_files(pins)
+    load_desktop_recipe()
+    validate_desktop_files()
     validate_catalog()
     return pins
 
@@ -570,15 +675,21 @@ def host_proxy() -> str | None:
 def build_vm(
     pins: dict[str, Any], work: Path, output: Path, tools: dict[str, str], image: str
 ) -> dict[str, Any]:
-    variant = "publisher" if image == "runner-publisher" else "runner"
+    is_desktop = image == "ubuntu-24.04-desktop"
+    if image == "runner-publisher":
+        variant = "publisher"
+    elif is_desktop:
+        variant = "desktop"
+    else:
+        variant = "runner"
+    recipe_dir = DESKTOP_DIR if is_desktop else RUNNER_DIR
+    recipe_path = DESKTOP_RECIPE_PATH if is_desktop else RUNNER_RECIPE_PATH
     downloads = work / "downloads"
     downloads.mkdir(mode=0o700)
     download_started = time.monotonic()
     ubuntu = pins["runner"]["ubuntu"]
-    actions = pins["runner"]["actions_runner"]
     ca_certs = pins["runner"]["ca_certificates"]
     ubuntu_archive = downloads / ubuntu["url"].rsplit("/", 1)[-1]
-    runner_archive = downloads / actions["url"].rsplit("/", 1)[-1]
     go_archive = downloads / pins["go"]["url"].rsplit("/", 1)[-1]
     distro_archive = downloads / pins["distrobuilder"]["url"].rsplit("/", 1)[-1]
     ca_deb = downloads / ca_certs["url"].rsplit("/", 1)[-1]
@@ -586,7 +697,14 @@ def build_vm(
     download(pins["distrobuilder"]["url"], distro_archive, pins["distrobuilder"]["sha256"])
     download(ubuntu["url"], ubuntu_archive, ubuntu["sha256"])
     download(ca_certs["url"], ca_deb, ca_certs["sha256"])
-    download(actions["url"], runner_archive, actions["sha256"])
+    if is_desktop:
+        cua = pins["desktop"]["cua_driver"]
+        extra_archive = downloads / cua["url"].rsplit("/", 1)[-1]
+        download(cua["url"], extra_archive, cua["sha256"])
+    else:
+        actions = pins["runner"]["actions_runner"]
+        runner_archive = downloads / actions["url"].rsplit("/", 1)[-1]
+        download(actions["url"], runner_archive, actions["sha256"])
     download_wall = round(time.monotonic() - download_started, 3)
     distro_bin, compile_wall, compile_rss = compile_distrobuilder(pins, work, downloads)
 
@@ -627,13 +745,22 @@ def build_vm(
         )
     cache = seed / "var" / "cache" / "agentcompute"
     cache.mkdir(parents=True, exist_ok=True)
-    seeded_runner = cache / "actions-runner.tar.gz"
-    try:
-        os.link(runner_archive, seeded_runner)
-    except OSError:
-        shutil.copyfile(runner_archive, seeded_runner, follow_symlinks=False)
-    if sha256_file(seeded_runner) != sha256_file(runner_archive):
-        raise Error("seed copy changed actions-runner archive bytes")
+    if is_desktop:
+        seeded = cache / "cua-driver.tar.gz"
+        try:
+            os.link(extra_archive, seeded)
+        except OSError:
+            shutil.copyfile(extra_archive, seeded, follow_symlinks=False)
+        if sha256_file(seeded) != sha256_file(extra_archive):
+            raise Error("seed copy changed cua-driver archive bytes")
+    else:
+        seeded_runner = cache / "actions-runner.tar.gz"
+        try:
+            os.link(runner_archive, seeded_runner)
+        except OSError:
+            shutil.copyfile(runner_archive, seeded_runner, follow_symlinks=False)
+        if sha256_file(seeded_runner) != sha256_file(runner_archive):
+            raise Error("seed copy changed actions-runner archive bytes")
     seed_tar = work / "seed.tar"
     run_checked(["tar", "-cf", str(seed_tar), "-C", str(seed), "."])
     shutil.rmtree(seed)
@@ -643,7 +770,7 @@ def build_vm(
     command = [
         str(distro_bin),
         "build-incus",
-        str(RUNNER_RECIPE_PATH),
+        str(recipe_path),
         str(output),
         "--vm",
         "--type=split",
@@ -661,7 +788,7 @@ def build_vm(
     peak_scratch = scratch_bytes(work)
     log_path = work / "build.log"
     with log_path.open("w", encoding="utf-8") as log:
-        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, cwd=RUNNER_DIR)
+        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, cwd=recipe_dir)
         while process.poll() is None:
             peak_scratch = max(peak_scratch, scratch_bytes(work))
             time.sleep(0.1)
@@ -685,16 +812,23 @@ def build_vm(
     virtual = int(info.get("virtual-size") or 0)
     if virtual <= 0:
         raise Error(f"{disk} has no virtual size")
+    download_includes = (
+        "https fetch and sha256 of go, vendored distrobuilder source, "
+        "ubuntu-base, snapshot ca-certificates, and the Actions Runner archive"
+    )
+    if is_desktop:
+        download_includes = (
+            "https fetch and sha256 of go, vendored distrobuilder source, "
+            "ubuntu-base, snapshot ca-certificates, and the Cua Driver 0.28.1 "
+            "full linux-x86_64 archive (GitHub pre-release, user-approved pin)"
+        )
     metrics = {
         "image": image,
         "variant": variant,
         "download_wall_seconds": download_wall,
         "compile_wall_seconds": compile_wall,
         "assemble_wall_seconds": assemble_wall,
-        "download_includes": (
-            "https fetch and sha256 of go, vendored distrobuilder source, "
-            "ubuntu-base, snapshot ca-certificates, and the Actions Runner archive"
-        ),
+        "download_includes": download_includes,
         "compile_includes": (
             "extract go+distrobuilder and go build -mod=vendor "
             f"-tags={DISTROBUILDER_TAGS}; excludes download and assemble"
@@ -720,9 +854,13 @@ def build_vm(
         },
         "tools": tools,
         "ubuntu_snapshot": ubuntu["snapshot"],
-        "actions_runner_version": actions["version"],
-        "guest_version": pins["runner"]["guest"]["version"],
     }
+    if is_desktop:
+        metrics["cua_driver_version"] = pins["desktop"]["cua_driver"]["version"]
+        metrics["cua_driver_prerelease"] = True
+    else:
+        metrics["actions_runner_version"] = actions["version"]
+        metrics["guest_version"] = pins["runner"]["guest"]["version"]
     (output / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(metrics, indent=2))
     return metrics
