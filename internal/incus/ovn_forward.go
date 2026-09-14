@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -28,7 +27,11 @@ func (c *Client) CreateForward(
 	if _, err := c.ownedProjectNetwork(ctx, sandbox, network); err != nil {
 		return compute.Forward{}, err
 	}
-	target, err := c.forwardTargetAddress(ctx, sandbox, network, ref)
+	instance, err := c.GetInstance(ctx, ref)
+	if err != nil {
+		return compute.Forward{}, err
+	}
+	target, err := c.forwardTargetAddress(ctx, sandbox, network, instance)
 	if err != nil {
 		return compute.Forward{}, err
 	}
@@ -105,11 +108,7 @@ func (c *Client) CreateForward(
 	}
 }
 
-func (c *Client) forwardTargetAddress(ctx context.Context, sandbox, network string, ref compute.Ref) (string, error) {
-	instance, err := c.GetInstance(ctx, ref)
-	if err != nil {
-		return "", err
-	}
+func (c *Client) forwardTargetAddress(ctx context.Context, sandbox, network string, instance compute.Instance) (string, error) {
 	for _, nic := range instance.NICs {
 		if nic.Network != network {
 			continue
@@ -126,7 +125,7 @@ func (c *Client) forwardTargetAddress(ctx context.Context, sandbox, network stri
 		return "", mapError(err)
 	}
 	for _, lease := range leases {
-		if lease.Hostname != ref.Name {
+		if lease.Hostname != instance.Ref.Name {
 			continue
 		}
 		ip := net.ParseIP(lease.Address)
@@ -134,7 +133,7 @@ func (c *Client) forwardTargetAddress(ctx context.Context, sandbox, network stri
 			return ip.String(), nil
 		}
 	}
-	return "", fmt.Errorf("instance %q has no address on network %q", ref.Name, network)
+	return "", fmt.Errorf("instance %q has no address on network %q", instance.Ref.Name, network)
 }
 
 func (c *Client) allocateForwardAddress(ctx context.Context) (string, error) {
@@ -210,6 +209,13 @@ func (c *Client) InstanceForward(ctx context.Context, ref compute.Ref, targetPor
 			if err != nil {
 				return compute.Forward{}, mapOVNError(err)
 			}
+			if len(forwards) == 0 {
+				continue
+			}
+			targetAddress, err := c.forwardTargetAddress(ctx, ref.Sandbox, network.Name, inst)
+			if err != nil {
+				return compute.Forward{}, err
+			}
 			for _, forward := range forwards {
 				for _, port := range forward.Ports {
 					address := port.TargetAddress
@@ -220,7 +226,7 @@ func (c *Client) InstanceForward(ctx context.Context, ref compute.Ref, targetPor
 					if mapped == "" {
 						mapped = port.ListenPort
 					}
-					if port.Protocol != protocol || mapped != target || !slices.Contains(nic.Addresses, address) {
+					if port.Protocol != protocol || mapped != target || address != targetAddress {
 						continue
 					}
 					listen, err := strconv.ParseInt(port.ListenPort, 10, 64)

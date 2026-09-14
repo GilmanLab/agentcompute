@@ -55,7 +55,11 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 		return nil, err
 	}
 
-	source, err := c.instanceSource(ctx, projectName(req.Ref.Sandbox), req.Image)
+	kind := api.InstanceTypeContainer
+	if req.Kind == kindVM {
+		kind = api.InstanceTypeVM
+	}
+	source, err := c.instanceSource(ctx, projectName(req.Ref.Sandbox), req.Image, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +86,6 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 			deviceNetworkKey: physical,
 			"name":           defaultNICName,
 		}
-	}
-
-	kind := api.InstanceTypeContainer
-	if req.Kind == kindVM {
-		kind = api.InstanceTypeVM
 	}
 
 	op, err := c.Scoped(ctx, projectName(req.Ref.Sandbox), host).CreateInstance(api.InstancesPost{
@@ -368,6 +367,7 @@ func (c *Client) instanceSource(
 	ctx context.Context,
 	project string,
 	image compute.CatalogImage,
+	kind api.InstanceType,
 ) (api.InstanceSource, error) {
 	if isSandboxImage(image) {
 		return api.InstanceSource{
@@ -395,6 +395,32 @@ func (c *Client) instanceSource(
 		if image.Fingerprint != "" {
 			source.Fingerprint = image.Fingerprint
 			source.Alias = ""
+		}
+		if _, native := server.(*incusclient.ProtocolIncus); native {
+			target := alias
+			if source.Fingerprint != "" {
+				target = source.Fingerprint
+			}
+			resolved, _, err := server.GetImage(target)
+			if errors.Is(mapError(err), compute.ErrNotFound) && source.Alias != "" {
+				entry, _, aliasErr := server.GetImageAliasType(string(kind), alias)
+				if aliasErr != nil {
+					return api.InstanceSource{}, mapError(aliasErr)
+				}
+				resolved, _, err = server.GetImage(entry.Target)
+			}
+			if err != nil {
+				return api.InstanceSource{}, mapError(err)
+			}
+			source.Fingerprint = resolved.Fingerprint
+			source.Alias = ""
+			source.Project = info.Project
+			if !resolved.Public {
+				source.Secret, err = server.GetImageSecret(resolved.Fingerprint)
+				if err != nil {
+					return api.InstanceSource{}, mapError(err)
+				}
+			}
 		}
 		return source, nil
 	}

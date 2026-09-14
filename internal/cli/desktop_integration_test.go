@@ -106,7 +106,7 @@ func TestDesktopAcceptance(t *testing.T) {
             break
     if not token:
         fail("editor snapshot has no actionable New tab element")
-    clicked = desktop.call(sandbox=name, instance="client", tool="click", args=json.encode({"pid":pid,"element_token":token}))
+    clicked = desktop.call(sandbox=name, instance="client", tool="click", args=json.encode({"pid":pid,"window_id":window,"element_token":token,"delivery_mode":"foreground"}))
     if not clicked["ok"]:
         fail(clicked["summary"])
     after_call = desktop.call(sandbox=name, instance="client", tool="get_window_state", args=args)
