@@ -379,10 +379,22 @@ func validateWaitUntil(until string) error {
 }
 
 func validateFilePath(path string) error {
-	if path == "" || !strings.HasPrefix(path, "/") {
+	if !absoluteGuestPath(path) {
 		return agentError("path must be an absolute path")
 	}
 	return nil
+}
+
+func absoluteGuestPath(path string) bool {
+	if strings.ContainsRune(path, '\x00') {
+		return false
+	}
+	if strings.HasPrefix(path, "/") {
+		return true
+	}
+	return len(path) >= 3 && ((path[0] >= 'A' && path[0] <= 'Z') ||
+		(path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':' &&
+		(path[2] == '\\' || path[2] == '/')
 }
 
 func validateFileMode(mode string) error {

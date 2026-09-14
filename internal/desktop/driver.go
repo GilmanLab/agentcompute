@@ -31,6 +31,9 @@ const (
 	driverHome            = "/home/automation"
 	driverRuntime         = "/run/user/1000"
 	driverUID             = "1000"
+	windowsDriverBin       = `C:\ProgramData\agentcompute\cua-driver\cua-driver.exe`
+	windowsDriverSocket    = `\\.\pipe\cua-driver`
+	windowsDriverHome      = `C:\ProgramData\agentcompute`
 	vncPort               = "5900"
 	vncTargetPort         = int64(5900)
 	nativeOKText          = "[OK]"
@@ -42,7 +45,7 @@ const (
 	imagePayloadSampleLen = 1024
 )
 
-// Driver proxies native Cua Driver CLI calls inside a Linux desktop guest.
+// Driver proxies native Cua Driver CLI calls inside Linux and Windows guests.
 type Driver struct {
 	compute *compute.Service
 	store   *Store
@@ -89,7 +92,7 @@ func (d *Driver) Info(ctx context.Context, ref compute.Ref) (Info, error) {
 		osName, osErr := d.imageOS(ctx, ref, inst.Image)
 		return Info{OS: osName, Tools: []string{}}, osErr
 	}
-	version, tools, err := d.discoverDocs(ctx, ref)
+	version, tools, err := d.discoverDocs(ctx, ref, inst.OS)
 	if err != nil {
 		return Info{}, err
 	}
@@ -116,7 +119,11 @@ func (d *Driver) Info(ctx context.Context, ref compute.Ref) (Info, error) {
 
 // Enable discovers dump-docs then reports whether the guest daemon answers.
 func (d *Driver) Enable(ctx context.Context, ref compute.Ref) (bool, error) {
-	if _, _, err := d.discoverDocs(ctx, ref); err != nil {
+	inst, err := d.compute.GetInstance(ctx, ref)
+	if err != nil {
+		return false, err
+	}
+	if _, _, err := d.discoverDocs(ctx, ref, inst.OS); err != nil {
 		return false, err
 	}
 	return d.Ready(ctx, ref)
@@ -141,7 +148,7 @@ func (d *Driver) Ready(ctx context.Context, ref compute.Ref) (bool, error) {
 	if !strings.EqualFold(inst.Status, "Running") && !strings.EqualFold(inst.Status, "Ready") {
 		return false, nil
 	}
-	result, err := d.execDriver(ctx, ref, []string{driverBin, "status", "--socket", driverSocket})
+	result, err := d.execDriver(ctx, ref, inst.OS, []string{"status"})
 	if err != nil {
 		return false, err
 	}
@@ -160,7 +167,11 @@ func (d *Driver) Call(ctx context.Context, ref compute.Ref, tool, args string) (
 	if err != nil {
 		return CallResult{}, err
 	}
-	path, err := randomGuestPNG()
+	inst, err := d.compute.GetInstance(ctx, ref)
+	if err != nil {
+		return CallResult{}, err
+	}
+	path, err := randomGuestPNG(inst.OS)
 	if err != nil {
 		return CallResult{}, err
 	}
@@ -171,7 +182,7 @@ func (d *Driver) Call(ctx context.Context, ref compute.Ref, tool, args string) (
 		}
 	}()
 
-	result, err := d.execDriver(ctx, ref, callArgv(tool, payload, path))
+	result, err := d.execDriver(ctx, ref, inst.OS, callArgv(tool, payload, path))
 	if err != nil {
 		return CallResult{}, err
 	}
@@ -225,13 +236,17 @@ func (d *Driver) Screenshot(
 		}
 		payload = encoded
 	}
-	path, err := randomGuestPNG()
+	inst, err := d.compute.GetInstance(ctx, ref)
+	if err != nil {
+		return Screenshot{}, err
+	}
+	path, err := randomGuestPNG(inst.OS)
 	if err != nil {
 		return Screenshot{}, err
 	}
 	defer d.removeGuestFile(ctx, ref, path)
 
-	result, err := d.execDriver(ctx, ref, callArgv(tool, payload, path))
+	result, err := d.execDriver(ctx, ref, inst.OS, callArgv(tool, payload, path))
 	if err != nil {
 		return Screenshot{}, err
 	}
@@ -272,8 +287,8 @@ func (d *Driver) Screenshot(
 	return shot, nil
 }
 
-func (d *Driver) discoverDocs(ctx context.Context, ref compute.Ref) (string, []string, error) {
-	result, err := d.execDriver(ctx, ref, []string{driverBin, "dump-docs", "--type", "mcp"})
+func (d *Driver) discoverDocs(ctx context.Context, ref compute.Ref, osName string) (string, []string, error) {
+	result, err := d.execDriver(ctx, ref, osName, []string{"dump-docs", "--type", "mcp"})
 	if err != nil {
 		return "", nil, err
 	}
@@ -319,17 +334,22 @@ func (d *Driver) vncEndpoint(ctx context.Context, ref compute.Ref, inst compute.
 	return "", nil
 }
 
-func (d *Driver) execDriver(ctx context.Context, ref compute.Ref, argv []string) (compute.ExecResult, error) {
-	if _, err := d.compute.SandboxExpiry(ctx, ref.Sandbox); err != nil {
-		return compute.ExecResult{}, err
+func (d *Driver) execDriver(ctx context.Context, ref compute.Ref, osName string, args []string) (compute.ExecResult, error) {
+	bin, socket := driverBin, driverSocket
+	req := compute.ExecRequest{Ref: ref}
+	if strings.HasPrefix(strings.ToLower(osName), "windows") {
+		bin, socket = windowsDriverBin, windowsDriverSocket
+		req.Cwd = windowsDriverHome
+	} else {
+		req.User, req.Cwd, req.Env = driverUID, driverHome, driverEnv()
 	}
-	return d.compute.ExecJSON(ctx, compute.ExecRequest{
-		Ref:  ref,
-		Argv: argv,
-		User: driverUID,
-		Cwd:  driverHome,
-		Env:  driverEnv(),
-	})
+	req.Argv = make([]string, 0, len(args)+3)
+	req.Argv = append(req.Argv, bin)
+	req.Argv = append(req.Argv, args...)
+	if args[0] != "dump-docs" {
+		req.Argv = append(req.Argv, "--socket", socket)
+	}
+	return d.compute.ExecJSON(ctx, req)
 }
 
 func (d *Driver) removeGuestFile(ctx context.Context, ref compute.Ref, path string) {
@@ -338,13 +358,18 @@ func (d *Driver) removeGuestFile(ctx context.Context, ref compute.Ref, path stri
 	}
 	rmCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), guestCleanupTimeout)
 	defer cancel()
-	_, _ = d.compute.ExecJSON(rmCtx, compute.ExecRequest{
+	req := compute.ExecRequest{
 		Ref:  ref,
 		Argv: []string{"/bin/rm", "-f", "--", path},
 		User: driverUID,
 		Cwd:  driverHome,
 		Env:  driverEnv(),
-	})
+	}
+	if strings.HasPrefix(path, `C:\`) {
+		req.Argv = []string{"cmd.exe", "/c", "del", "/q", path}
+		req.User, req.Cwd, req.Env = "", windowsDriverHome, nil
+	}
+	_, _ = d.compute.ExecJSON(rmCtx, req)
 }
 
 func (d *Driver) pullScreenshot(
@@ -377,8 +402,7 @@ func (d *Driver) pullScreenshot(
 
 func callArgv(tool, payload, screenshotPath string) []string {
 	return []string{
-		driverBin, "call",
-		"--socket", driverSocket,
+		"call",
 		"--screenshot-out-file", screenshotPath,
 		tool, payload,
 	}
@@ -391,10 +415,13 @@ func driverEnv() map[string]string {
 	}
 }
 
-func randomGuestPNG() (string, error) {
+func randomGuestPNG(osName string) (string, error) {
 	var token [16]byte
 	if _, err := rand.Read(token[:]); err != nil {
 		return "", fmt.Errorf("generate screenshot path: %w", err)
+	}
+	if strings.HasPrefix(strings.ToLower(osName), "windows") {
+		return `C:\ProgramData\agentcompute\cua-` + hex.EncodeToString(token[:]) + ".png", nil
 	}
 	return "/tmp/cua-" + hex.EncodeToString(token[:]) + ".png", nil
 }

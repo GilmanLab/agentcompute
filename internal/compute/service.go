@@ -341,6 +341,9 @@ func (s *Service) exec(ctx context.Context, req ExecRequest, outputLimit int) (E
 	if inst.Status != statusRunning && inst.Status != "Ready" {
 		return ExecResult{}, agentErrorf("instance %q in sandbox %q is not running", req.Ref.Name, req.Ref.Sandbox)
 	}
+	if strings.HasPrefix(strings.ToLower(inst.OS), "windows") && req.User != "" {
+		return ExecResult{}, agentError("Windows exec uses the Incus agent service identity; user is unsupported")
+	}
 
 	stdout := newDrainingWriter(outputLimit)
 	stderr := newDrainingWriter(outputLimit)
@@ -679,7 +682,7 @@ func validateExec(req ExecRequest) error {
 			return agentError("user must be a numeric UID")
 		}
 	}
-	if req.Cwd != "" && !strings.HasPrefix(req.Cwd, "/") {
+	if req.Cwd != "" && !absoluteGuestPath(req.Cwd) {
 		return agentError("cwd must be an absolute path")
 	}
 	return nil

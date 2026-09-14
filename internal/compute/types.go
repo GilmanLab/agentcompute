@@ -39,6 +39,8 @@ type Instance struct {
 	Ref Ref
 	// Image is the catalog name used to create the guest.
 	Image string
+	// OS is the guest operating system recorded by Incus image metadata.
+	OS string
 	// Kind is container or vm.
 	Kind string
 	// Host is the actual member.
@@ -115,6 +117,8 @@ type CatalogImage struct {
 	Description string
 	// Reference is the immutable imgoci release or upstream remote alias.
 	Reference string
+	// Alias names a qualified cluster-local image in the image-build project.
+	Alias string
 	// Fingerprint is derived during reconciliation, not an image build identity.
 	Fingerprint string
 	// CPUs is the default CPU count.
@@ -151,9 +155,9 @@ type CreateInstance struct {
 type ExecRequest struct {
 	// Ref identifies the guest.
 	Ref Ref
-	// Argv contains sh, -c, and the agent's command.
+	// Argv is a native argument vector; shell callers use sh -c or cmd.exe /c.
 	Argv []string
-	// User is a numeric UID; empty selects root.
+	// User is a Linux numeric UID; Windows exec uses the agent service identity.
 	User string
 	// Cwd is the optional absolute guest working directory.
 	Cwd string

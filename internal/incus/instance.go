@@ -87,6 +87,18 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 			"name":           defaultNICName,
 		}
 	}
+	config := map[string]string{
+		"limits.cpu":    strconv.FormatInt(req.CPUs, 10),
+		"limits.memory": fmt.Sprintf("%dMiB", req.MemoryMB),
+		metaImage:       req.Image.Name,
+		metaDesktop:     strconv.FormatBool(req.Image.Desktop),
+	}
+	if strings.HasPrefix(strings.ToLower(req.Image.OS), "windows") {
+		config["image.os"] = "Windows"
+		config["security.secureboot"] = "true"
+		devices["agent"] = map[string]string{"type": "disk", "source": "agent:config"}
+		devices["tpm"] = map[string]string{"type": "tpm"}
+	}
 
 	op, err := c.Scoped(ctx, projectName(req.Ref.Sandbox), host).CreateInstance(api.InstancesPost{
 		Name:   req.Ref.Name,
@@ -94,12 +106,7 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 		Source: source,
 		InstancePut: api.InstancePut{
 			Profiles: []string{},
-			Config: map[string]string{
-				"limits.cpu":    strconv.FormatInt(req.CPUs, 10),
-				"limits.memory": fmt.Sprintf("%dMiB", req.MemoryMB),
-				metaImage:       req.Image.Name,
-				metaDesktop:     strconv.FormatBool(req.Image.Desktop),
-			},
+			Config: config,
 			Devices: devices,
 		},
 	})
@@ -471,13 +478,17 @@ func resolveNativeImage(
 }
 
 func isSandboxImage(image compute.CatalogImage) bool {
-	return image.Fingerprint != "" && image.Reference == ""
+	return image.Fingerprint != "" && image.Reference == "" && image.Alias == ""
 }
 
 func (c *Client) copyImage(ctx context.Context, project string, image compute.CatalogImage) (string, error) {
 	fingerprint := image.Fingerprint
 	if fingerprint == "" {
-		alias, _, err := c.Scoped(ctx, imageBuildProject, "").GetImageAlias(image.Name)
+		aliasName := image.Name
+		if image.Alias != "" {
+			aliasName = image.Alias
+		}
+		alias, _, err := c.Scoped(ctx, imageBuildProject, "").GetImageAlias(aliasName)
 		if err != nil {
 			return "", mapError(err)
 		}
@@ -549,6 +560,7 @@ func (c *Client) mapInstance(ctx context.Context, sandbox string, full *api.Inst
 	return compute.Instance{
 		Ref:       compute.Ref{Sandbox: sandbox, Name: full.Name},
 		Image:     config[metaImage],
+		OS:        config["image.os"],
 		Kind:      kind,
 		Host:      full.Location,
 		Status:    full.Status,

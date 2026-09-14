@@ -38,6 +38,7 @@ type catalogFileImage struct {
 	Desktop     bool     `yaml:"desktop"`
 	Description string   `yaml:"description"`
 	Reference   string   `yaml:"reference"`
+	Alias       string   `yaml:"alias"`
 	CPUs        int64    `yaml:"cpus"`
 	MemoryMB    int64    `yaml:"memory_mb"`
 	DiskGB      int64    `yaml:"disk_gb"`
@@ -129,6 +130,7 @@ func (entry catalogFileImage) toCatalogImage() (CatalogImage, error) {
 		Desktop:     entry.Desktop,
 		Description: entry.Description,
 		Reference:   entry.Reference,
+		Alias:       entry.Alias,
 		CPUs:        entry.CPUs,
 		MemoryMB:    entry.MemoryMB,
 		DiskGB:      entry.DiskGB,
@@ -154,10 +156,17 @@ func normalizeCatalogImage(image CatalogImage) (CatalogImage, error) {
 	if !slices.Contains(image.Kinds, image.Kind) {
 		return CatalogImage{}, fmt.Errorf("kind %q is not listed in kinds", image.Kind)
 	}
-	if image.Reference == "" {
-		return CatalogImage{}, errors.New("reference is required")
+	if (image.Reference == "") == (image.Alias == "") {
+		return CatalogImage{}, errors.New("exactly one of reference or alias is required")
 	}
-	if !validReference(image.Reference) {
+	if image.Alias != "" && (strings.TrimSpace(image.Alias) != image.Alias ||
+		strings.ContainsAny(image.Alias, ":\x00\r\n")) {
+		return CatalogImage{}, errors.New("alias must be a cluster-local image alias")
+	}
+	if strings.HasPrefix(strings.ToLower(image.OS), "windows") && image.Reference != "" {
+		return CatalogImage{}, errors.New("Windows images must use a cluster-local alias")
+	}
+	if image.Reference != "" && !validReference(image.Reference) {
 		return CatalogImage{}, fmt.Errorf("reference %q is neither a digest nor a remote alias", image.Reference)
 	}
 	if image.CPUs <= 0 {

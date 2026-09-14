@@ -81,6 +81,13 @@ func (c *Client) EnsureCatalog(ctx context.Context, images []compute.CatalogImag
 func (c *Client) ensureImage(ctx context.Context, image compute.CatalogImage) (compute.CatalogImage, error) {
 	out := copyCatalogImage(image)
 	switch {
+	case image.Alias != "":
+		alias, _, err := c.Scoped(ctx, imageBuildProject, "").GetImageAlias(image.Alias)
+		if err != nil {
+			return compute.CatalogImage{}, fmt.Errorf("catalog image %q: resolve local alias %q: %w", image.Name, image.Alias, err)
+		}
+		out.Fingerprint = alias.Target
+		return out, nil
 	case isImgociDigestRef(image.Reference):
 		fingerprint, err := c.ensureDigestImage(ctx, image)
 		if err != nil {
