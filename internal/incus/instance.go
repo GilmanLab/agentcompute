@@ -603,12 +603,20 @@ func (c *Client) mapNICs(ctx context.Context, sandbox string, full *api.Instance
 		}
 		physical := device[deviceNetworkKey]
 		logical := logicalByPhysical[physical]
-		mac, addresses := observedNIC(full.State, iface)
-		if configuredMAC := device["hwaddr"]; configuredMAC != "" {
+		configuredMAC := device["hwaddr"]
+		if configuredMAC == "" {
+			configuredMAC = full.Config["volatile."+name+".hwaddr"]
+		}
+		if configuredMAC == "" {
+			configuredMAC = full.ExpandedConfig["volatile."+name+".hwaddr"]
+		}
+		guestName, mac, addresses := observedNIC(full.State, iface, configuredMAC)
+		if mac == "" {
 			mac = configuredMAC
 		}
 		nics = append(nics, compute.NIC{
 			Name:      iface,
+			GuestName: guestName,
 			Network:   logical,
 			MAC:       mac,
 			Addresses: addresses,
@@ -617,18 +625,29 @@ func (c *Client) mapNICs(ctx context.Context, sandbox string, full *api.Instance
 	return nics, nil
 }
 
-func observedNIC(state *api.InstanceState, iface string) (string, []string) {
+func observedNIC(state *api.InstanceState, iface, mac string) (string, string, []string) {
 	addresses := []string{}
 	if state == nil {
-		return "", addresses
+		return "", "", addresses
 	}
-	network := state.Network[iface]
+	var network api.InstanceStateNetwork
+	guestName := ""
+	if mac != "" {
+		for name, candidate := range state.Network {
+			if strings.EqualFold(candidate.Hwaddr, mac) {
+				guestName, network = name, candidate
+				break
+			}
+		}
+	} else if candidate, ok := state.Network[iface]; ok {
+		guestName, network = iface, candidate
+	}
 	for _, address := range network.Addresses {
 		if address.Scope != "link" && address.Scope != "local" && address.Address != "" {
 			addresses = append(addresses, address.Address)
 		}
 	}
-	return network.Hwaddr, addresses
+	return guestName, network.Hwaddr, addresses
 }
 
 func parseInt64(value string) int64 {

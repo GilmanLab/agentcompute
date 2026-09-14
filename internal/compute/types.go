@@ -63,8 +63,10 @@ type Instance struct {
 
 // NIC describes an attached interface using agent-facing network names.
 type NIC struct {
-	// Name is the guest device name.
+	// Name is the configured device name used by network operations.
 	Name string
+	// GuestName is the observed OS interface name, which may differ on VMs.
+	GuestName string
 	// Network is the metadata-resolved agent-facing network name.
 	Network string
 	// MAC is the observed hardware address.

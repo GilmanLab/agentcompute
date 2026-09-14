@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/netip"
 	"strconv"
@@ -352,7 +353,17 @@ func (s *Service) ImpairNIC(ctx context.Context, ref Ref, nic string, impairment
 	if err := s.requireLinuxGuest(ctx, inst); err != nil {
 		return err
 	}
-	script := impairCommand(nic, impairment)
+	guestNIC := nic
+	for _, attached := range inst.NICs {
+		if attached.Name == nic && attached.GuestName != "" {
+			guestNIC = attached.GuestName
+			break
+		}
+	}
+	if err := validateName(guestNIC); err != nil {
+		return agentErrorf("unsupported guest NIC name %q", guestNIC)
+	}
+	script := impairCommand(guestNIC, impairment)
 	stdout := newDrainingWriter(execOutputLimit)
 	stderr := newDrainingWriter(execOutputLimit)
 	code, execErr := s.backend.Exec(ctx, ExecRequest{
@@ -531,7 +542,7 @@ func validateImpairment(impairment Impairment) error {
 	if impairment.LatencyMS < 0 || impairment.JitterMS < 0 || impairment.RateMbit < 0 || impairment.LossPercent < 0 {
 		return agentError("impairment values must be non-negative")
 	}
-	if impairment.LossPercent > maxLossPercent {
+	if math.IsNaN(impairment.LossPercent) || impairment.LossPercent > maxLossPercent {
 		return agentError("loss_percent must be between 0 and 100")
 	}
 	if impairment.JitterMS > 0 && impairment.LatencyMS == 0 {
@@ -563,11 +574,15 @@ func nicExists(instance Instance, nic string) bool {
 }
 
 func (s *Service) requireLinuxGuest(ctx context.Context, inst Instance) error {
-	if image, ok := s.catalog.Lookup(inst.Image); ok {
-		osName := strings.ToLower(image.OS)
-		if strings.Contains(osName, "windows") || osName == "darwin" || osName == "macos" {
-			return agentErrorf("net.impair is not supported on %s guests", image.OS)
+	osName := inst.OS
+	if osName == "" {
+		if image, ok := s.catalog.Lookup(inst.Image); ok {
+			osName = image.OS
 		}
+	}
+	lowerOS := strings.ToLower(osName)
+	if strings.HasPrefix(lowerOS, "windows") || lowerOS == "darwin" || lowerOS == "macos" {
+		return agentErrorf("net.impair is not supported on %s guests", osName)
 	}
 	stdout := newDrainingWriter(execOutputLimit)
 	stderr := newDrainingWriter(execOutputLimit)
