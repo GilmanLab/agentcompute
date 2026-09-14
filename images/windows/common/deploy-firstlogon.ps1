@@ -57,7 +57,8 @@ try {
                              Select-String -SimpleMatch 'cua-driver' | ForEach-Object { $_.Line.Trim() }) -join '; '
     }
 
-    $survived = ($before.daemon_status -match 'running')
+    $survived = ($before.daemon_status -match 'running') -and
+        ($before.daemon_status -notmatch 'not running')
     $repaired = $false
 
     if (-not $survived) {
@@ -81,10 +82,10 @@ try {
     for ($attempt = 1; $attempt -le 30; $attempt++) {
         Start-Sleep -Seconds 2
         $after = Get-DriverText @('status')
-        if ($after -match 'running') { break }
+        if ($after -match 'running' -and $after -notmatch 'not running') { break }
     }
 
-    if (-not ($after -match 'running')) {
+    if (-not ($after -match 'running') -or $after -match 'not running') {
         $status = 'failed'
         $failure = "Cua Driver daemon not running after repair: $after"
     }

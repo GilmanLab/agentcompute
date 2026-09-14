@@ -246,7 +246,7 @@ def build_vm(
     args: argparse.Namespace,
     evidence: Evidence,
 ) -> str:
-    name = args.instance or f"{args.volume_prefix}-golden"
+    name = run_prefix(args)
     existing = incus_json(["list", f"{args.remote}:", name], project=args.project)
     if existing:
         raise Error(f"instance {name} already exists in {args.project}; pick another name")
@@ -352,6 +352,7 @@ def push_guest_scripts(instance: str, args: argparse.Namespace, evidence: Eviden
     effect in the run that is already in flight.
     """
     pushed = {}
+    failed = []
     for script in ("finalize.ps1", "deploy-firstlogon.ps1", "smoke.ps1"):
         result = incus(
             ["file", "push", str(WINDOWS_DIR / "common" / script),
@@ -359,8 +360,15 @@ def push_guest_scripts(instance: str, args: argparse.Namespace, evidence: Eviden
             project=args.project, check=False, timeout=180,
         )
         pushed[script] = {"exit": result.returncode, "stderr": result.stderr.strip()}
+        if result.returncode != 0:
+            failed.append(script)
 
     evidence.record("guest-scripts-push", pushed)
+    if failed:
+        # The file API is part of the contract, not a convenience: a silent
+        # fallback to whatever the image happens to carry would qualify code
+        # nobody reviewed.
+        raise Error(f"guest file push failed for {', '.join(failed)}")
 
 
 def finalize_and_seal(
@@ -430,6 +438,11 @@ def publish_candidate(
     })
 
 
+def run_prefix(args: argparse.Namespace) -> str:
+    """Names every resource this run creates from one unique prefix."""
+    return args.instance or f"{args.volume_prefix}-golden"
+
+
 def launch_clone(
     fingerprint: str,
     settings: dict[str, Any],
@@ -437,7 +450,7 @@ def launch_clone(
     args: argparse.Namespace,
     evidence: Evidence,
 ) -> str:
-    name = f"{args.volume_prefix}-clone"
+    name = f"{run_prefix(args)}-clone"
     runtime = settings["runtime"]
     # The clone gets the runtime device set, not the build one: no installer
     # media, but the same agent CD, vTPM and Secure Boot a real sandbox
@@ -477,7 +490,7 @@ def probe_container(args: argparse.Namespace, evidence: Evidence) -> str:
     way to test the fallback console is from another instance on the sandbox
     network, not from an external forward.
     """
-    name = f"{args.volume_prefix}-probe"
+    name = f"{run_prefix(args)}-probe"
     existing = incus_json(["list", f"{args.remote}:", name], project=args.project)
     if not existing:
         incus(["launch", PROBE_IMAGE, f"{args.remote}:{name}", "--target", args.target],
@@ -539,8 +552,10 @@ def qualify_clone(
     evidence.record("smoke-script-push", {
         "exit": pushed.returncode,
         "stderr": pushed.stderr.strip(),
-        "source": "working tree" if pushed.returncode == 0 else "image copy (push failed)",
+        "source": "working tree",
     })
+    if pushed.returncode != 0:
+        raise Error(f"pushing smoke.ps1 to {clone} failed: {pushed.stderr.strip()}")
 
     smoke_started = time.monotonic()
     smoke = guest_exec(
@@ -589,6 +604,9 @@ def qualify_clone(
              f"{args.remote}:{clone}/" + guest_path.replace("\\", "/"), str(local)],
             project=args.project, check=False, timeout=180,
         )
+        if pull.returncode != 0:
+            raise Error(f"pulling the desktop screenshot failed: {pull.stderr.strip()}")
+
         screenshot = {
             "guest_path": guest_path,
             "local_path": str(local),
@@ -598,6 +616,11 @@ def qualify_clone(
             "measured": {key: value for key, value in detail.items() if key != "path"},
         }
         break
+
+    if file_api.returncode != 0:
+        raise Error(
+            f"binary file API failed on the Windows clone: {file_api.stderr.strip()}"
+        )
 
     result: dict[str, Any] = {
         "role": role,
@@ -658,6 +681,13 @@ def vnc_login_screen_gate(
         " if ($s) { ($s | ForEach-Object { $_.LogonId }) -join ',' } else { 'none' }",
         args.remote, args.project,
     ).strip()
+    if sessions != "none":
+        # Without this the probe could be reading a banner served to an
+        # already logged-on desktop, which proves nothing about the login
+        # screen.
+        raise Error(
+            f"expected no interactive logon before probing VNC, found sessions {sessions}"
+        )
 
     addresses = guest_addresses(clone, args.remote, args.project)
     if not addresses:
@@ -676,14 +706,19 @@ def vnc_login_screen_gate(
                lambda: agent_ready(clone, args.remote, args.project),
                timeout=runtime["ready_timeout"], interval=10.0)
 
+    def driver_running() -> str | None:
+        text = guest_powershell(
+            clone, f"& '{STATE_DIR}\\cua-driver\\cua-driver.exe' status 2>&1 | Out-String",
+            args.remote, args.project, check=False,
+        )
+        # "is not running" contains "running": require the positive statement
+        # and the absence of the negative one.
+        if "running" in text and "not running" not in text:
+            return text
+        return None
+
     driver_status, driver_seconds = wait_until(
-        "the Driver daemon after the autologon reboot",
-        lambda: (lambda text: text if "running" in text else None)(
-            guest_powershell(
-                clone, f"& '{STATE_DIR}\\cua-driver\\cua-driver.exe' status 2>&1 | Out-String",
-                args.remote, args.project, check=False,
-            )
-        ),
+        "the Driver daemon after the autologon reboot", driver_running,
         timeout=600, interval=10.0,
     )
 
@@ -883,18 +918,36 @@ def promote(args: argparse.Namespace) -> int:
 
 
 def teardown(args: argparse.Namespace) -> int:
+    """Remove only what one run created.
+
+    A shared project such as `image-build` holds other people's images and
+    volumes, so a name prefix is mandatory unless the project is being deleted
+    outright, and image deletion is limited to images carrying the matching
+    candidate alias.
+    """
+    if not args.prefix and not args.delete_project:
+        raise Error("--prefix is required unless --delete-project is given")
+
+    def owned(name: str) -> bool:
+        return not args.prefix or name.startswith(args.prefix)
+
     removed: dict[str, list[str]] = {"instances": [], "images": [], "volumes": []}
     for entry in incus_json(["list", f"{args.remote}:"], project=args.project) or []:
+        if not owned(entry["name"]):
+            continue
         incus(["delete", f"{args.remote}:{entry['name']}", "--force"], project=args.project)
         removed["instances"].append(entry["name"])
 
     for entry in incus_json(["image", "list", f"{args.remote}:"], project=args.project) or []:
+        aliases = [alias["name"] for alias in entry.get("aliases") or []]
+        if args.prefix and not any(owned(alias) for alias in aliases):
+            continue
         incus(["image", "delete", f"{args.remote}:{entry['fingerprint']}"], project=args.project)
         removed["images"].append(entry["fingerprint"])
 
     for entry in incus_json(["storage", "volume", "list", f"{args.remote}:{args.pool}"],
                             project=args.project) or []:
-        if entry.get("type") != "custom":
+        if entry.get("type") != "custom" or not owned(entry["name"]):
             continue
         incus(["storage", "volume", "delete", f"{args.remote}:{args.pool}", entry["name"]],
               project=args.project)
@@ -966,6 +1019,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     teardown_cmd.add_argument("--remote", default="local")
     teardown_cmd.add_argument("--project", required=True)
     teardown_cmd.add_argument("--pool", default="data")
+    teardown_cmd.add_argument("--prefix", help="only remove resources whose name starts with this")
     teardown_cmd.add_argument("--delete-project", action="store_true")
 
     return parser.parse_args(argv)

@@ -139,7 +139,8 @@ if ($Role -eq 'desktop') {
     }
 
     $status = Get-Text $driver @('status')
-    Add-Check 'driver-daemon-running' ($status -match 'running') $status | Out-Null
+    Add-Check 'driver-daemon-running' `
+        (($status -match 'running') -and ($status -notmatch 'not running')) $status | Out-Null
 
     $session = -1
     if ($status -match '(?m)session:\s*(\d+)') { $session = [int]$Matches[1] }

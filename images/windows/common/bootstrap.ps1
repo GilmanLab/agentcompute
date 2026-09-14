@@ -295,10 +295,12 @@ function Install-CuaDriver {
             continue
         }
 
-        if ($status -match 'running') { break }
+        # "is not running" contains "running", so require the positive
+        # statement and the absence of the negative one.
+        if ($status -match 'running' -and $status -notmatch 'not running') { break }
     }
 
-    if (-not ($status -match 'running')) {
+    if (-not ($status -match 'running') -or $status -match 'not running') {
         throw "Cua Driver daemon did not come up in the interactive session: $status"
     }
 
