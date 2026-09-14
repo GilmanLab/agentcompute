@@ -290,11 +290,3 @@ func TestPublishBoundedPNGSetsCoordinateScale(t *testing.T) {
 	assert.InDelta(t, 2.5, shot.Scale, 1e-9)
 	assert.NotEmpty(t, shot.URL)
 }
-
-func requireAgentMessage(t *testing.T, err error, message string) {
-	t.Helper()
-	require.Error(t, err)
-	var agent *codemode.AgentError
-	require.ErrorAs(t, err, &agent)
-	assert.Equal(t, message, agent.Message)
-}
