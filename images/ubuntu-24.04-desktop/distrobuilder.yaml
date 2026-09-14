@@ -1,0 +1,282 @@
+image:
+  distribution: ubuntu
+  release: noble
+  architecture: amd64
+  name: ubuntu-24.04-desktop
+  description: Ubuntu 24.04 Xorg desktop VM
+  variant: desktop
+  serial: phase6
+  expiry: 3650d
+source:
+  downloader: rootfs-http
+  url: file:///build/seed.tar
+targets:
+  incus:
+    vm:
+      size: 17179869184
+      filesystem: ext4
+packages:
+  manager: apt
+  update: true
+  cleanup: true
+  sets:
+  - action: install
+    flags:
+    - --no-install-recommends
+    packages:
+    - systemd
+    - systemd-sysv
+    - systemd-resolved
+    - dbus
+    - dbus-user-session
+    - linux-virtual
+    - grub-efi-amd64-signed
+    - shim-signed
+    - efibootmgr
+    - acpid
+    - netplan.io
+    - cloud-initramfs-growroot
+    - tzdata
+    - ca-certificates
+    - util-linux
+    - ubuntu-desktop-minimal
+    - ubuntu-session
+    - gnome-text-editor
+    - tigervnc-scraping-server
+    - libxi6
+    - libxtst6
+    - at-spi2-core
+    - dconf-cli
+files:
+- path: /etc/hostname
+  generator: hostname
+- path: /etc/hosts
+  generator: hosts
+- path: /etc/machine-id
+  generator: dump
+  content: uninitialized
+- path: /var/lib/dbus/machine-id
+  generator: remove
+- name: incus-agent
+  generator: incus-agent
+  types:
+  - vm
+- path: /etc/fstab
+  generator: dump
+  types:
+  - vm
+  content: |-
+    LABEL=rootfs  /         ext4  defaults,x-systemd.growfs  0 1
+    LABEL=UEFI    /boot/efi vfat  umask=0077  0 1
+- path: /etc/netplan/10-incus.yaml
+  generator: dump
+  mode: "0600"
+  types:
+  - vm
+  content: |-
+    network:
+      version: 2
+      renderer: networkd
+      ethernets:
+        id0:
+          match:
+            name: "en*"
+          dhcp4: true
+          dhcp-identifier: mac
+- path: /etc/default/grub.d/50-incus.cfg
+  generator: dump
+  types:
+  - vm
+  content: |-
+    GRUB_RECORDFAIL_TIMEOUT=0
+    GRUB_TIMEOUT=0
+    GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} console=tty1 console=ttyS0"
+    GRUB_TERMINAL=console
+- path: /etc/gdm3/custom.conf
+  generator: dump
+  mode: "0644"
+  content: |-
+    [daemon]
+    WaylandEnable=false
+    AutomaticLoginEnable=true
+    AutomaticLogin=automation
+    DefaultSession=ubuntu-xorg.desktop
+- path: /var/lib/AccountsService/users/automation
+  generator: dump
+  mode: "0644"
+  content: |-
+    [User]
+    Session=ubuntu-xorg
+    XSession=ubuntu-xorg
+    SystemAccount=false
+- path: /etc/dconf/profile/user
+  generator: dump
+  mode: "0644"
+  content: |-
+    user-db:user
+    system-db:local
+    system-db:ibus
+- path: /etc/dconf/db/local.d/00-automation
+  generator: dump
+  mode: "0644"
+  content: |-
+    [org/gnome/desktop/session]
+    idle-delay=uint32 0
+
+    [org/gnome/desktop/screensaver]
+    lock-enabled=false
+    idle-activation-enabled=false
+    lock-delay=uint32 0
+
+    [org/gnome/desktop/lockdown]
+    disable-lock-screen=true
+
+    [org/gnome/settings-daemon/plugins/power]
+    sleep-inactive-ac-type='nothing'
+    sleep-inactive-battery-type='nothing'
+    idle-dim=false
+
+    [org/gnome/shell]
+    welcome-dialog-last-shown-version='4294967295'
+- path: /etc/dconf/db/local.d/locks/00-automation
+  generator: dump
+  mode: "0644"
+  content: |-
+    /org/gnome/desktop/session/idle-delay
+    /org/gnome/desktop/screensaver/lock-enabled
+    /org/gnome/desktop/screensaver/idle-activation-enabled
+    /org/gnome/desktop/lockdown/disable-lock-screen
+- path: /etc/xdg/autostart/gnome-initial-setup-first-login.desktop
+  generator: dump
+  mode: "0644"
+  content: |-
+    [Desktop Entry]
+    Name=GNOME Initial Setup
+    Hidden=true
+- path: /etc/xdg/autostart/gnome-welcome-tour.desktop
+  generator: dump
+  mode: "0644"
+  content: |-
+    [Desktop Entry]
+    Name=GNOME Welcome Tour
+    Hidden=true
+- path: /etc/skel/.config/gnome-initial-setup-done
+  generator: dump
+  mode: "0644"
+  content: |-
+    yes
+- generator: copy
+  source: files/usr/local/libexec/agentcompute-desktop-session
+  path: /usr/local/libexec/agentcompute-desktop-session
+  mode: "0755"
+- generator: copy
+  source: files/usr/lib/systemd/user/cua-driver.service
+  path: /usr/lib/systemd/user/cua-driver.service
+  mode: "0644"
+- generator: copy
+  source: files/usr/lib/systemd/user/x0vncserver.service
+  path: /usr/lib/systemd/user/x0vncserver.service
+  mode: "0644"
+actions:
+- trigger: post-unpack
+  action: |-
+    #!/bin/sh
+    set -eux
+    [ -d /run/systemd ] || exit 0
+    command -v chattr >/dev/null 2>&1 || exit 0
+    rm -Rf /run/systemd/system
+    chattr +i /run/systemd
+- trigger: post-packages
+  action: |-
+    #!/bin/sh
+    set -eux
+    [ -d /run/systemd ] || exit 0
+    command -v chattr >/dev/null 2>&1 || exit 0
+    chattr -i /run/systemd
+- trigger: post-packages
+  action: |-
+    #!/bin/sh
+    set -eux
+    umount -l /etc/resolv.conf || true
+    rm -f /etc/resolv.conf
+    ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+    systemctl enable systemd-resolved
+    systemctl enable systemd-networkd
+    systemctl set-default graphical.target
+    systemctl enable gdm.service || systemctl enable gdm3.service
+    systemctl mask ua-auto-attach || true
+    systemctl mask snapd.service snapd.socket snapd.seeded.service || true
+    systemctl mask cloud-init.service cloud-init-local.service cloud-config.service cloud-final.service || true
+    systemctl mask ssh.service ssh.socket || true
+    systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target || true
+    for pkg in os-prober snapd cloud-init openssh-server; do
+      if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
+        apt-get purge -y "$pkg"
+      fi
+    done
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+    echo UTC > /etc/timezone
+    rm -f /etc/*-
+- trigger: post-packages
+  action: |-
+    #!/bin/sh
+    set -eux
+    if getent passwd 1000 >/dev/null; then
+      existing=$(getent passwd 1000 | cut -d: -f1)
+      [ "$existing" = automation ]
+    else
+      useradd --uid 1000 --user-group --create-home --home-dir /home/automation --shell /bin/bash automation
+    fi
+    for grp in video audio render input plugdev; do
+      getent group "$grp" >/dev/null || continue
+      usermod -aG "$grp" automation
+    done
+    passwd -d automation
+    install -d -m 0755 /home/automation/.config
+    printf 'yes\n' > /home/automation/.config/gnome-initial-setup-done
+    chown -R automation:automation /home/automation
+    install -d -m 0755 /tmp/cua-driver-extract
+    tar --extract --gzip --file /var/cache/agentcompute/cua-driver.tar.gz --directory /tmp/cua-driver-extract
+    if [ -f /tmp/cua-driver-extract/cua-driver ]; then
+      src=/tmp/cua-driver-extract
+    else
+      src=/tmp/cua-driver-extract/cua-driver-rs-0.28.1-linux-x86_64
+    fi
+    [ -f "$src/cua-driver" ]
+    rm -rf /usr/local/lib/cua-driver
+    install -d -m 0755 /usr/local/lib
+    cp -a "$src" /usr/local/lib/cua-driver
+    chown -R root:root /usr/local/lib/cua-driver
+    chmod 0755 /usr/local/lib/cua-driver/cua-driver
+    if [ -f /usr/local/lib/cua-driver/cua-cursor-theme ]; then
+      chmod 0755 /usr/local/lib/cua-driver/cua-cursor-theme
+    fi
+    ln -sfn /usr/local/lib/cua-driver/cua-driver /usr/local/bin/cua-driver
+    rm -rf /tmp/cua-driver-extract /var/cache/agentcompute/cua-driver.tar.gz
+    rmdir /var/cache/agentcompute 2>/dev/null || true
+    echo uninitialized > /etc/machine-id
+    rm -f /var/lib/dbus/machine-id
+    rm -f /etc/apt/apt.conf.d/99agentcompute-build-proxy
+- trigger: post-files
+  action: |-
+    #!/bin/sh
+    set -eux
+    dconf update
+    install -d -m 0755 /etc/systemd/user/graphical-session.target.wants
+    ln -sfn /usr/lib/systemd/user/cua-driver.service /etc/systemd/user/graphical-session.target.wants/cua-driver.service
+    ln -sfn /usr/lib/systemd/user/x0vncserver.service /etc/systemd/user/graphical-session.target.wants/x0vncserver.service
+    chown root:root /usr/local/libexec/agentcompute-desktop-session
+    chmod 0755 /usr/local/libexec/agentcompute-desktop-session
+- trigger: post-files
+  action: |-
+    #!/bin/sh
+    set -eux
+    update-grub
+    grub-install --uefi-secure-boot --target=x86_64-efi --no-nvram --removable
+    grub-install --uefi-secure-boot --target=x86_64-efi --no-nvram
+    update-grub
+    sed -i "s#root=[^ ]*#root=${DISTROBUILDER_ROOT_UUID}#g" /boot/grub/grub.cfg
+  types:
+  - vm
+mappings:
+  architecture_map: debian

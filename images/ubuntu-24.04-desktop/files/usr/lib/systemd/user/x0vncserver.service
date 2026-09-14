@@ -1,0 +1,13 @@
+[Unit]
+Description=x0vncserver on the graphical session
+After=graphical-session-pre.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/agentcompute-desktop-session x0vnc
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

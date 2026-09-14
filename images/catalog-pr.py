@@ -13,6 +13,9 @@ import yaml
 
 REPO = "GilmanLab/agentcompute"
 NAMESPACE = "ghcr.io/gilmanlab/agentcompute"
+IMAGES = ("router", "runner", "runner-publisher", "ubuntu-24.04-desktop")
+DESKTOP_IMAGE = "ubuntu-24.04-desktop"
+DESKTOP_CATALOG = "ubuntu/24.04/desktop"
 
 
 def capture(*args: str, cwd: Path | None = None) -> str:
@@ -23,6 +26,49 @@ def run(*args: str, cwd: Path) -> None:
     subprocess.run(args, cwd=cwd, check=True)
 
 
+def catalog_name(image: str) -> str:
+    if image == DESKTOP_IMAGE:
+        return DESKTOP_CATALOG
+    return image
+
+
+def new_entry(image: str) -> dict:
+    if image == DESKTOP_IMAGE:
+        return {
+            "name": DESKTOP_CATALOG,
+            "os": "ubuntu",
+            "version": "24.04",
+            "kinds": ["vm"],
+            "kind": "vm",
+            "desktop": True,
+            "cpus": 4,
+            "memory_mb": 8192,
+            "disk_gb": 40,
+        }
+    return {
+        "name": image,
+        "os": "ubuntu",
+        "version": "24.04",
+        "kinds": ["vm"],
+        "kind": "vm",
+        "cpus": 4,
+        "memory_mb": 8192,
+        "disk_gb": 40,
+    }
+
+
+def apply_desktop_contract(entry: dict) -> None:
+    entry["name"] = DESKTOP_CATALOG
+    entry["os"] = "ubuntu"
+    entry["version"] = "24.04"
+    entry["kinds"] = ["vm"]
+    entry["kind"] = "vm"
+    entry["desktop"] = True
+    entry["cpus"] = 4
+    entry["memory_mb"] = 8192
+    entry["disk_gb"] = 40
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sha", required=True)
@@ -31,8 +77,8 @@ def main() -> None:
     if not re.fullmatch(r"[0-9a-f]{40}", args.sha):
         raise ValueError("invalid source SHA")
     releases = json.loads(args.releases.read_text())
-    if {item["name"] for item in releases} != {"router", "runner", "runner-publisher"} or len(releases) != 3:
-        raise ValueError("all three qualified image releases are required")
+    if {item["name"] for item in releases} != set(IMAGES) or len(releases) != len(IMAGES):
+        raise ValueError("all four qualified image releases are required")
     for item in releases:
         if item["source_sha"] != args.sha or not re.fullmatch(r"sha256:[0-9a-f]{64}", item["digest"]):
             raise ValueError("invalid qualified release identity")
@@ -58,13 +104,19 @@ def main() -> None:
         changed = False
         for item in releases:
             name = item["name"]
-            entry = entries.get(name)
+            entry_name = catalog_name(name)
+            entry = entries.get(entry_name)
             if entry is None:
                 if name == "router":
                     raise ValueError("router catalog entry is missing")
-                entry = {"name": name, "os": "ubuntu", "version": "24.04", "kinds": ["vm"],
-                         "kind": "vm", "cpus": 4, "memory_mb": 8192, "disk_gb": 40}
+                entry = new_entry(name)
                 catalog["images"].append(entry)
+                entries[entry_name] = entry
+                changed = True
+            if name == DESKTOP_IMAGE:
+                before = json.dumps(entry, sort_keys=True, default=str)
+                apply_desktop_contract(entry)
+                changed |= json.dumps(entry, sort_keys=True, default=str) != before
             reference = f"{NAMESPACE}/{name}@{item['digest']}"
             changed |= entry.get("reference") != reference
             entry["reference"] = reference

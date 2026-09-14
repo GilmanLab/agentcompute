@@ -324,3 +324,11 @@ runner:
   proxy:
     http: http://10.10.10.14:3128
     no_proxy: 10.10.10.14,127.0.0.1,localhost
+# cua-driver-rs-v0.28.1 is a GitHub pre-release (monorepo latest-pointer
+# policy). Exact user-approved pin of the full linux-x86_64 archive, not the
+# binary-only asset and not the curl-pipe installer.
+desktop:
+  cua_driver:
+    version: "0.28.1"
+    url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.28.1/cua-driver-rs-0.28.1-linux-x86_64.tar.gz
+    sha256: a068b6e477893b77ced74bceccf7db7483cf140e8d54150ce5849b6252b90bcf

@@ -1,0 +1,13 @@
+[Unit]
+Description=Cua Driver daemon
+After=graphical-session-pre.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/agentcompute-desktop-session cua-driver
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
