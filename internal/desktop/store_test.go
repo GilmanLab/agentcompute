@@ -111,11 +111,16 @@ func TestScreenshotSizeAndCapacityRejectWithoutEviction(t *testing.T) {
 	pngData := testPNG(t)
 	padded := make([]byte, MaxImageBytes)
 	copy(padded, pngData)
-	_, err := store.Publish("one", now.Add(time.Hour), io.MultiReader(bytes.NewReader(padded), bytes.NewReader([]byte{0})))
+	_, err := store.Publish(
+		"one",
+		now.Add(time.Hour),
+		io.MultiReader(bytes.NewReader(padded), bytes.NewReader([]byte{0})),
+	)
 	require.ErrorContains(t, err, "16 MiB")
 	var urls []string
 	for range 8 {
-		shot, err := store.Publish("one", now.Add(time.Hour), bytes.NewReader(padded))
+		var shot Screenshot
+		shot, err = store.Publish("one", now.Add(time.Hour), bytes.NewReader(padded))
 		require.NoError(t, err)
 		urls = append(urls, shot.URL)
 	}

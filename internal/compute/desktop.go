@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-const desktopJSONLimit = 4 << 20
+const (
+	desktopJSONLimit    = 4 << 20
+	desktopPollInterval = 500 * time.Millisecond
+)
 
 // ExecJSON runs a guest argv with a 4 MiB output bound and rejects truncation.
 // It uses the same draining, deadline, and cancellation path as Exec.
@@ -24,7 +27,7 @@ func (s *Service) ExecJSON(ctx context.Context, req ExecRequest) (ExecResult, er
 }
 
 // ReadBinaryFile opens a guest file for bounded streaming by an internal consumer.
-// Missing files retain os.ErrNotExist so optional screenshots need no text parsing.
+// Missing files retain [os.ErrNotExist] so optional screenshots need no text parsing.
 func (s *Service) ReadBinaryFile(ctx context.Context, ref Ref, path string) (io.ReadCloser, error) {
 	if err := validateRef(ref); err != nil {
 		return nil, err
@@ -68,7 +71,7 @@ func (s *Service) waitDesktop(ctx context.Context, ref Ref) (WaitResult, error) 
 	if err != nil {
 		return result, err
 	}
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(desktopPollInterval)
 	defer ticker.Stop()
 	for {
 		ready, err := s.desktopReady(ctx, ref)

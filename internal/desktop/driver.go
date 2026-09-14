@@ -26,14 +26,20 @@ import (
 )
 
 const (
-	driverBin     = "/usr/local/bin/cua-driver"
-	driverSocket  = "/run/user/1000/cua-driver.sock"
-	driverHome    = "/home/automation"
-	driverRuntime = "/run/user/1000"
-	driverUID     = "1000"
-	vncPort       = "5900"
-	vncTargetPort = int64(5900)
-	nativeOKText  = "[OK]"
+	driverBin             = "/usr/local/bin/cua-driver"
+	driverSocket          = "/run/user/1000/cua-driver.sock"
+	driverHome            = "/home/automation"
+	driverRuntime         = "/run/user/1000"
+	driverUID             = "1000"
+	vncPort               = "5900"
+	vncTargetPort         = int64(5900)
+	nativeOKText          = "[OK]"
+	jsonNull              = "null"
+	emptyJSONObject       = "{}"
+	dataImagePrefix       = "data:image/"
+	guestCleanupTimeout   = 10 * time.Second
+	minImagePayloadLen    = 512
+	imagePayloadSampleLen = 1024
 )
 
 // Driver proxies native Cua Driver CLI calls inside a Linux desktop guest.
@@ -80,8 +86,8 @@ func (d *Driver) Info(ctx context.Context, ref compute.Ref) (Info, error) {
 		return Info{}, err
 	}
 	if !strings.EqualFold(inst.Status, "Running") && !strings.EqualFold(inst.Status, "Ready") {
-		osName, err := d.imageOS(ctx, ref, inst.Image)
-		return Info{OS: osName, Tools: []string{}}, err
+		osName, osErr := d.imageOS(ctx, ref, inst.Image)
+		return Info{OS: osName, Tools: []string{}}, osErr
 	}
 	version, tools, err := d.discoverDocs(ctx, ref)
 	if err != nil {
@@ -193,12 +199,16 @@ func (d *Driver) Call(ctx context.Context, ref compute.Ref, tool, args string) (
 // pass max_dimension through to get_window_state and still honor the bound
 // after the file is pulled. Scale maps returned pixels back to the native
 // window or screen coordinate width, including any resize performed in-guest.
-func (d *Driver) Screenshot(ctx context.Context, ref compute.Ref, pid, windowID, maxDimension int64) (Screenshot, error) {
+func (d *Driver) Screenshot(
+	ctx context.Context,
+	ref compute.Ref,
+	pid, windowID, maxDimension int64,
+) (Screenshot, error) {
 	if err := validateScreenshotArgs(pid, windowID, maxDimension); err != nil {
 		return Screenshot{}, err
 	}
 	tool := "get_desktop_state"
-	payload := "{}"
+	payload := emptyJSONObject
 	if pid != 0 {
 		tool = "get_window_state"
 		body := map[string]any{
@@ -241,7 +251,7 @@ func (d *Driver) Screenshot(ctx context.Context, ref compute.Ref, pid, windowID,
 			Width float64 `json:"width"`
 		} `json:"window_bounds"`
 	}
-	if err := json.Unmarshal([]byte(classified.Result), &dimensions); err != nil {
+	if err = json.Unmarshal([]byte(classified.Result), &dimensions); err != nil {
 		return Screenshot{}, agentError("Driver screenshot metadata is not JSON")
 	}
 	originalWidth := dimensions.ScreenWidth
@@ -326,7 +336,7 @@ func (d *Driver) removeGuestFile(ctx context.Context, ref compute.Ref, path stri
 	if path == "" {
 		return
 	}
-	rmCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	rmCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), guestCleanupTimeout)
 	defer cancel()
 	_, _ = d.compute.ExecJSON(rmCtx, compute.ExecRequest{
 		Ref:  ref,
@@ -337,7 +347,12 @@ func (d *Driver) removeGuestFile(ctx context.Context, ref compute.Ref, path stri
 	})
 }
 
-func (d *Driver) pullScreenshot(ctx context.Context, ref compute.Ref, path string, maxDimension int64) (Screenshot, error) {
+func (d *Driver) pullScreenshot(
+	ctx context.Context,
+	ref compute.Ref,
+	path string,
+	maxDimension int64,
+) (Screenshot, error) {
 	body, err := d.compute.ReadBinaryFile(ctx, ref, path)
 	if err != nil {
 		return Screenshot{}, err
@@ -400,7 +415,7 @@ func validateScreenshotArgs(pid, windowID, maxDimension int64) error {
 func normalizeArgs(args string) (string, error) {
 	trimmed := strings.TrimSpace(args)
 	if trimmed == "" {
-		return "{}", nil
+		return emptyJSONObject, nil
 	}
 	if trimmed[0] != '{' || !json.Valid([]byte(trimmed)) {
 		return "", agentError("args must be a JSON object")
@@ -442,32 +457,32 @@ func classifyCall(exitCode int64, stdout, stderr string) CallResult {
 		if summary == "" {
 			summary = out
 		}
-		return CallResult{OK: false, Summary: summary, Result: "null"}
+		return CallResult{OK: false, Summary: summary, Result: jsonNull}
 	}
 	if out == "" {
-		return CallResult{OK: false, Summary: errText, Result: "null"}
+		return CallResult{OK: false, Summary: errText, Result: jsonNull}
 	}
 	if isNativeOK(out) {
-		return CallResult{OK: true, Summary: out, Result: "null"}
+		return CallResult{OK: true, Summary: out, Result: jsonNull}
 	}
 	decoder := json.NewDecoder(strings.NewReader(out))
 	decoder.UseNumber()
 	var value any
 	if err := decoder.Decode(&value); err != nil {
-		return CallResult{OK: false, Summary: out, Result: "null"}
+		return CallResult{OK: false, Summary: out, Result: jsonNull}
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		return CallResult{OK: false, Summary: out, Result: "null"}
+		return CallResult{OK: false, Summary: out, Result: jsonNull}
 	}
 	switch value.(type) {
 	case map[string]any, []any:
 		encoded, err := marshalJSON(stripImages(value))
 		if err != nil {
-			return CallResult{OK: false, Summary: out, Result: "null"}
+			return CallResult{OK: false, Summary: out, Result: jsonNull}
 		}
 		return CallResult{OK: true, Summary: "structured content", Result: encoded}
 	default:
-		return CallResult{OK: false, Summary: out, Result: "null"}
+		return CallResult{OK: false, Summary: out, Result: jsonNull}
 	}
 }
 
@@ -484,22 +499,7 @@ func isNativeOK(text string) bool {
 func stripImages(v any) any {
 	switch t := v.(type) {
 	case map[string]any:
-		typeName, _ := t["type"].(string)
-		if strings.EqualFold(typeName, "image") {
-			delete(t, "data")
-			if src, ok := t["source"].(map[string]any); ok {
-				delete(src, "data")
-			}
-		}
-		for key, child := range t {
-			if s, ok := child.(string); ok {
-				if strings.HasPrefix(s, "data:image/") || (stripImageKey(key) && looksLikeImagePayload(s)) {
-					delete(t, key)
-					continue
-				}
-			}
-			t[key] = stripImages(child)
-		}
+		stripImageMap(t)
 		return t
 	case []any:
 		for i, child := range t {
@@ -507,7 +507,7 @@ func stripImages(v any) any {
 		}
 		return t
 	case string:
-		if strings.HasPrefix(t, "data:image/") {
+		if strings.HasPrefix(t, dataImagePrefix) {
 			return ""
 		}
 		return t
@@ -516,9 +516,33 @@ func stripImages(v any) any {
 	}
 }
 
+func stripImageMap(m map[string]any) {
+	if typeName, _ := m["type"].(string); strings.EqualFold(typeName, "image") {
+		delete(m, "data")
+		if src, ok := m["source"].(map[string]any); ok {
+			delete(src, "data")
+		}
+	}
+	for key, child := range m {
+		if shouldStripImageValue(key, child) {
+			delete(m, key)
+			continue
+		}
+		m[key] = stripImages(child)
+	}
+}
+
+func shouldStripImageValue(key string, child any) bool {
+	s, ok := child.(string)
+	if !ok {
+		return false
+	}
+	return strings.HasPrefix(s, dataImagePrefix) || (stripImageKey(key) && looksLikeImagePayload(s))
+}
+
 func stripImageKey(key string) bool {
 	switch strings.ToLower(key) {
-	case "screenshot", "image", "image_data", "png", "png_base64",
+	case "screenshot", "image", "image_data", pngFormat, "png_base64",
 		"jpeg", "jpeg_base64", "screenshot_png_b64", "screenshot_base64",
 		"image_base64", "screenshot_data":
 		return true
@@ -528,15 +552,15 @@ func stripImageKey(key string) bool {
 }
 
 func looksLikeImagePayload(s string) bool {
-	if strings.HasPrefix(s, "data:image/") {
+	if strings.HasPrefix(s, dataImagePrefix) {
 		return true
 	}
-	if len(s) < 512 {
+	if len(s) < minImagePayloadLen {
 		return false
 	}
 	sample := s
-	if len(sample) > 1024 {
-		sample = sample[:1024]
+	if len(sample) > imagePayloadSampleLen {
+		sample = sample[:imagePayloadSampleLen]
 	}
 	for _, r := range sample {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '+' || r == '/' || r == '=' || r == '\n' || r == '\r' {
@@ -547,9 +571,15 @@ func looksLikeImagePayload(s string) bool {
 	return true
 }
 
-func publishBoundedPNG(store *Store, sandbox string, expiry time.Time, raw []byte, maxDimension int64) (Screenshot, error) {
+func publishBoundedPNG(
+	store *Store,
+	sandbox string,
+	expiry time.Time,
+	raw []byte,
+	maxDimension int64,
+) (Screenshot, error) {
 	config, format, err := image.DecodeConfig(bytes.NewReader(raw))
-	if err != nil || format != "png" {
+	if err != nil || format != pngFormat {
 		return store.Publish(sandbox, expiry, bytes.NewReader(raw))
 	}
 	if config.Width <= 0 || config.Height <= 0 || int64(config.Width) > maxImagePixels/int64(config.Height) {
@@ -567,7 +597,7 @@ func publishBoundedPNG(store *Store, sandbox string, expiry time.Time, raw []byt
 	payload := raw
 	if bounded != src {
 		var buf bytes.Buffer
-		if err := png.Encode(&buf, bounded); err != nil {
+		if err = png.Encode(&buf, bounded); err != nil {
 			return Screenshot{}, agentError("encode screenshot PNG")
 		}
 		payload = buf.Bytes()
@@ -584,28 +614,24 @@ func publishBoundedPNG(store *Store, sandbox string, expiry time.Time, raw []byt
 
 func boundImage(src image.Image, maxDimension int) image.Image {
 	b := src.Bounds()
-	w, h := b.Dx(), b.Dy()
-	if maxDimension <= 0 || w <= 0 || h <= 0 {
+	w, h := boundsForDimension(b.Dx(), b.Dy(), maxDimension)
+	if w == b.Dx() && h == b.Dy() {
 		return src
 	}
-	long := w
-	if h > long {
-		long = h
-	}
-	if long <= maxDimension {
-		return src
-	}
-	newW := w * maxDimension / long
-	newH := h * maxDimension / long
-	if newW < 1 {
-		newW = 1
-	}
-	if newH < 1 {
-		newH = 1
-	}
-	dst := image.NewNRGBA(image.Rect(0, 0, newW, newH))
+	dst := image.NewNRGBA(image.Rect(0, 0, w, h))
 	draw.CatmullRom.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
 	return dst
+}
+
+func boundsForDimension(width, height, maxDimension int) (int, int) {
+	if maxDimension <= 0 || width <= 0 || height <= 0 {
+		return width, height
+	}
+	long := max(width, height)
+	if long <= maxDimension {
+		return width, height
+	}
+	return max(width*maxDimension/long, 1), max(height*maxDimension/long, 1)
 }
 
 func marshalJSON(v any) (string, error) {
