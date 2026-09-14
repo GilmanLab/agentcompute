@@ -14,7 +14,7 @@ func TestReapRetriesPartialDelete(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
-	expired := expiredSandbox("demo")
+	expired := expiredSandbox()
 	live := liveSandbox("keep")
 
 	tc.backend.EXPECT().ListSandboxes(mock.Anything).Return([]compute.Sandbox{expired, live}, nil).Times(2)
@@ -32,7 +32,7 @@ func TestReapSkipsUnexpiredAfterReread(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
-	listed := expiredSandbox("demo")
+	listed := expiredSandbox()
 	tc.backend.EXPECT().ListSandboxes(mock.Anything).Return([]compute.Sandbox{listed}, nil)
 	tc.backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(liveSandbox("demo"), nil)
 

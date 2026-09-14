@@ -38,6 +38,7 @@ const (
 	versionValue          = "1"
 	projectPrefix         = "ac-"
 	imagesRemoteName      = "images"
+	defaultHost           = "lab01"
 	defaultLogicalNetwork = "default"
 	defaultNICName        = "eth0"
 	rootDeviceName        = "root"
@@ -46,12 +47,19 @@ const (
 	kindVM                = "vm"
 	networkKindBridge     = "bridge"
 	configTrue            = "true"
+	configFalse           = "false"
 	configNone            = "none"
 	configManaged         = "managed"
 	configBlock           = "block"
 	deviceTypeKey         = "type"
 	deviceTypeNIC         = "nic"
 	deviceNetworkKey      = "network"
+	ipv4AddressKey        = "ipv4.address"
+	ipv4NATKey            = "ipv4.nat"
+	ipv4DHCPKey           = "ipv4.dhcp"
+	dnsModeKey            = "dns.mode"
+	addressAuto           = "auto"
+	featuresNetworksKey   = "features.networks"
 	bytesPerMiB           = 1024 * 1024
 	bytesPerGiB           = 1024 * bytesPerMiB
 
@@ -88,23 +96,37 @@ type Options struct {
 
 	// Pool is the storage pool used for explicit root disks.
 	Pool string
+
+	// OVNUplink is the default-project physical network for sandbox OVN networks.
+	OVNUplink string
+
+	// OVNRanges is the external subnet authorization on the physical uplink.
+	OVNRanges string
 }
 
 // Client is the Incus adapter used by compute.Service.
 type Client struct {
-	server incusclient.InstanceServer
-	cfg    *cliconfig.Config
-	host   string
-	pool   string
+	server    incusclient.InstanceServer
+	cfg       *cliconfig.Config
+	host      string
+	pool      string
+	ovnUplink string
+	ovnRanges string
 }
 
 // New connects to Incus and returns a Client.
 func New(ctx context.Context, opts Options) (*Client, error) {
 	if opts.Host == "" {
-		return nil, errors.New("incus host is required")
+		opts.Host = defaultHost
 	}
 	if opts.Pool == "" {
 		return nil, errors.New("incus pool is required")
+	}
+	if opts.OVNUplink == "" {
+		opts.OVNUplink = defaultOVNUplink
+	}
+	if opts.OVNRanges == "" {
+		opts.OVNRanges = defaultOVNRanges
 	}
 
 	cfg, err := cliconfig.LoadConfig("")
@@ -124,10 +146,12 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 	}
 
 	return &Client{
-		server: server,
-		cfg:    cfg,
-		host:   opts.Host,
-		pool:   opts.Pool,
+		server:    server,
+		cfg:       cfg,
+		host:      opts.Host,
+		pool:      opts.Pool,
+		ovnUplink: opts.OVNUplink,
+		ovnRanges: opts.OVNRanges,
 	}, nil
 }
 
@@ -442,13 +466,18 @@ func parseSandbox(project api.Project) (compute.Sandbox, bool) {
 	}
 	created, _ := parseTime(project.Config[metaCreatedAt])
 	expires, _ := parseTime(project.Config[metaExpiresAt])
+	networkKind := networkKindBridge
+	if isTrue(project.Config[featuresNetworksKey]) {
+		networkKind = networkKindOVN
+	}
 	return compute.Sandbox{
-		Name:      name,
-		Platform:  platformIncus,
-		Subject:   project.Config[metaSubject],
-		Host:      project.Config[metaHost],
-		CreatedAt: created,
-		ExpiresAt: expires,
+		Name:        name,
+		Platform:    platformIncus,
+		Subject:     project.Config[metaSubject],
+		Host:        project.Config[metaHost],
+		NetworkKind: networkKind,
+		CreatedAt:   created,
+		ExpiresAt:   expires,
 	}, true
 }
 

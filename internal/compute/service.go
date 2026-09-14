@@ -26,34 +26,34 @@ const (
 
 // Options configures a compute Service.
 type Options struct {
-	// Host is the slice-1 member every new sandbox is pinned to.
+	// Host is the member used to pin bridge-backed sandboxes.
 	Host string
 	// DefaultTTL is used when create or extend omits a TTL. Zero selects 240 minutes.
 	DefaultTTL time.Duration
 	// MaxTTL is the upper bound for create and extend. Zero selects 1440 minutes.
 	MaxTTL time.Duration
+	// DefaultNetworkKind selects ovn or bridge for new sandboxes. Empty selects ovn.
+	DefaultNetworkKind string
 	// Logger receives operational logs. Nil selects a no-op logger.
 	Logger *slog.Logger
 }
 
 // Service orchestrates sandboxes against a Backend and an immutable catalog.
 type Service struct {
-	backend    Backend
-	catalog    *Catalog
-	gate       *gate
-	log        *slog.Logger
-	host       string
-	defaultTTL time.Duration
-	maxTTL     time.Duration
+	backend            Backend
+	catalog            *Catalog
+	gate               *gate
+	log                *slog.Logger
+	host               string
+	defaultTTL         time.Duration
+	maxTTL             time.Duration
+	defaultNetworkKind string
 }
 
-// New constructs a Service. Host is required; zero TTLs select the documented defaults.
+// New constructs a Service. Bridge defaults require Host; zero TTLs select the documented defaults.
 func New(backend Backend, catalog *Catalog, opts Options) (*Service, error) {
 	if backend == nil {
 		return nil, errors.New("backend is required")
-	}
-	if opts.Host == "" {
-		return nil, errors.New("host is required")
 	}
 	if catalog == nil {
 		empty, err := NewCatalog(nil)
@@ -73,14 +73,25 @@ func New(backend Backend, catalog *Catalog, opts Options) (*Service, error) {
 	if resolvedDefault > resolvedMax {
 		return nil, errors.New("default TTL exceeds maximum TTL")
 	}
+	kind := opts.DefaultNetworkKind
+	if kind == "" {
+		kind = kindOVN
+	}
+	if kind != kindBridge && kind != kindOVN {
+		return nil, fmt.Errorf("unsupported default network kind %q", kind)
+	}
+	if kind == kindBridge && opts.Host == "" {
+		return nil, errors.New("host is required for bridge sandboxes")
+	}
 	return &Service{
-		backend:    backend,
-		catalog:    catalog,
-		gate:       newGate(),
-		log:        loggerOrDiscard(opts.Logger),
-		host:       opts.Host,
-		defaultTTL: resolvedDefault,
-		maxTTL:     resolvedMax,
+		backend:            backend,
+		catalog:            catalog,
+		gate:               newGate(),
+		log:                loggerOrDiscard(opts.Logger),
+		host:               opts.Host,
+		defaultTTL:         resolvedDefault,
+		maxTTL:             resolvedMax,
+		defaultNetworkKind: kind,
 	}, nil
 }
 
@@ -343,32 +354,15 @@ func (s *Service) Exec(ctx context.Context, req ExecRequest) (ExecResult, error)
 
 // CreateNetwork creates an additional agent-facing network in a live sandbox.
 func (s *Service) CreateNetwork(ctx context.Context, sandbox string, network Network) (Network, error) {
-	if err := validateName(network.Name); err != nil {
+	network, err := prepareNetwork(network)
+	if err != nil {
 		return Network{}, err
-	}
-	if err := validateNetworkKind(network.Kind); err != nil {
-		return Network{}, err
-	}
-	if network.Kind == "" {
-		network.Kind = kindBridge
 	}
 	var created Network
-	err := s.withLiveSandbox(ctx, sandbox, func(box Sandbox) error {
-		if network.Host == "" {
-			network.Host = box.Host
-		}
-		if network.Host != box.Host {
-			return agentErrorf("host %q is not sandbox member %q", network.Host, box.Host)
-		}
+	err = s.withLiveSandbox(ctx, sandbox, func(box Sandbox) error {
 		var createErr error
-		created, createErr = s.backend.CreateNetwork(ctx, sandbox, network)
-		if createErr != nil {
-			if errors.Is(createErr, ErrNotFound) {
-				return sandboxNotFound(sandbox)
-			}
-			return s.backendError(ctx, "create network", createErr)
-		}
-		return nil
+		created, createErr = s.createPreparedNetwork(ctx, box, sandbox, network)
+		return createErr
 	})
 	if err != nil {
 		return Network{}, err
@@ -426,6 +420,59 @@ func validateAttachment(ref Ref, network, nic string) error {
 	return nil
 }
 
+func prepareNetwork(network Network) (Network, error) {
+	if err := validateName(network.Name); err != nil {
+		return Network{}, err
+	}
+	if err := validateNetworkKind(network.Kind); err != nil {
+		return Network{}, err
+	}
+	if network.CIDR != "" {
+		if err := validateCIDR(network.CIDR); err != nil {
+			return Network{}, err
+		}
+	}
+	if network.Kind == "" {
+		network.Kind = kindOVN
+	}
+	if network.Kind == kindOVN && !network.NAT && network.Gateway != "" {
+		return Network{}, agentError(
+			"nat=false networks have no uplink gateway; attach a router instance or use net.peer",
+		)
+	}
+	return network, nil
+}
+
+func (s *Service) createPreparedNetwork(
+	ctx context.Context,
+	box Sandbox,
+	sandbox string,
+	network Network,
+) (Network, error) {
+	fabric := sandboxNetworkKind(box)
+	if network.Kind != fabric {
+		return Network{}, agentErrorf("cannot create a %q network in a %q sandbox", network.Kind, fabric)
+	}
+	if fabric == kindBridge {
+		if network.Host == "" {
+			network.Host = box.Host
+		}
+		if network.Host != box.Host {
+			return Network{}, agentErrorf("host %q is not sandbox member %q", network.Host, box.Host)
+		}
+	} else {
+		network.Host = ""
+	}
+	created, err := s.backend.CreateNetwork(ctx, sandbox, network)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return Network{}, sandboxNotFound(sandbox)
+		}
+		return Network{}, s.backendError(ctx, "create network", err)
+	}
+	return created, nil
+}
+
 func (s *Service) createGeneratedSandbox(ctx context.Context, ttl time.Duration, subject string) (Sandbox, error) {
 	for range nameGenerateTries {
 		name, err := generateName()
@@ -456,7 +503,8 @@ func (s *Service) createNamedSandbox(
 	}
 	defer unlock()
 
-	if _, err := s.backend.GetSandbox(ctx, name); err == nil {
+	_, err = s.backend.GetSandbox(ctx, name)
+	if err == nil {
 		return Sandbox{}, agentErrorf("sandbox %q already exists", name)
 	} else if !errors.Is(err, ErrNotFound) {
 		return Sandbox{}, s.backendError(ctx, "get sandbox", err)
@@ -464,12 +512,15 @@ func (s *Service) createNamedSandbox(
 
 	now := time.Now()
 	box := Sandbox{
-		Name:      name,
-		Platform:  platformIncus,
-		Subject:   subject,
-		Host:      s.host,
-		CreatedAt: now,
-		ExpiresAt: now.Add(ttl),
+		Name:        name,
+		Platform:    platformIncus,
+		Subject:     subject,
+		NetworkKind: s.defaultNetworkKind,
+		CreatedAt:   now,
+		ExpiresAt:   now.Add(ttl),
+	}
+	if s.defaultNetworkKind == kindBridge {
+		box.Host = s.host
 	}
 	if err := s.backend.CreateSandbox(ctx, box); err != nil {
 		return Sandbox{}, s.backendError(ctx, "create sandbox", err)
@@ -511,14 +562,16 @@ func (s *Service) beginInstance(ctx context.Context, req CreateInstance) (Pendin
 }
 
 func (s *Service) prepareCreate(box Sandbox, req CreateInstance) (CreateInstance, error) {
-	if box.Host == "" {
-		box.Host = s.host
-	}
-	if req.Host == "" {
-		req.Host = box.Host
-	}
-	if req.Host != box.Host {
-		return CreateInstance{}, agentErrorf("host %q is not sandbox member %q", req.Host, box.Host)
+	if isBridgeSandbox(box) {
+		if box.Host == "" {
+			box.Host = s.host
+		}
+		if req.Host == "" {
+			req.Host = box.Host
+		}
+		if req.Host != box.Host {
+			return CreateInstance{}, agentErrorf("host %q is not sandbox member %q", req.Host, box.Host)
+		}
 	}
 	if req.Kind == "" {
 		req.Kind = req.Image.Kind
@@ -635,7 +688,7 @@ func validateInstanceKind(kind string, image CatalogImage) error {
 }
 
 func validateNetworkKind(kind string) error {
-	if kind == "" || kind == kindBridge {
+	if kind == "" || kind == kindBridge || kind == kindOVN {
 		return nil
 	}
 	return agentErrorf("kind %q is not available yet", kind)

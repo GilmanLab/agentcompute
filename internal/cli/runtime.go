@@ -51,6 +51,8 @@ type incusConfig struct {
 	ServerCert string `yaml:"server_cert" toml:"server_cert"`
 	Host       string `yaml:"host"        toml:"host"`
 	Pool       string `yaml:"pool"        toml:"pool"`
+	OVNUplink  string `yaml:"ovn_uplink"  toml:"ovn_uplink"`
+	OVNRanges  string `yaml:"ovn_ranges"  toml:"ovn_ranges"`
 }
 
 type sandboxConfig struct {
@@ -69,61 +71,89 @@ func loadRuntimeConfig(path string) (runtimeConfig, error) {
 		Sandbox: sandboxConfig{
 			DefaultTTLMinutes:  defaultTTLMinutes,
 			MaxTTLMinutes:      maxTTLMinutes,
-			DefaultNetworkKind: "bridge",
+			DefaultNetworkKind: "ovn",
 		},
 		ImagesFile: "images/catalog.yaml",
 	}
 	if path == "" {
 		return cfg, errors.New("configuration is required: use --config or AGENTCOMPUTE_CONFIG")
 	}
+	if err := decodeRuntimeConfig(path, &cfg); err != nil {
+		return cfg, err
+	}
+	if err := validateRuntimeConfig(cfg); err != nil {
+		return cfg, err
+	}
+	resolveRuntimePaths(path, &cfg)
+	return cfg, nil
+}
+
+func decodeRuntimeConfig(path string, cfg *runtimeConfig) error {
 	file, err := os.Open(path)
 	if err != nil {
-		return cfg, fmt.Errorf("open configuration: %w", err)
+		return fmt.Errorf("open configuration: %w", err)
 	}
 	defer file.Close()
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".toml":
-		err = toml.NewDecoder(file).DisallowUnknownFields().Decode(&cfg)
+		err = toml.NewDecoder(file).DisallowUnknownFields().Decode(cfg)
 	case yamlExtension, ".yml":
-		decoder := yaml.NewDecoder(file)
-		decoder.KnownFields(true)
-		err = decoder.Decode(&cfg)
-		if err == nil {
-			var extra any
-			if next := decoder.Decode(&extra); !errors.Is(next, io.EOF) {
-				err = errors.New("configuration must contain exactly one YAML document")
-			}
-		}
+		err = decodeYAMLConfig(file, cfg)
 	default:
 		err = errors.New("configuration must be a .yaml, .yml, or .toml file")
 	}
 	if err != nil {
-		return cfg, fmt.Errorf("decode configuration: %w", err)
+		return fmt.Errorf("decode configuration: %w", err)
 	}
-	if cfg.Incus.Host == "" || cfg.Incus.Pool == "" {
-		return cfg, errors.New("incus.host and incus.pool are required")
+	return nil
+}
+
+func decodeYAMLConfig(r io.Reader, cfg *runtimeConfig) error {
+	decoder := yaml.NewDecoder(r)
+	decoder.KnownFields(true)
+	if err := decoder.Decode(cfg); err != nil {
+		return err
+	}
+	var extra any
+	if next := decoder.Decode(&extra); !errors.Is(next, io.EOF) {
+		return errors.New("configuration must contain exactly one YAML document")
+	}
+	return nil
+}
+
+func validateRuntimeConfig(cfg runtimeConfig) error {
+	if cfg.Incus.Pool == "" {
+		return errors.New("incus.pool is required")
 	}
 	if (cfg.Incus.Remote == "") == (cfg.Incus.URL == "") {
-		return cfg, errors.New("configure exactly one of incus.remote and incus.url")
+		return errors.New("configure exactly one of incus.remote and incus.url")
 	}
-	if cfg.Sandbox.DefaultNetworkKind != "bridge" {
-		return cfg, errors.New("sandbox.default_network_kind must be bridge; OVN is not available yet")
+	if cfg.Sandbox.DefaultNetworkKind != "bridge" && cfg.Sandbox.DefaultNetworkKind != "ovn" {
+		return errors.New("sandbox.default_network_kind must be bridge or ovn")
+	}
+	if cfg.Sandbox.DefaultNetworkKind == "bridge" && cfg.Incus.Host == "" {
+		return errors.New("incus.host is required for bridge sandboxes")
 	}
 	const maxDurationMinutes = int64((1<<63 - 1) / time.Minute)
 	if cfg.Sandbox.DefaultTTLMinutes <= 0 || cfg.Sandbox.MaxTTLMinutes < cfg.Sandbox.DefaultTTLMinutes ||
 		cfg.Sandbox.MaxTTLMinutes > maxDurationMinutes {
-		return cfg, errors.New("sandbox TTL minutes must be positive, representable durations with default <= maximum")
+		return errors.New("sandbox TTL minutes must be positive, representable durations with default <= maximum")
 	}
 	if cfg.ImagesFile == "" {
-		return cfg, errors.New("images_file must not be empty")
+		return errors.New("images_file must not be empty")
 	}
+	return nil
+}
+
+func resolveRuntimePaths(path string, cfg *runtimeConfig) {
 	base := filepath.Dir(path)
-	for _, value := range []*string{&cfg.ImagesFile, &cfg.Incus.ClientCert, &cfg.Incus.ClientKey, &cfg.Incus.ServerCert, &cfg.Screenshots.Dir} {
+	for _, value := range []*string{
+		&cfg.ImagesFile, &cfg.Incus.ClientCert, &cfg.Incus.ClientKey, &cfg.Incus.ServerCert, &cfg.Screenshots.Dir,
+	} {
 		if *value != "" && !filepath.IsAbs(*value) {
 			*value = filepath.Join(base, *value)
 		}
 	}
-	return cfg, nil
 }
 
 func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime, error) {
@@ -139,6 +169,7 @@ func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime
 		Remote: cfg.Incus.Remote, URL: cfg.Incus.URL,
 		ClientCert: cfg.Incus.ClientCert, ClientKey: cfg.Incus.ClientKey, ServerCert: cfg.Incus.ServerCert,
 		Host: cfg.Incus.Host, Pool: cfg.Incus.Pool,
+		OVNUplink: cfg.Incus.OVNUplink, OVNRanges: cfg.Incus.OVNRanges,
 	})
 	if err != nil {
 		return nil, err
@@ -152,10 +183,11 @@ func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime
 		return nil, errors.Join(err, client.Close())
 	}
 	service, err := compute.New(client, catalog, compute.Options{
-		Host:       cfg.Incus.Host,
-		DefaultTTL: time.Duration(cfg.Sandbox.DefaultTTLMinutes) * time.Minute,
-		MaxTTL:     time.Duration(cfg.Sandbox.MaxTTLMinutes) * time.Minute,
-		Logger:     logger,
+		Host:               cfg.Incus.Host,
+		DefaultNetworkKind: cfg.Sandbox.DefaultNetworkKind,
+		DefaultTTL:         time.Duration(cfg.Sandbox.DefaultTTLMinutes) * time.Minute,
+		MaxTTL:             time.Duration(cfg.Sandbox.MaxTTLMinutes) * time.Minute,
+		Logger:             logger,
 	})
 	if err != nil {
 		return nil, errors.Join(err, client.Close())

@@ -63,30 +63,31 @@ func TestListSandboxesEmptyItemsAreNonNil(t *testing.T) {
 	assert.Empty(t, out.Items)
 }
 
-func TestNetCreateRejectsOVN(t *testing.T) {
+func TestNetCreateRejectsUnknownKind(t *testing.T) {
 	t.Parallel()
 
+	kind := "macvlan"
 	_, err := netAPI{}.create(context.Background(), authz.Subject{}, netCreateIn{
 		Sandbox: "demo",
 		Name:    "lan",
-		Kind:    new(kindOVN),
+		Kind:    &kind,
 	})
 	require.Error(t, err)
 	var actionable *codemode.AgentError
 	require.ErrorAs(t, err, &actionable)
 }
 
-func TestNetCreateDefaultsToBridgeAndOmitsPhysicalName(t *testing.T) {
+func TestNetCreateDefaultsToOVNAndOmitsPhysicalName(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestDeps(t)
 	tc.network.EXPECT().
-		CreateNetwork(mock.Anything, "demo", compute.Network{Name: "lan", Kind: kindBridge}).
+		CreateNetwork(mock.Anything, "demo", compute.Network{Name: "lan", Kind: kindOVN, DHCP: true, NAT: true, DNS: true}).
 		Return(compute.Network{
 			Name:         "lan",
-			PhysicalName: "acffffffff",
-			Kind:         kindBridge,
-			CIDR:         "10.1.0.0/24",
+			PhysicalName: "lan",
+			Kind:         kindOVN,
+			CIDR:         "10.1.0.1/24",
 			Gateway:      "10.1.0.1",
 		}, nil)
 
@@ -96,10 +97,10 @@ func TestNetCreateDefaultsToBridgeAndOmitsPhysicalName(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "lan", out.Name)
-	assert.Equal(t, kindBridge, out.Kind)
+	assert.Equal(t, kindOVN, out.Kind)
 	raw, err := json.Marshal(out)
 	require.NoError(t, err)
-	assert.NotContains(t, string(raw), "acffffffff")
+	assert.NotContains(t, string(raw), "PhysicalName")
 }
 
 func TestGetInstanceEmptyCollectionsAreNonNil(t *testing.T) {

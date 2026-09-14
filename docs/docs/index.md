@@ -8,7 +8,7 @@ description: A CodeMode-native Model Context Protocol server.
 
 `agentcompute` is a [CodeMode](https://github.com/meigma/codemode) [Model Context Protocol](https://modelcontextprotocol.io) server. You register typed Go capabilities; an agent uses the fixed `search_api`, `describe_api`, and `execute` MCP tools to discover and compose them in bounded Starlark programs.
 
-Slice 1 manages time-limited Incus container sandboxes: 13 capabilities cover sandbox lifecycle, curated images, instances and bounded exec, and bridge networks. State survives process restarts in Incus project metadata.
+Agentcompute manages time-limited Incus sandboxes with cross-member OVN networking or member-local bridges. Capabilities cover instance lifecycle, bounded exec, files, snapshots, image publishing, peering, ACLs, forwards, and link impairment. State survives process restarts in Incus project metadata.
 
 ## Documentation
 

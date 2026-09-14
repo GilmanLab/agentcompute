@@ -64,12 +64,39 @@ type instanceService interface {
 	GetInstance(ctx context.Context, ref compute.Ref) (compute.Instance, error)
 	DeleteInstance(ctx context.Context, ref compute.Ref) error
 	Exec(ctx context.Context, req compute.ExecRequest) (compute.ExecResult, error)
+	StartInstance(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error)
+	StopInstance(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error)
+	RestartInstance(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error)
+	WaitInstance(ctx context.Context, req compute.WaitRequest) (compute.WaitResult, error)
+	ReadFile(ctx context.Context, req compute.FileReadRequest) (compute.FileReadResult, error)
+	WriteFile(ctx context.Context, req compute.FileWriteRequest) (compute.FileWriteResult, error)
+	CreateSnapshot(ctx context.Context, ref compute.Ref, snapshot string) error
+	RestoreSnapshot(ctx context.Context, ref compute.Ref, snapshot string) error
+	DeleteSnapshot(ctx context.Context, ref compute.Ref, snapshot string) error
+	ListSnapshots(ctx context.Context, ref compute.Ref) ([]compute.Snapshot, error)
+	PublishInstance(ctx context.Context, ref compute.Ref, image string) (string, error)
+	ResolveImage(ctx context.Context, sandbox, name string) (compute.CatalogImage, error)
 }
 
 // networkService is the network surface consumed by net.* handlers.
 type networkService interface {
 	CreateNetwork(ctx context.Context, sandbox string, network compute.Network) (compute.Network, error)
 	AttachNIC(ctx context.Context, ref compute.Ref, network, nic, ip, mac string) (compute.NIC, error)
+	ListNetworks(ctx context.Context, sandbox string) ([]compute.Network, error)
+	GetNetwork(ctx context.Context, sandbox, name string) (compute.Network, error)
+	DeleteNetwork(ctx context.Context, sandbox, name string) error
+	DetachNIC(ctx context.Context, ref compute.Ref, nic string) error
+	PeerNetworks(ctx context.Context, sandbox, network, peer string) error
+	AddACLRule(ctx context.Context, sandbox, network string, rule compute.ACLRule) (compute.ACLRule, error)
+	RemoveACLRule(ctx context.Context, sandbox, network, rule string) error
+	CreateForward(
+		ctx context.Context,
+		sandbox, network string,
+		ref compute.Ref,
+		port, listenPort int64,
+		protocol string,
+	) (compute.Forward, error)
+	ImpairNIC(ctx context.Context, ref compute.Ref, nic string, impairment compute.Impairment) error
 }
 
 // imageService is the catalog surface consumed by image.list and instance.create.

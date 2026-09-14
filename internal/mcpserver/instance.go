@@ -99,12 +99,10 @@ type instanceExecOut struct {
 
 type instanceAPI struct {
 	instances instanceService
-	images    imageService
 }
 
-//nolint:dupl // Explicit typed registrations keep each capability's contract visible.
 func registerInstance(builder *codemode.Builder, deps Dependencies) {
-	api := instanceAPI{instances: deps.Instance, images: deps.Image}
+	api := instanceAPI{instances: deps.Instance}
 	codemode.Register(builder, codemode.Capability[instanceCreateIn, instanceCreateOut]{
 		ID:      capabilityInstanceCreate,
 		Name:    capabilityInstanceCreate,
@@ -135,6 +133,10 @@ func registerInstance(builder *codemode.Builder, deps Dependencies) {
 		Summary: "Run a shell command in an instance.",
 		Handler: api.exec,
 	})
+	registerInstanceLifecycle(builder, api)
+	registerInstanceFiles(builder, api)
+	registerInstanceSnapshots(builder, api)
+	registerInstancePublish(builder, api)
 }
 
 func (api instanceAPI) create(
@@ -142,7 +144,7 @@ func (api instanceAPI) create(
 	_ authz.Subject,
 	in instanceCreateIn,
 ) (instanceCreateOut, error) {
-	image, err := api.images.CatalogImage(in.Image)
+	image, err := api.instances.ResolveImage(ctx, in.Sandbox, in.Image)
 	if err != nil {
 		return instanceCreateOut{}, err
 	}

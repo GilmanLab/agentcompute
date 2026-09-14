@@ -3,6 +3,7 @@ package incus
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	incusclient "github.com/lxc/incus/v7/client"
@@ -11,11 +12,26 @@ import (
 	"github.com/GilmanLab/agentcompute/internal/compute"
 )
 
-// CreateSandbox creates a restricted project and its default all-member bridge.
+// CreateSandbox creates a restricted project and its default network.
 func (c *Client) CreateSandbox(ctx context.Context, sandbox compute.Sandbox) error {
 	if sandbox.Name == "" {
 		return errors.New("sandbox name is required")
 	}
+	kind := sandbox.NetworkKind
+	if kind == "" {
+		kind = networkKindBridge
+	}
+	switch kind {
+	case networkKindOVN:
+		return c.createOVNSandbox(ctx, sandbox)
+	case networkKindBridge:
+		return c.createBridgeSandbox(ctx, sandbox)
+	default:
+		return fmt.Errorf("network kind %q is not available", kind)
+	}
+}
+
+func (c *Client) createBridgeSandbox(ctx context.Context, sandbox compute.Sandbox) error {
 	host := sandbox.Host
 	if host == "" {
 		host = c.host
@@ -39,7 +55,7 @@ func (c *Client) CreateSandbox(ctx context.Context, sandbox compute.Sandbox) err
 		},
 	})
 	if err != nil {
-		return mapError(err)
+		return c.recoverBridgeProjectConflict(ctx, sandbox, host, physical, err)
 	}
 
 	_, err = c.createReservedBridge(ctx, physical, sandbox.Name, defaultLogicalNetwork, compute.Network{
@@ -50,10 +66,67 @@ func (c *Client) CreateSandbox(ctx context.Context, sandbox compute.Sandbox) err
 		NAT:  true,
 		DNS:  true,
 	}, false)
-	if err != nil {
-		return err
+	return err
+}
+
+func (c *Client) recoverBridgeProjectConflict(
+	ctx context.Context,
+	sandbox compute.Sandbox,
+	host, physical string,
+	createErr error,
+) error {
+	if !isConflict(createErr) {
+		return mapError(createErr)
 	}
-	return nil
+	existing, _, getErr := c.getProject(ctx, sandbox.Name)
+	if getErr != nil {
+		return mapError(createErr)
+	}
+	reserved := reservedNetworks(existing.Config)[defaultLogicalNetwork]
+	if reserved == "" {
+		reserved = physical
+	}
+	_, err := c.createReservedBridge(ctx, reserved, sandbox.Name, defaultLogicalNetwork, compute.Network{
+		Name: defaultLogicalNetwork,
+		Kind: networkKindBridge,
+		Host: host,
+		DHCP: true,
+		NAT:  true,
+		DNS:  true,
+	}, true)
+	return err
+}
+
+func (c *Client) createOVNSandbox(ctx context.Context, sandbox compute.Sandbox) error {
+	created := sandbox.CreatedAt.UTC()
+	if created.IsZero() {
+		created = time.Now().UTC()
+	}
+	expires := sandbox.ExpiresAt.UTC()
+	config := ovnProjectConfig(sandbox.Subject, created, expires, c.ovnUplinkName())
+
+	err := c.Scoped(ctx, "", "").CreateProject(api.ProjectsPost{
+		Name: projectName(sandbox.Name),
+		ProjectPut: api.ProjectPut{
+			Config: config,
+		},
+	})
+	if err != nil && !isConflict(err) {
+		return mapError(err)
+	}
+	if isConflict(err) {
+		if _, _, getErr := c.getProject(ctx, sandbox.Name); getErr != nil {
+			return mapError(err)
+		}
+	}
+	_, err = c.createOVNNetwork(ctx, sandbox.Name, compute.Network{
+		Name: defaultLogicalNetwork,
+		Kind: networkKindOVN,
+		DHCP: true,
+		NAT:  true,
+		DNS:  true,
+	})
+	return err
 }
 
 // ListSandboxes returns owned sandbox projects.
@@ -68,7 +141,7 @@ func (c *Client) ListSandboxes(ctx context.Context) ([]compute.Sandbox, error) {
 		if !ok {
 			continue
 		}
-		if sandbox.Host == "" {
+		if sandbox.Host == "" && (sandbox.NetworkKind == "" || sandbox.NetworkKind == networkKindBridge) {
 			sandbox.Host = c.host
 		}
 		out = append(out, sandbox)
@@ -86,7 +159,7 @@ func (c *Client) GetSandbox(ctx context.Context, name string) (compute.Sandbox, 
 	if !ok {
 		return compute.Sandbox{}, compute.ErrNotFound
 	}
-	if sandbox.Host == "" {
+	if sandbox.Host == "" && (sandbox.NetworkKind == "" || sandbox.NetworkKind == networkKindBridge) {
 		sandbox.Host = c.host
 	}
 	return sandbox, nil
@@ -109,54 +182,103 @@ func (c *Client) ExtendSandbox(ctx context.Context, name string, expires time.Ti
 // DeleteSandbox removes sandbox resources in dependency order.
 //
 // Partial failures are returned so the reaper can retry. The project is never
-// deleted while owned bridges still exist.
+// deleted while owned networks still exist.
 func (c *Client) DeleteSandbox(ctx context.Context, name string) error {
 	project, _, projectErr := c.getProject(ctx, name)
 	if projectErr != nil && !errors.Is(projectErr, compute.ErrNotFound) {
 		return projectErr
 	}
-
 	physicals, err := c.sandboxBridgeNames(ctx, name, project)
 	if err != nil {
 		return err
 	}
+	ovns, err := c.ownedOVNNetworks(ctx, name)
+	if err != nil {
+		return err
+	}
+	if err = c.deleteSandboxForwarding(ctx, name, ovns, physicals); err != nil {
+		return err
+	}
+	if project != nil {
+		if err = c.emptySandboxProject(ctx, name); err != nil {
+			return err
+		}
+	}
+	if err = c.deleteSandboxNetworks(ctx, name, ovns, physicals); err != nil {
+		return err
+	}
+	remaining, err := c.ownedOVNNetworks(ctx, name)
+	if err != nil {
+		return err
+	}
+	if len(remaining) > 0 {
+		return errors.New("owned OVN networks still present")
+	}
+	if project != nil {
+		if err = c.deleteSandboxProject(ctx, name); err != nil {
+			return err
+		}
+	}
+	if project == nil && len(physicals) == 0 && len(ovns) == 0 {
+		return compute.ErrNotFound
+	}
+	return nil
+}
+
+func (c *Client) deleteSandboxForwarding(
+	ctx context.Context,
+	sandbox string,
+	ovns []compute.Network,
+	physicals map[string]struct{},
+) error {
 	var errs []error
+	for _, network := range ovns {
+		errs = append(errs, c.deleteForwardsInProject(ctx, projectName(sandbox), network.PhysicalName)...)
+		errs = append(errs, c.deletePeers(ctx, sandbox, network.PhysicalName)...)
+	}
 	for physical := range physicals {
 		errs = append(errs, c.deleteForwards(ctx, physical)...)
 	}
+	return errors.Join(errs...)
+}
 
-	if project != nil {
-		if err := c.deleteProjectContents(ctx, name); err != nil {
+func (c *Client) emptySandboxProject(ctx context.Context, name string) error {
+	if err := c.detachSandboxNICs(ctx, name); err != nil {
+		return err
+	}
+	if err := c.deleteProjectContents(ctx, name); err != nil {
+		return err
+	}
+	return c.clearProfileNetworkRefs(ctx, name)
+}
+
+func (c *Client) deleteSandboxNetworks(
+	ctx context.Context,
+	name string,
+	ovns []compute.Network,
+	physicals map[string]struct{},
+) error {
+	var errs []error
+	for _, network := range ovns {
+		if err := c.deleteOVNNetwork(ctx, name, network.PhysicalName); err != nil {
 			errs = append(errs, err)
 		}
 	}
-
-	var remaining []string
 	for physical := range physicals {
 		if err := c.deleteBridge(ctx, physical); err != nil {
 			errs = append(errs, err)
-			remaining = append(remaining, physical)
 		}
 	}
-	if len(remaining) > 0 {
-		errs = append(errs, errors.New("bridges still present"))
-		return errors.Join(errs...)
-	}
+	return errors.Join(errs...)
+}
 
-	if project != nil {
-		if err := c.Scoped(ctx, "", "").
-			DeleteProject(projectName(name)); err != nil &&
-			!errors.Is(mapError(err), compute.ErrNotFound) {
-			errs = append(errs, mapError(err))
-		}
+func (c *Client) deleteSandboxProject(ctx context.Context, name string) error {
+	if err := errors.Join(c.deleteOwnedACLs(ctx, name)...); err != nil {
+		return err
 	}
-
-	joined := errors.Join(errs...)
-	if joined != nil {
-		return joined
-	}
-	if project == nil && len(physicals) == 0 {
-		return compute.ErrNotFound
+	if err := c.Scoped(ctx, "", "").DeleteProject(projectName(name)); err != nil &&
+		!errors.Is(mapError(err), compute.ErrNotFound) {
+		return mapError(err)
 	}
 	return nil
 }
@@ -167,7 +289,7 @@ func (c *Client) sandboxBridgeNames(
 	project *api.Project,
 ) (map[string]struct{}, error) {
 	physicals := map[string]struct{}{}
-	if project != nil {
+	if project != nil && !featuresNetworks(project) {
 		for _, physical := range reservedNetworks(project.Config) {
 			physicals[physical] = struct{}{}
 		}
@@ -191,12 +313,13 @@ func sandboxProjectConfig(host, physical, subject string, created, expires time.
 	return map[string]string{
 		"features.images":                 configTrue,
 		"features.profiles":               configTrue,
-		"features.networks":               "false",
+		featuresNetworksKey:               configFalse,
 		"restricted":                      configTrue,
 		"restricted.containers.nesting":   configBlock,
 		"restricted.containers.privilege": "unprivileged",
 		"restricted.containers.lowlevel":  configBlock,
-		"restricted.cluster.target":       "allow",
+		"restricted.cluster.target":       aclActionAllow,
+		"restricted.snapshots":            aclActionAllow,
 		"restricted.devices.nic":          configManaged,
 		"restricted.devices.disk":         configManaged,
 		"restricted.devices.gpu":          configBlock,
@@ -217,13 +340,65 @@ func sandboxProjectConfig(host, physical, subject string, created, expires time.
 	}
 }
 
+func ovnProjectConfig(subject string, created, expires time.Time, uplink string) map[string]string {
+	return map[string]string{
+		"features.images":                 configTrue,
+		"features.profiles":               configTrue,
+		featuresNetworksKey:               configTrue,
+		"restricted":                      configTrue,
+		"restricted.containers.nesting":   configBlock,
+		"restricted.containers.privilege": "unprivileged",
+		"restricted.containers.lowlevel":  configBlock,
+		"restricted.cluster.target":       aclActionAllow,
+		"restricted.snapshots":            aclActionAllow,
+		"restricted.devices.nic":          configManaged,
+		"restricted.devices.disk":         configManaged,
+		"restricted.devices.gpu":          configBlock,
+		"restricted.devices.pci":          configBlock,
+		"restricted.devices.proxy":        configBlock,
+		"restricted.devices.usb":          configBlock,
+		"restricted.devices.unix-block":   configBlock,
+		"restricted.devices.unix-char":    configBlock,
+		"restricted.devices.unix-hotplug": configBlock,
+		"restricted.devices.infiniband":   configBlock,
+		"restricted.networks.uplinks":     uplink,
+		metaVersion:                       versionValue,
+		metaCreatedAt:                     created.Format(time.RFC3339Nano),
+		metaExpiresAt:                     expires.Format(time.RFC3339Nano),
+		metaSubject:                       subject,
+	}
+}
+
+func (c *Client) detachSandboxNICs(ctx context.Context, sandbox string) error {
+	instances, err := c.ListInstances(ctx, sandbox)
+	if err != nil && !errors.Is(err, compute.ErrNotFound) {
+		return err
+	}
+	var errs []error
+	for _, instance := range instances {
+		if _, err := c.StopInstance(ctx, instance.Ref, true); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		for _, nic := range instance.NICs {
+			if nic.Name == "" {
+				continue
+			}
+			if err := c.DetachNIC(ctx, instance.Ref, nic.Name); err != nil && !errors.Is(err, compute.ErrNotFound) {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func (c *Client) deleteProjectContents(ctx context.Context, sandbox string) error {
 	srv := c.Scoped(ctx, projectName(sandbox), "")
 	var errs []error
 
 	instances, err := srv.GetInstances(api.InstanceTypeAny)
 	if err != nil && !errors.Is(mapError(err), compute.ErrNotFound) {
-		errs = append(errs, mapError(err))
+		return mapError(err)
 	}
 	for _, instance := range instances {
 		if deleteErr := c.forceDeleteInstance(
@@ -235,10 +410,13 @@ func (c *Client) deleteProjectContents(ctx context.Context, sandbox string) erro
 			errs = append(errs, deleteErr)
 		}
 	}
+	if err = errors.Join(errs...); err != nil {
+		return err
+	}
 
 	images, err := srv.GetImages()
 	if err != nil && !errors.Is(mapError(err), compute.ErrNotFound) {
-		errs = append(errs, mapError(err))
+		return mapError(err)
 	}
 	for _, image := range images {
 		if deleteErr := waitDelete(ctx, func() (incusclient.Operation, error) {
@@ -248,20 +426,52 @@ func (c *Client) deleteProjectContents(ctx context.Context, sandbox string) erro
 		}
 	}
 
+	return errors.Join(errs...)
+}
+
+func (c *Client) clearProfileNetworkRefs(ctx context.Context, sandbox string) error {
+	srv := c.Scoped(ctx, projectName(sandbox), "")
 	profiles, err := srv.GetProfiles()
 	if err != nil && !errors.Is(mapError(err), compute.ErrNotFound) {
-		errs = append(errs, mapError(err))
+		return mapError(err)
 	}
+	var errs []error
 	for _, profile := range profiles {
 		if profile.Name == "default" {
+			if nicErr := stripDefaultProfileNICs(srv, profile); nicErr != nil {
+				errs = append(errs, nicErr)
+			}
 			continue
 		}
-		if err := srv.DeleteProfile(profile.Name); err != nil && !errors.Is(mapError(err), compute.ErrNotFound) {
-			errs = append(errs, mapError(err))
+		if delErr := srv.DeleteProfile(
+			profile.Name,
+		); delErr != nil &&
+			!errors.Is(mapError(delErr), compute.ErrNotFound) {
+			errs = append(errs, mapError(delErr))
 		}
 	}
-
 	return errors.Join(errs...)
+}
+
+func stripDefaultProfileNICs(srv incusclient.InstanceServer, profile api.Profile) error {
+	devices := copyDevices(profile.Devices)
+	changed := false
+	for name, device := range devices {
+		if device[deviceTypeKey] == deviceTypeNIC {
+			delete(devices, name)
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	writable := profile.Writable()
+	writable.Devices = devices
+	if err := srv.UpdateProfile(profile.Name, writable, ""); err != nil &&
+		!errors.Is(mapError(err), compute.ErrNotFound) {
+		return mapError(err)
+	}
+	return nil
 }
 
 func waitDelete(ctx context.Context, fn func() (incusclient.Operation, error)) error {

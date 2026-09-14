@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/meigma/codemode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,6 @@ func TestCreateSandboxZeroTTLUsesOptionsDefault(t *testing.T) {
 	backend.EXPECT().CreateSandbox(mock.Anything, mock.AnythingOfType("compute.Sandbox")).
 		RunAndReturn(func(_ context.Context, box compute.Sandbox) error {
 			assert.WithinDuration(t, time.Now().Add(configured), box.ExpiresAt, time.Second)
-			assert.Equal(t, "lab01", box.Host)
 			return nil
 		})
 
@@ -54,11 +54,13 @@ func TestCreateSandboxGeneratedNameRetriesCollision(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
-	calls := 0
+	collision := ""
 	tc.backend.EXPECT().GetSandbox(mock.Anything, mock.AnythingOfType("string")).
 		RunAndReturn(func(_ context.Context, name string) (compute.Sandbox, error) {
-			calls++
-			if calls == 1 {
+			if collision == "" {
+				collision = name
+			}
+			if name == collision {
 				return compute.Sandbox{Name: name}, nil
 			}
 			return compute.Sandbox{}, compute.ErrNotFound
@@ -67,17 +69,14 @@ func TestCreateSandboxGeneratedNameRetriesCollision(t *testing.T) {
 
 	box, err := tc.service.CreateSandbox(t.Context(), "", 0, "subj")
 	require.NoError(t, err)
-	assert.NotEmpty(t, box.Name)
-	assert.Equal(t, "lab01", box.Host)
-	assert.GreaterOrEqual(t, calls, 2)
-	assert.WithinDuration(t, time.Now().Add(240*time.Minute), box.ExpiresAt, 5*time.Second)
+	assert.NotEqual(t, collision, box.Name)
 }
 
 func TestCreateInstanceRejectsExpiredSandboxAfterGate(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
-	tc.backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(expiredSandbox("demo"), nil)
+	tc.backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(expiredSandbox(), nil)
 
 	_, err := tc.service.CreateInstance(t.Context(), compute.CreateInstance{
 		Ref:   compute.Ref{Sandbox: "demo", Name: "web"},
@@ -132,12 +131,24 @@ func TestCreateInstanceRejectsOtherHost(t *testing.T) {
 	requireAgentMessage(t, err, `host "lab02" is not sandbox member "lab01"`)
 }
 
-func TestCreateNetworkRejectsOVN(t *testing.T) {
+func TestCreateNetworkRejectsMixedKind(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
+	tc.backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(liveSandbox("demo"), nil)
 	_, err := tc.service.CreateNetwork(t.Context(), "demo", compute.Network{Name: "lan", Kind: "ovn"})
-	requireAgentMessage(t, err, `kind "ovn" is not available yet`)
+	requireAgentMessage(t, err, `cannot create a "ovn" network in a "bridge" sandbox`)
+}
+
+func TestCreateNetworkRejectsBridgeInOVNSandbox(t *testing.T) {
+	t.Parallel()
+
+	tc := newTestContext(t)
+	box := liveSandbox("demo")
+	box.NetworkKind = "ovn"
+	tc.backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(box, nil)
+	_, err := tc.service.CreateNetwork(t.Context(), "demo", compute.Network{Name: "lan", Kind: "bridge"})
+	requireAgentMessage(t, err, `cannot create a "bridge" network in a "ovn" sandbox`)
 }
 
 func TestCreateInstanceRejectsMacPlatform(t *testing.T) {
@@ -231,4 +242,82 @@ func TestDeleteSandboxMarksExpiryThenDeletes(t *testing.T) {
 	tc.backend.EXPECT().DeleteSandbox(mock.Anything, "demo").Return(nil)
 
 	require.NoError(t, tc.service.DeleteSandbox(t.Context(), "demo"))
+}
+
+func TestCreateInstanceOVNLeavesHostEmpty(t *testing.T) {
+	t.Parallel()
+
+	tc := newTestContext(t)
+	box := liveSandbox("demo")
+	box.NetworkKind = "ovn"
+	box.Host = ""
+	pending := mocks.NewMockPendingInstance(t)
+	pending.EXPECT().Wait(mock.Anything).Return(runningInstance(), nil)
+	tc.backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(box, nil)
+	tc.backend.EXPECT().GetInstance(mock.Anything, compute.Ref{Sandbox: "demo", Name: "web"}).
+		Return(compute.Instance{}, compute.ErrNotFound)
+	tc.backend.EXPECT().
+		BeginCreateInstance(mock.Anything, mock.MatchedBy(func(req compute.CreateInstance) bool {
+			return req.Host == "" && req.Network == "default"
+		})).
+		Return(pending, nil)
+
+	_, err := tc.service.CreateInstance(t.Context(), compute.CreateInstance{
+		Ref:   compute.Ref{Sandbox: "demo", Name: "web"},
+		Image: routerImage(),
+		Kind:  "container",
+		Start: true,
+	})
+	require.NoError(t, err)
+}
+
+func TestRemoveACLRuleRejectsBaseline(t *testing.T) {
+	t.Parallel()
+
+	tc := newTestContext(t)
+	for _, id := range []string{compute.BaselineEgressMgmt, compute.BaselineEgressOOB} {
+		err := tc.service.RemoveACLRule(t.Context(), "demo", "default", id)
+		var agentErr *codemode.AgentError
+		require.ErrorAs(t, err, &agentErr)
+	}
+}
+
+func TestImpairRejectsJitterWithoutLatency(t *testing.T) {
+	t.Parallel()
+
+	tc := newTestContext(t)
+	err := tc.service.ImpairNIC(t.Context(), compute.Ref{Sandbox: "demo", Name: "web"}, "eth0", compute.Impairment{
+		JitterMS: 5,
+	})
+	requireAgentMessage(t, err, "jitter_ms requires latency_ms")
+}
+
+func TestACLAllowsCannotOverrideBaseline(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name      string
+		direction string
+		dst       string
+	}{
+		{name: "wildcard", direction: "egress"},
+		{name: "supernet", direction: "egress", dst: "10.0.0.0/8"},
+		{name: "management subset", direction: "egress", dst: "10.10.10.128/25"},
+		{name: "OOB host", direction: "egress", dst: "10.10.70.20"},
+		{name: "mapped prefix", direction: "egress", dst: "::ffff:10.10.10.0/120"},
+		{name: "unbounded selector", direction: "egress", dst: "@external"},
+		{name: "reversed ingress", direction: "ingress"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			tc := newTestContext(t)
+			_, err := tc.service.AddACLRule(t.Context(), "demo", "default", compute.ACLRule{
+				Direction: test.direction,
+				Action:    "allow",
+				Dst:       test.dst,
+			})
+			var agentErr *codemode.AgentError
+			require.ErrorAs(t, err, &agentErr)
+		})
+	}
 }

@@ -76,7 +76,7 @@ type MocksandboxService_CreateSandbox_Call struct {
 //   - name string
 //   - ttl time.Duration
 //   - subject string
-func (_e *MocksandboxService_Expecter) CreateSandbox(ctx any, name any, ttl any, subject any) *MocksandboxService_CreateSandbox_Call {
+func (_e *MocksandboxService_Expecter) CreateSandbox(ctx interface{}, name interface{}, ttl interface{}, subject interface{}) *MocksandboxService_CreateSandbox_Call {
 	return &MocksandboxService_CreateSandbox_Call{Call: _e.mock.On("CreateSandbox", ctx, name, ttl, subject)}
 }
 
@@ -143,7 +143,7 @@ type MocksandboxService_DeleteSandbox_Call struct {
 // DeleteSandbox is a helper method to define mock.On call
 //   - ctx context.Context
 //   - name string
-func (_e *MocksandboxService_Expecter) DeleteSandbox(ctx any, name any) *MocksandboxService_DeleteSandbox_Call {
+func (_e *MocksandboxService_Expecter) DeleteSandbox(ctx interface{}, name interface{}) *MocksandboxService_DeleteSandbox_Call {
 	return &MocksandboxService_DeleteSandbox_Call{Call: _e.mock.On("DeleteSandbox", ctx, name)}
 }
 
@@ -210,7 +210,7 @@ type MocksandboxService_ExtendSandbox_Call struct {
 //   - ctx context.Context
 //   - name string
 //   - ttl time.Duration
-func (_e *MocksandboxService_Expecter) ExtendSandbox(ctx any, name any, ttl any) *MocksandboxService_ExtendSandbox_Call {
+func (_e *MocksandboxService_Expecter) ExtendSandbox(ctx interface{}, name interface{}, ttl interface{}) *MocksandboxService_ExtendSandbox_Call {
 	return &MocksandboxService_ExtendSandbox_Call{Call: _e.mock.On("ExtendSandbox", ctx, name, ttl)}
 }
 
@@ -297,7 +297,7 @@ type MocksandboxService_GetSandbox_Call struct {
 // GetSandbox is a helper method to define mock.On call
 //   - ctx context.Context
 //   - name string
-func (_e *MocksandboxService_Expecter) GetSandbox(ctx any, name any) *MocksandboxService_GetSandbox_Call {
+func (_e *MocksandboxService_Expecter) GetSandbox(ctx interface{}, name interface{}) *MocksandboxService_GetSandbox_Call {
 	return &MocksandboxService_GetSandbox_Call{Call: _e.mock.On("GetSandbox", ctx, name)}
 }
 
@@ -364,7 +364,7 @@ type MocksandboxService_ListSandboxes_Call struct {
 
 // ListSandboxes is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MocksandboxService_Expecter) ListSandboxes(ctx any) *MocksandboxService_ListSandboxes_Call {
+func (_e *MocksandboxService_Expecter) ListSandboxes(ctx interface{}) *MocksandboxService_ListSandboxes_Call {
 	return &MocksandboxService_ListSandboxes_Call{Call: _e.mock.On("ListSandboxes", ctx)}
 }
 
@@ -452,7 +452,7 @@ type MockinstanceService_CreateInstance_Call struct {
 // CreateInstance is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req compute.CreateInstance
-func (_e *MockinstanceService_Expecter) CreateInstance(ctx any, req any) *MockinstanceService_CreateInstance_Call {
+func (_e *MockinstanceService_Expecter) CreateInstance(ctx interface{}, req interface{}) *MockinstanceService_CreateInstance_Call {
 	return &MockinstanceService_CreateInstance_Call{Call: _e.mock.On("CreateInstance", ctx, req)}
 }
 
@@ -484,6 +484,69 @@ func (_c *MockinstanceService_CreateInstance_Call) RunAndReturn(run func(ctx con
 	return _c
 }
 
+// CreateSnapshot provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) CreateSnapshot(ctx context.Context, ref compute.Ref, snapshot string) error {
+	ret := _mock.Called(ctx, ref, snapshot)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateSnapshot")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) error); ok {
+		r0 = returnFunc(ctx, ref, snapshot)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockinstanceService_CreateSnapshot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateSnapshot'
+type MockinstanceService_CreateSnapshot_Call struct {
+	*mock.Call
+}
+
+// CreateSnapshot is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - snapshot string
+func (_e *MockinstanceService_Expecter) CreateSnapshot(ctx interface{}, ref interface{}, snapshot interface{}) *MockinstanceService_CreateSnapshot_Call {
+	return &MockinstanceService_CreateSnapshot_Call{Call: _e.mock.On("CreateSnapshot", ctx, ref, snapshot)}
+}
+
+func (_c *MockinstanceService_CreateSnapshot_Call) Run(run func(ctx context.Context, ref compute.Ref, snapshot string)) *MockinstanceService_CreateSnapshot_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_CreateSnapshot_Call) Return(err error) *MockinstanceService_CreateSnapshot_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockinstanceService_CreateSnapshot_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, snapshot string) error) *MockinstanceService_CreateSnapshot_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteInstance provides a mock function for the type MockinstanceService
 func (_mock *MockinstanceService) DeleteInstance(ctx context.Context, ref compute.Ref) error {
 	ret := _mock.Called(ctx, ref)
@@ -509,7 +572,7 @@ type MockinstanceService_DeleteInstance_Call struct {
 // DeleteInstance is a helper method to define mock.On call
 //   - ctx context.Context
 //   - ref compute.Ref
-func (_e *MockinstanceService_Expecter) DeleteInstance(ctx any, ref any) *MockinstanceService_DeleteInstance_Call {
+func (_e *MockinstanceService_Expecter) DeleteInstance(ctx interface{}, ref interface{}) *MockinstanceService_DeleteInstance_Call {
 	return &MockinstanceService_DeleteInstance_Call{Call: _e.mock.On("DeleteInstance", ctx, ref)}
 }
 
@@ -537,6 +600,69 @@ func (_c *MockinstanceService_DeleteInstance_Call) Return(err error) *Mockinstan
 }
 
 func (_c *MockinstanceService_DeleteInstance_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref) error) *MockinstanceService_DeleteInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteSnapshot provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) DeleteSnapshot(ctx context.Context, ref compute.Ref, snapshot string) error {
+	ret := _mock.Called(ctx, ref, snapshot)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteSnapshot")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) error); ok {
+		r0 = returnFunc(ctx, ref, snapshot)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockinstanceService_DeleteSnapshot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteSnapshot'
+type MockinstanceService_DeleteSnapshot_Call struct {
+	*mock.Call
+}
+
+// DeleteSnapshot is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - snapshot string
+func (_e *MockinstanceService_Expecter) DeleteSnapshot(ctx interface{}, ref interface{}, snapshot interface{}) *MockinstanceService_DeleteSnapshot_Call {
+	return &MockinstanceService_DeleteSnapshot_Call{Call: _e.mock.On("DeleteSnapshot", ctx, ref, snapshot)}
+}
+
+func (_c *MockinstanceService_DeleteSnapshot_Call) Run(run func(ctx context.Context, ref compute.Ref, snapshot string)) *MockinstanceService_DeleteSnapshot_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_DeleteSnapshot_Call) Return(err error) *MockinstanceService_DeleteSnapshot_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockinstanceService_DeleteSnapshot_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, snapshot string) error) *MockinstanceService_DeleteSnapshot_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -575,7 +701,7 @@ type MockinstanceService_Exec_Call struct {
 // Exec is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req compute.ExecRequest
-func (_e *MockinstanceService_Expecter) Exec(ctx any, req any) *MockinstanceService_Exec_Call {
+func (_e *MockinstanceService_Expecter) Exec(ctx interface{}, req interface{}) *MockinstanceService_Exec_Call {
 	return &MockinstanceService_Exec_Call{Call: _e.mock.On("Exec", ctx, req)}
 }
 
@@ -641,7 +767,7 @@ type MockinstanceService_GetInstance_Call struct {
 // GetInstance is a helper method to define mock.On call
 //   - ctx context.Context
 //   - ref compute.Ref
-func (_e *MockinstanceService_Expecter) GetInstance(ctx any, ref any) *MockinstanceService_GetInstance_Call {
+func (_e *MockinstanceService_Expecter) GetInstance(ctx interface{}, ref interface{}) *MockinstanceService_GetInstance_Call {
 	return &MockinstanceService_GetInstance_Call{Call: _e.mock.On("GetInstance", ctx, ref)}
 }
 
@@ -709,7 +835,7 @@ type MockinstanceService_ListInstances_Call struct {
 // ListInstances is a helper method to define mock.On call
 //   - ctx context.Context
 //   - sandbox string
-func (_e *MockinstanceService_Expecter) ListInstances(ctx any, sandbox any) *MockinstanceService_ListInstances_Call {
+func (_e *MockinstanceService_Expecter) ListInstances(ctx interface{}, sandbox interface{}) *MockinstanceService_ListInstances_Call {
 	return &MockinstanceService_ListInstances_Call{Call: _e.mock.On("ListInstances", ctx, sandbox)}
 }
 
@@ -741,6 +867,695 @@ func (_c *MockinstanceService_ListInstances_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// ListSnapshots provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) ListSnapshots(ctx context.Context, ref compute.Ref) ([]compute.Snapshot, error) {
+	ret := _mock.Called(ctx, ref)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListSnapshots")
+	}
+
+	var r0 []compute.Snapshot
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref) ([]compute.Snapshot, error)); ok {
+		return returnFunc(ctx, ref)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref) []compute.Snapshot); ok {
+		r0 = returnFunc(ctx, ref)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]compute.Snapshot)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref) error); ok {
+		r1 = returnFunc(ctx, ref)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_ListSnapshots_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListSnapshots'
+type MockinstanceService_ListSnapshots_Call struct {
+	*mock.Call
+}
+
+// ListSnapshots is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+func (_e *MockinstanceService_Expecter) ListSnapshots(ctx interface{}, ref interface{}) *MockinstanceService_ListSnapshots_Call {
+	return &MockinstanceService_ListSnapshots_Call{Call: _e.mock.On("ListSnapshots", ctx, ref)}
+}
+
+func (_c *MockinstanceService_ListSnapshots_Call) Run(run func(ctx context.Context, ref compute.Ref)) *MockinstanceService_ListSnapshots_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_ListSnapshots_Call) Return(snapshots []compute.Snapshot, err error) *MockinstanceService_ListSnapshots_Call {
+	_c.Call.Return(snapshots, err)
+	return _c
+}
+
+func (_c *MockinstanceService_ListSnapshots_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref) ([]compute.Snapshot, error)) *MockinstanceService_ListSnapshots_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishInstance provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) PublishInstance(ctx context.Context, ref compute.Ref, image string) (string, error) {
+	ret := _mock.Called(ctx, ref, image)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishInstance")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) (string, error)); ok {
+		return returnFunc(ctx, ref, image)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) string); ok {
+		r0 = returnFunc(ctx, ref, image)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref, string) error); ok {
+		r1 = returnFunc(ctx, ref, image)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_PublishInstance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishInstance'
+type MockinstanceService_PublishInstance_Call struct {
+	*mock.Call
+}
+
+// PublishInstance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - image string
+func (_e *MockinstanceService_Expecter) PublishInstance(ctx interface{}, ref interface{}, image interface{}) *MockinstanceService_PublishInstance_Call {
+	return &MockinstanceService_PublishInstance_Call{Call: _e.mock.On("PublishInstance", ctx, ref, image)}
+}
+
+func (_c *MockinstanceService_PublishInstance_Call) Run(run func(ctx context.Context, ref compute.Ref, image string)) *MockinstanceService_PublishInstance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_PublishInstance_Call) Return(s string, err error) *MockinstanceService_PublishInstance_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockinstanceService_PublishInstance_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, image string) (string, error)) *MockinstanceService_PublishInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadFile provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) ReadFile(ctx context.Context, req compute.FileReadRequest) (compute.FileReadResult, error) {
+	ret := _mock.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadFile")
+	}
+
+	var r0 compute.FileReadResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.FileReadRequest) (compute.FileReadResult, error)); ok {
+		return returnFunc(ctx, req)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.FileReadRequest) compute.FileReadResult); ok {
+		r0 = returnFunc(ctx, req)
+	} else {
+		r0 = ret.Get(0).(compute.FileReadResult)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.FileReadRequest) error); ok {
+		r1 = returnFunc(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_ReadFile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadFile'
+type MockinstanceService_ReadFile_Call struct {
+	*mock.Call
+}
+
+// ReadFile is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req compute.FileReadRequest
+func (_e *MockinstanceService_Expecter) ReadFile(ctx interface{}, req interface{}) *MockinstanceService_ReadFile_Call {
+	return &MockinstanceService_ReadFile_Call{Call: _e.mock.On("ReadFile", ctx, req)}
+}
+
+func (_c *MockinstanceService_ReadFile_Call) Run(run func(ctx context.Context, req compute.FileReadRequest)) *MockinstanceService_ReadFile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.FileReadRequest
+		if args[1] != nil {
+			arg1 = args[1].(compute.FileReadRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_ReadFile_Call) Return(fileReadResult compute.FileReadResult, err error) *MockinstanceService_ReadFile_Call {
+	_c.Call.Return(fileReadResult, err)
+	return _c
+}
+
+func (_c *MockinstanceService_ReadFile_Call) RunAndReturn(run func(ctx context.Context, req compute.FileReadRequest) (compute.FileReadResult, error)) *MockinstanceService_ReadFile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ResolveImage provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) ResolveImage(ctx context.Context, sandbox string, name string) (compute.CatalogImage, error) {
+	ret := _mock.Called(ctx, sandbox, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResolveImage")
+	}
+
+	var r0 compute.CatalogImage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (compute.CatalogImage, error)); ok {
+		return returnFunc(ctx, sandbox, name)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) compute.CatalogImage); ok {
+		r0 = returnFunc(ctx, sandbox, name)
+	} else {
+		r0 = ret.Get(0).(compute.CatalogImage)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, sandbox, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_ResolveImage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResolveImage'
+type MockinstanceService_ResolveImage_Call struct {
+	*mock.Call
+}
+
+// ResolveImage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sandbox string
+//   - name string
+func (_e *MockinstanceService_Expecter) ResolveImage(ctx interface{}, sandbox interface{}, name interface{}) *MockinstanceService_ResolveImage_Call {
+	return &MockinstanceService_ResolveImage_Call{Call: _e.mock.On("ResolveImage", ctx, sandbox, name)}
+}
+
+func (_c *MockinstanceService_ResolveImage_Call) Run(run func(ctx context.Context, sandbox string, name string)) *MockinstanceService_ResolveImage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_ResolveImage_Call) Return(catalogImage compute.CatalogImage, err error) *MockinstanceService_ResolveImage_Call {
+	_c.Call.Return(catalogImage, err)
+	return _c
+}
+
+func (_c *MockinstanceService_ResolveImage_Call) RunAndReturn(run func(ctx context.Context, sandbox string, name string) (compute.CatalogImage, error)) *MockinstanceService_ResolveImage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RestartInstance provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) RestartInstance(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error) {
+	ret := _mock.Called(ctx, ref, force)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RestartInstance")
+	}
+
+	var r0 compute.Instance
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, bool) (compute.Instance, error)); ok {
+		return returnFunc(ctx, ref, force)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, bool) compute.Instance); ok {
+		r0 = returnFunc(ctx, ref, force)
+	} else {
+		r0 = ret.Get(0).(compute.Instance)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref, bool) error); ok {
+		r1 = returnFunc(ctx, ref, force)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_RestartInstance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RestartInstance'
+type MockinstanceService_RestartInstance_Call struct {
+	*mock.Call
+}
+
+// RestartInstance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - force bool
+func (_e *MockinstanceService_Expecter) RestartInstance(ctx interface{}, ref interface{}, force interface{}) *MockinstanceService_RestartInstance_Call {
+	return &MockinstanceService_RestartInstance_Call{Call: _e.mock.On("RestartInstance", ctx, ref, force)}
+}
+
+func (_c *MockinstanceService_RestartInstance_Call) Run(run func(ctx context.Context, ref compute.Ref, force bool)) *MockinstanceService_RestartInstance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_RestartInstance_Call) Return(instance compute.Instance, err error) *MockinstanceService_RestartInstance_Call {
+	_c.Call.Return(instance, err)
+	return _c
+}
+
+func (_c *MockinstanceService_RestartInstance_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error)) *MockinstanceService_RestartInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RestoreSnapshot provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) RestoreSnapshot(ctx context.Context, ref compute.Ref, snapshot string) error {
+	ret := _mock.Called(ctx, ref, snapshot)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RestoreSnapshot")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) error); ok {
+		r0 = returnFunc(ctx, ref, snapshot)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockinstanceService_RestoreSnapshot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RestoreSnapshot'
+type MockinstanceService_RestoreSnapshot_Call struct {
+	*mock.Call
+}
+
+// RestoreSnapshot is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - snapshot string
+func (_e *MockinstanceService_Expecter) RestoreSnapshot(ctx interface{}, ref interface{}, snapshot interface{}) *MockinstanceService_RestoreSnapshot_Call {
+	return &MockinstanceService_RestoreSnapshot_Call{Call: _e.mock.On("RestoreSnapshot", ctx, ref, snapshot)}
+}
+
+func (_c *MockinstanceService_RestoreSnapshot_Call) Run(run func(ctx context.Context, ref compute.Ref, snapshot string)) *MockinstanceService_RestoreSnapshot_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_RestoreSnapshot_Call) Return(err error) *MockinstanceService_RestoreSnapshot_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockinstanceService_RestoreSnapshot_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, snapshot string) error) *MockinstanceService_RestoreSnapshot_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StartInstance provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) StartInstance(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error) {
+	ret := _mock.Called(ctx, ref, force)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StartInstance")
+	}
+
+	var r0 compute.Instance
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, bool) (compute.Instance, error)); ok {
+		return returnFunc(ctx, ref, force)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, bool) compute.Instance); ok {
+		r0 = returnFunc(ctx, ref, force)
+	} else {
+		r0 = ret.Get(0).(compute.Instance)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref, bool) error); ok {
+		r1 = returnFunc(ctx, ref, force)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_StartInstance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartInstance'
+type MockinstanceService_StartInstance_Call struct {
+	*mock.Call
+}
+
+// StartInstance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - force bool
+func (_e *MockinstanceService_Expecter) StartInstance(ctx interface{}, ref interface{}, force interface{}) *MockinstanceService_StartInstance_Call {
+	return &MockinstanceService_StartInstance_Call{Call: _e.mock.On("StartInstance", ctx, ref, force)}
+}
+
+func (_c *MockinstanceService_StartInstance_Call) Run(run func(ctx context.Context, ref compute.Ref, force bool)) *MockinstanceService_StartInstance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_StartInstance_Call) Return(instance compute.Instance, err error) *MockinstanceService_StartInstance_Call {
+	_c.Call.Return(instance, err)
+	return _c
+}
+
+func (_c *MockinstanceService_StartInstance_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error)) *MockinstanceService_StartInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StopInstance provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) StopInstance(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error) {
+	ret := _mock.Called(ctx, ref, force)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopInstance")
+	}
+
+	var r0 compute.Instance
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, bool) (compute.Instance, error)); ok {
+		return returnFunc(ctx, ref, force)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, bool) compute.Instance); ok {
+		r0 = returnFunc(ctx, ref, force)
+	} else {
+		r0 = ret.Get(0).(compute.Instance)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref, bool) error); ok {
+		r1 = returnFunc(ctx, ref, force)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_StopInstance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopInstance'
+type MockinstanceService_StopInstance_Call struct {
+	*mock.Call
+}
+
+// StopInstance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - force bool
+func (_e *MockinstanceService_Expecter) StopInstance(ctx interface{}, ref interface{}, force interface{}) *MockinstanceService_StopInstance_Call {
+	return &MockinstanceService_StopInstance_Call{Call: _e.mock.On("StopInstance", ctx, ref, force)}
+}
+
+func (_c *MockinstanceService_StopInstance_Call) Run(run func(ctx context.Context, ref compute.Ref, force bool)) *MockinstanceService_StopInstance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_StopInstance_Call) Return(instance compute.Instance, err error) *MockinstanceService_StopInstance_Call {
+	_c.Call.Return(instance, err)
+	return _c
+}
+
+func (_c *MockinstanceService_StopInstance_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, force bool) (compute.Instance, error)) *MockinstanceService_StopInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WaitInstance provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) WaitInstance(ctx context.Context, req compute.WaitRequest) (compute.WaitResult, error) {
+	ret := _mock.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WaitInstance")
+	}
+
+	var r0 compute.WaitResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.WaitRequest) (compute.WaitResult, error)); ok {
+		return returnFunc(ctx, req)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.WaitRequest) compute.WaitResult); ok {
+		r0 = returnFunc(ctx, req)
+	} else {
+		r0 = ret.Get(0).(compute.WaitResult)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.WaitRequest) error); ok {
+		r1 = returnFunc(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_WaitInstance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitInstance'
+type MockinstanceService_WaitInstance_Call struct {
+	*mock.Call
+}
+
+// WaitInstance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req compute.WaitRequest
+func (_e *MockinstanceService_Expecter) WaitInstance(ctx interface{}, req interface{}) *MockinstanceService_WaitInstance_Call {
+	return &MockinstanceService_WaitInstance_Call{Call: _e.mock.On("WaitInstance", ctx, req)}
+}
+
+func (_c *MockinstanceService_WaitInstance_Call) Run(run func(ctx context.Context, req compute.WaitRequest)) *MockinstanceService_WaitInstance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.WaitRequest
+		if args[1] != nil {
+			arg1 = args[1].(compute.WaitRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_WaitInstance_Call) Return(waitResult compute.WaitResult, err error) *MockinstanceService_WaitInstance_Call {
+	_c.Call.Return(waitResult, err)
+	return _c
+}
+
+func (_c *MockinstanceService_WaitInstance_Call) RunAndReturn(run func(ctx context.Context, req compute.WaitRequest) (compute.WaitResult, error)) *MockinstanceService_WaitInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WriteFile provides a mock function for the type MockinstanceService
+func (_mock *MockinstanceService) WriteFile(ctx context.Context, req compute.FileWriteRequest) (compute.FileWriteResult, error) {
+	ret := _mock.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WriteFile")
+	}
+
+	var r0 compute.FileWriteResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.FileWriteRequest) (compute.FileWriteResult, error)); ok {
+		return returnFunc(ctx, req)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.FileWriteRequest) compute.FileWriteResult); ok {
+		r0 = returnFunc(ctx, req)
+	} else {
+		r0 = ret.Get(0).(compute.FileWriteResult)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.FileWriteRequest) error); ok {
+		r1 = returnFunc(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockinstanceService_WriteFile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WriteFile'
+type MockinstanceService_WriteFile_Call struct {
+	*mock.Call
+}
+
+// WriteFile is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req compute.FileWriteRequest
+func (_e *MockinstanceService_Expecter) WriteFile(ctx interface{}, req interface{}) *MockinstanceService_WriteFile_Call {
+	return &MockinstanceService_WriteFile_Call{Call: _e.mock.On("WriteFile", ctx, req)}
+}
+
+func (_c *MockinstanceService_WriteFile_Call) Run(run func(ctx context.Context, req compute.FileWriteRequest)) *MockinstanceService_WriteFile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.FileWriteRequest
+		if args[1] != nil {
+			arg1 = args[1].(compute.FileWriteRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockinstanceService_WriteFile_Call) Return(fileWriteResult compute.FileWriteResult, err error) *MockinstanceService_WriteFile_Call {
+	_c.Call.Return(fileWriteResult, err)
+	return _c
+}
+
+func (_c *MockinstanceService_WriteFile_Call) RunAndReturn(run func(ctx context.Context, req compute.FileWriteRequest) (compute.FileWriteResult, error)) *MockinstanceService_WriteFile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMocknetworkService creates a new instance of MocknetworkService. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMocknetworkService(t interface {
@@ -766,6 +1581,84 @@ type MocknetworkService_Expecter struct {
 
 func (_m *MocknetworkService) EXPECT() *MocknetworkService_Expecter {
 	return &MocknetworkService_Expecter{mock: &_m.Mock}
+}
+
+// AddACLRule provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) AddACLRule(ctx context.Context, sandbox string, network string, rule compute.ACLRule) (compute.ACLRule, error) {
+	ret := _mock.Called(ctx, sandbox, network, rule)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AddACLRule")
+	}
+
+	var r0 compute.ACLRule
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, compute.ACLRule) (compute.ACLRule, error)); ok {
+		return returnFunc(ctx, sandbox, network, rule)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, compute.ACLRule) compute.ACLRule); ok {
+		r0 = returnFunc(ctx, sandbox, network, rule)
+	} else {
+		r0 = ret.Get(0).(compute.ACLRule)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, compute.ACLRule) error); ok {
+		r1 = returnFunc(ctx, sandbox, network, rule)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MocknetworkService_AddACLRule_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddACLRule'
+type MocknetworkService_AddACLRule_Call struct {
+	*mock.Call
+}
+
+// AddACLRule is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sandbox string
+//   - network string
+//   - rule compute.ACLRule
+func (_e *MocknetworkService_Expecter) AddACLRule(ctx interface{}, sandbox interface{}, network interface{}, rule interface{}) *MocknetworkService_AddACLRule_Call {
+	return &MocknetworkService_AddACLRule_Call{Call: _e.mock.On("AddACLRule", ctx, sandbox, network, rule)}
+}
+
+func (_c *MocknetworkService_AddACLRule_Call) Run(run func(ctx context.Context, sandbox string, network string, rule compute.ACLRule)) *MocknetworkService_AddACLRule_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 compute.ACLRule
+		if args[3] != nil {
+			arg3 = args[3].(compute.ACLRule)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_AddACLRule_Call) Return(aCLRule compute.ACLRule, err error) *MocknetworkService_AddACLRule_Call {
+	_c.Call.Return(aCLRule, err)
+	return _c
+}
+
+func (_c *MocknetworkService_AddACLRule_Call) RunAndReturn(run func(ctx context.Context, sandbox string, network string, rule compute.ACLRule) (compute.ACLRule, error)) *MocknetworkService_AddACLRule_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // AttachNIC provides a mock function for the type MocknetworkService
@@ -806,7 +1699,7 @@ type MocknetworkService_AttachNIC_Call struct {
 //   - nic string
 //   - ip string
 //   - mac string
-func (_e *MocknetworkService_Expecter) AttachNIC(ctx any, ref any, network any, nic any, ip any, mac any) *MocknetworkService_AttachNIC_Call {
+func (_e *MocknetworkService_Expecter) AttachNIC(ctx interface{}, ref interface{}, network interface{}, nic interface{}, ip interface{}, mac interface{}) *MocknetworkService_AttachNIC_Call {
 	return &MocknetworkService_AttachNIC_Call{Call: _e.mock.On("AttachNIC", ctx, ref, network, nic, ip, mac)}
 }
 
@@ -858,6 +1751,102 @@ func (_c *MocknetworkService_AttachNIC_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// CreateForward provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) CreateForward(ctx context.Context, sandbox string, network string, ref compute.Ref, port int64, listenPort int64, protocol string) (compute.Forward, error) {
+	ret := _mock.Called(ctx, sandbox, network, ref, port, listenPort, protocol)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateForward")
+	}
+
+	var r0 compute.Forward
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, compute.Ref, int64, int64, string) (compute.Forward, error)); ok {
+		return returnFunc(ctx, sandbox, network, ref, port, listenPort, protocol)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, compute.Ref, int64, int64, string) compute.Forward); ok {
+		r0 = returnFunc(ctx, sandbox, network, ref, port, listenPort, protocol)
+	} else {
+		r0 = ret.Get(0).(compute.Forward)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, compute.Ref, int64, int64, string) error); ok {
+		r1 = returnFunc(ctx, sandbox, network, ref, port, listenPort, protocol)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MocknetworkService_CreateForward_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateForward'
+type MocknetworkService_CreateForward_Call struct {
+	*mock.Call
+}
+
+// CreateForward is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sandbox string
+//   - network string
+//   - ref compute.Ref
+//   - port int64
+//   - listenPort int64
+//   - protocol string
+func (_e *MocknetworkService_Expecter) CreateForward(ctx interface{}, sandbox interface{}, network interface{}, ref interface{}, port interface{}, listenPort interface{}, protocol interface{}) *MocknetworkService_CreateForward_Call {
+	return &MocknetworkService_CreateForward_Call{Call: _e.mock.On("CreateForward", ctx, sandbox, network, ref, port, listenPort, protocol)}
+}
+
+func (_c *MocknetworkService_CreateForward_Call) Run(run func(ctx context.Context, sandbox string, network string, ref compute.Ref, port int64, listenPort int64, protocol string)) *MocknetworkService_CreateForward_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 compute.Ref
+		if args[3] != nil {
+			arg3 = args[3].(compute.Ref)
+		}
+		var arg4 int64
+		if args[4] != nil {
+			arg4 = args[4].(int64)
+		}
+		var arg5 int64
+		if args[5] != nil {
+			arg5 = args[5].(int64)
+		}
+		var arg6 string
+		if args[6] != nil {
+			arg6 = args[6].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_CreateForward_Call) Return(forward compute.Forward, err error) *MocknetworkService_CreateForward_Call {
+	_c.Call.Return(forward, err)
+	return _c
+}
+
+func (_c *MocknetworkService_CreateForward_Call) RunAndReturn(run func(ctx context.Context, sandbox string, network string, ref compute.Ref, port int64, listenPort int64, protocol string) (compute.Forward, error)) *MocknetworkService_CreateForward_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateNetwork provides a mock function for the type MocknetworkService
 func (_mock *MocknetworkService) CreateNetwork(ctx context.Context, sandbox string, network compute.Network) (compute.Network, error) {
 	ret := _mock.Called(ctx, sandbox, network)
@@ -893,7 +1882,7 @@ type MocknetworkService_CreateNetwork_Call struct {
 //   - ctx context.Context
 //   - sandbox string
 //   - network compute.Network
-func (_e *MocknetworkService_Expecter) CreateNetwork(ctx any, sandbox any, network any) *MocknetworkService_CreateNetwork_Call {
+func (_e *MocknetworkService_Expecter) CreateNetwork(ctx interface{}, sandbox interface{}, network interface{}) *MocknetworkService_CreateNetwork_Call {
 	return &MocknetworkService_CreateNetwork_Call{Call: _e.mock.On("CreateNetwork", ctx, sandbox, network)}
 }
 
@@ -926,6 +1915,479 @@ func (_c *MocknetworkService_CreateNetwork_Call) Return(network1 compute.Network
 }
 
 func (_c *MocknetworkService_CreateNetwork_Call) RunAndReturn(run func(ctx context.Context, sandbox string, network compute.Network) (compute.Network, error)) *MocknetworkService_CreateNetwork_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteNetwork provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) DeleteNetwork(ctx context.Context, sandbox string, name string) error {
+	ret := _mock.Called(ctx, sandbox, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNetwork")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, sandbox, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MocknetworkService_DeleteNetwork_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNetwork'
+type MocknetworkService_DeleteNetwork_Call struct {
+	*mock.Call
+}
+
+// DeleteNetwork is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sandbox string
+//   - name string
+func (_e *MocknetworkService_Expecter) DeleteNetwork(ctx interface{}, sandbox interface{}, name interface{}) *MocknetworkService_DeleteNetwork_Call {
+	return &MocknetworkService_DeleteNetwork_Call{Call: _e.mock.On("DeleteNetwork", ctx, sandbox, name)}
+}
+
+func (_c *MocknetworkService_DeleteNetwork_Call) Run(run func(ctx context.Context, sandbox string, name string)) *MocknetworkService_DeleteNetwork_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_DeleteNetwork_Call) Return(err error) *MocknetworkService_DeleteNetwork_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MocknetworkService_DeleteNetwork_Call) RunAndReturn(run func(ctx context.Context, sandbox string, name string) error) *MocknetworkService_DeleteNetwork_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DetachNIC provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) DetachNIC(ctx context.Context, ref compute.Ref, nic string) error {
+	ret := _mock.Called(ctx, ref, nic)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DetachNIC")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) error); ok {
+		r0 = returnFunc(ctx, ref, nic)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MocknetworkService_DetachNIC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DetachNIC'
+type MocknetworkService_DetachNIC_Call struct {
+	*mock.Call
+}
+
+// DetachNIC is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - nic string
+func (_e *MocknetworkService_Expecter) DetachNIC(ctx interface{}, ref interface{}, nic interface{}) *MocknetworkService_DetachNIC_Call {
+	return &MocknetworkService_DetachNIC_Call{Call: _e.mock.On("DetachNIC", ctx, ref, nic)}
+}
+
+func (_c *MocknetworkService_DetachNIC_Call) Run(run func(ctx context.Context, ref compute.Ref, nic string)) *MocknetworkService_DetachNIC_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_DetachNIC_Call) Return(err error) *MocknetworkService_DetachNIC_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MocknetworkService_DetachNIC_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, nic string) error) *MocknetworkService_DetachNIC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetNetwork provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) GetNetwork(ctx context.Context, sandbox string, name string) (compute.Network, error) {
+	ret := _mock.Called(ctx, sandbox, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNetwork")
+	}
+
+	var r0 compute.Network
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (compute.Network, error)); ok {
+		return returnFunc(ctx, sandbox, name)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) compute.Network); ok {
+		r0 = returnFunc(ctx, sandbox, name)
+	} else {
+		r0 = ret.Get(0).(compute.Network)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, sandbox, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MocknetworkService_GetNetwork_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNetwork'
+type MocknetworkService_GetNetwork_Call struct {
+	*mock.Call
+}
+
+// GetNetwork is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sandbox string
+//   - name string
+func (_e *MocknetworkService_Expecter) GetNetwork(ctx interface{}, sandbox interface{}, name interface{}) *MocknetworkService_GetNetwork_Call {
+	return &MocknetworkService_GetNetwork_Call{Call: _e.mock.On("GetNetwork", ctx, sandbox, name)}
+}
+
+func (_c *MocknetworkService_GetNetwork_Call) Run(run func(ctx context.Context, sandbox string, name string)) *MocknetworkService_GetNetwork_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_GetNetwork_Call) Return(network compute.Network, err error) *MocknetworkService_GetNetwork_Call {
+	_c.Call.Return(network, err)
+	return _c
+}
+
+func (_c *MocknetworkService_GetNetwork_Call) RunAndReturn(run func(ctx context.Context, sandbox string, name string) (compute.Network, error)) *MocknetworkService_GetNetwork_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ImpairNIC provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) ImpairNIC(ctx context.Context, ref compute.Ref, nic string, impairment compute.Impairment) error {
+	ret := _mock.Called(ctx, ref, nic, impairment)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ImpairNIC")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string, compute.Impairment) error); ok {
+		r0 = returnFunc(ctx, ref, nic, impairment)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MocknetworkService_ImpairNIC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ImpairNIC'
+type MocknetworkService_ImpairNIC_Call struct {
+	*mock.Call
+}
+
+// ImpairNIC is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ref compute.Ref
+//   - nic string
+//   - impairment compute.Impairment
+func (_e *MocknetworkService_Expecter) ImpairNIC(ctx interface{}, ref interface{}, nic interface{}, impairment interface{}) *MocknetworkService_ImpairNIC_Call {
+	return &MocknetworkService_ImpairNIC_Call{Call: _e.mock.On("ImpairNIC", ctx, ref, nic, impairment)}
+}
+
+func (_c *MocknetworkService_ImpairNIC_Call) Run(run func(ctx context.Context, ref compute.Ref, nic string, impairment compute.Impairment)) *MocknetworkService_ImpairNIC_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 compute.Impairment
+		if args[3] != nil {
+			arg3 = args[3].(compute.Impairment)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_ImpairNIC_Call) Return(err error) *MocknetworkService_ImpairNIC_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MocknetworkService_ImpairNIC_Call) RunAndReturn(run func(ctx context.Context, ref compute.Ref, nic string, impairment compute.Impairment) error) *MocknetworkService_ImpairNIC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListNetworks provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) ListNetworks(ctx context.Context, sandbox string) ([]compute.Network, error) {
+	ret := _mock.Called(ctx, sandbox)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListNetworks")
+	}
+
+	var r0 []compute.Network
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]compute.Network, error)); ok {
+		return returnFunc(ctx, sandbox)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []compute.Network); ok {
+		r0 = returnFunc(ctx, sandbox)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]compute.Network)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, sandbox)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MocknetworkService_ListNetworks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNetworks'
+type MocknetworkService_ListNetworks_Call struct {
+	*mock.Call
+}
+
+// ListNetworks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sandbox string
+func (_e *MocknetworkService_Expecter) ListNetworks(ctx interface{}, sandbox interface{}) *MocknetworkService_ListNetworks_Call {
+	return &MocknetworkService_ListNetworks_Call{Call: _e.mock.On("ListNetworks", ctx, sandbox)}
+}
+
+func (_c *MocknetworkService_ListNetworks_Call) Run(run func(ctx context.Context, sandbox string)) *MocknetworkService_ListNetworks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_ListNetworks_Call) Return(networks []compute.Network, err error) *MocknetworkService_ListNetworks_Call {
+	_c.Call.Return(networks, err)
+	return _c
+}
+
+func (_c *MocknetworkService_ListNetworks_Call) RunAndReturn(run func(ctx context.Context, sandbox string) ([]compute.Network, error)) *MocknetworkService_ListNetworks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PeerNetworks provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) PeerNetworks(ctx context.Context, sandbox string, network string, peer string) error {
+	ret := _mock.Called(ctx, sandbox, network, peer)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PeerNetworks")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = returnFunc(ctx, sandbox, network, peer)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MocknetworkService_PeerNetworks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PeerNetworks'
+type MocknetworkService_PeerNetworks_Call struct {
+	*mock.Call
+}
+
+// PeerNetworks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sandbox string
+//   - network string
+//   - peer string
+func (_e *MocknetworkService_Expecter) PeerNetworks(ctx interface{}, sandbox interface{}, network interface{}, peer interface{}) *MocknetworkService_PeerNetworks_Call {
+	return &MocknetworkService_PeerNetworks_Call{Call: _e.mock.On("PeerNetworks", ctx, sandbox, network, peer)}
+}
+
+func (_c *MocknetworkService_PeerNetworks_Call) Run(run func(ctx context.Context, sandbox string, network string, peer string)) *MocknetworkService_PeerNetworks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_PeerNetworks_Call) Return(err error) *MocknetworkService_PeerNetworks_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MocknetworkService_PeerNetworks_Call) RunAndReturn(run func(ctx context.Context, sandbox string, network string, peer string) error) *MocknetworkService_PeerNetworks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RemoveACLRule provides a mock function for the type MocknetworkService
+func (_mock *MocknetworkService) RemoveACLRule(ctx context.Context, sandbox string, network string, rule string) error {
+	ret := _mock.Called(ctx, sandbox, network, rule)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveACLRule")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = returnFunc(ctx, sandbox, network, rule)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MocknetworkService_RemoveACLRule_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveACLRule'
+type MocknetworkService_RemoveACLRule_Call struct {
+	*mock.Call
+}
+
+// RemoveACLRule is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sandbox string
+//   - network string
+//   - rule string
+func (_e *MocknetworkService_Expecter) RemoveACLRule(ctx interface{}, sandbox interface{}, network interface{}, rule interface{}) *MocknetworkService_RemoveACLRule_Call {
+	return &MocknetworkService_RemoveACLRule_Call{Call: _e.mock.On("RemoveACLRule", ctx, sandbox, network, rule)}
+}
+
+func (_c *MocknetworkService_RemoveACLRule_Call) Run(run func(ctx context.Context, sandbox string, network string, rule string)) *MocknetworkService_RemoveACLRule_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MocknetworkService_RemoveACLRule_Call) Return(err error) *MocknetworkService_RemoveACLRule_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MocknetworkService_RemoveACLRule_Call) RunAndReturn(run func(ctx context.Context, sandbox string, network string, rule string) error) *MocknetworkService_RemoveACLRule_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -990,7 +2452,7 @@ type MockimageService_CatalogImage_Call struct {
 
 // CatalogImage is a helper method to define mock.On call
 //   - name string
-func (_e *MockimageService_Expecter) CatalogImage(name any) *MockimageService_CatalogImage_Call {
+func (_e *MockimageService_Expecter) CatalogImage(name interface{}) *MockimageService_CatalogImage_Call {
 	return &MockimageService_CatalogImage_Call{Call: _e.mock.On("CatalogImage", name)}
 }
 
@@ -1045,7 +2507,7 @@ type MockimageService_ListImages_Call struct {
 //   - os string
 //   - desktop *bool
 //   - platform string
-func (_e *MockimageService_Expecter) ListImages(os any, desktop any, platform any) *MockimageService_ListImages_Call {
+func (_e *MockimageService_Expecter) ListImages(os interface{}, desktop interface{}, platform interface{}) *MockimageService_ListImages_Call {
 	return &MockimageService_ListImages_Call{Call: _e.mock.On("ListImages", os, desktop, platform)}
 }
 

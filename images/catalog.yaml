@@ -10,10 +10,20 @@ images:
   kinds:
   - container
   kind: container
-  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:7d0877799aafc04c8a3ce321bfd586969f97c65e91665941455eeb160555df39
+  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:47cc9f058575d398736f45cd696f5613a24af73188df0a154c6284cc3e091960
   cpus: 1
   memory_mb: 512
   disk_gb: 2
+- name: ubuntu/24.04
+  os: ubuntu
+  version: '24.04'
+  kinds:
+  - container
+  kind: container
+  reference: images:ubuntu/24.04
+  cpus: 1
+  memory_mb: 1024
+  disk_gb: 4
 - name: runner
   os: ubuntu
   version: '24.04'
