@@ -14,30 +14,6 @@ import (
 	"github.com/GilmanLab/agentcompute/internal/compute"
 )
 
-func TestWaitInstanceRejectsDesktopAndUnknownUntil(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		until string
-	}{
-		{name: "desktop is reserved", until: compute.WaitUntilDesktop},
-		{name: "unknown stage", until: "booted"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tc := newTestContext(t)
-			_, err := tc.service.WaitInstance(t.Context(), compute.WaitRequest{
-				Ref:   compute.Ref{Sandbox: "demo", Name: "web"},
-				Until: tt.until,
-			})
-			requireAgentContains(t, err, "not available yet")
-		})
-	}
-}
-
 func TestWriteFileRejectsOversizedContentAndRelativePath(t *testing.T) {
 	t.Parallel()
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -183,6 +184,55 @@ func (c *Client) usedOVNAddresses(ctx context.Context) (map[string]bool, error) 
 		}
 	}
 	return used, nil
+}
+
+// InstanceForward observes the scalar forward shape created by net.forward.
+func (c *Client) InstanceForward(ctx context.Context, ref compute.Ref, targetPort int64, protocol string) (compute.Forward, error) {
+	inst, err := c.GetInstance(ctx, ref)
+	if err != nil {
+		return compute.Forward{}, err
+	}
+	networks, err := c.ListNetworks(ctx, ref.Sandbox)
+	if err != nil {
+		return compute.Forward{}, err
+	}
+	srv := c.Scoped(ctx, projectName(ref.Sandbox), "")
+	target := strconv.FormatInt(targetPort, 10)
+	for _, network := range networks {
+		if network.Kind != networkKindOVN {
+			continue
+		}
+		for _, nic := range inst.NICs {
+			if nic.Network != network.Name {
+				continue
+			}
+			forwards, err := srv.GetNetworkForwards(network.Name)
+			if err != nil {
+				return compute.Forward{}, mapOVNError(err)
+			}
+			for _, forward := range forwards {
+				for _, port := range forward.Ports {
+					address := port.TargetAddress
+					if address == "" {
+						address = forward.Config["target_address"]
+					}
+					mapped := port.TargetPort
+					if mapped == "" {
+						mapped = port.ListenPort
+					}
+					if port.Protocol != protocol || mapped != target || !slices.Contains(nic.Addresses, address) {
+						continue
+					}
+					listen, err := strconv.ParseInt(port.ListenPort, 10, 64)
+					if err != nil {
+						continue
+					}
+					return compute.Forward{Address: forward.ListenAddress, Port: listen, Protocol: protocol, Network: network.Name, Instance: ref.Name}, nil
+				}
+			}
+		}
+	}
+	return compute.Forward{}, nil
 }
 
 func (c *Client) deleteForwardsInProject(ctx context.Context, project, network string) []error {

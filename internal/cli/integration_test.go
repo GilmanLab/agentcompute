@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,6 +47,7 @@ func TestClusterLifecycle(t *testing.T) {
 		host,
 		filepath.Join(root, "images", "catalog.yaml"),
 	)
+	text += integrationScreenshotConfig(t)
 	require.NoError(t, os.WriteFile(config, []byte(text), 0o600))
 	backend, err := incus.New(ctx, incus.Options{Remote: remote, Host: host, Pool: "data"})
 	require.NoError(t, err)
@@ -304,4 +306,13 @@ func jsonBool(t *testing.T, value any) bool {
 	out, ok := value.(bool)
 	require.True(t, ok, "expected bool, got %T", value)
 	return out
+}
+
+func integrationScreenshotConfig(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	address := listener.Addr().String()
+	require.NoError(t, listener.Close())
+	return fmt.Sprintf("screenshots:\n  listen: %q\n  base_url: %q\n", address, "http://"+address)
 }

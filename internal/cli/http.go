@@ -18,6 +18,7 @@ import (
 	"github.com/meigma/codemode/authz"
 	hostmcp "github.com/meigma/codemode/mcpserver"
 
+	"github.com/GilmanLab/agentcompute/internal/desktop"
 	"github.com/GilmanLab/agentcompute/internal/mcpserver"
 	"github.com/GilmanLab/agentcompute/internal/templateinfo"
 )
@@ -70,6 +71,7 @@ type httpConfig struct {
 	logger *slog.Logger
 	// deps are constructed once before serving any HTTP session.
 	deps mcpserver.Dependencies
+	screenshots *desktop.Store
 }
 
 // newHTTPCommand builds the "http" subcommand, which serves the MCP server over
@@ -109,6 +111,7 @@ func newHTTPCommand(options Options) *cobra.Command {
 				insecure:  options.Viper.GetBool(insecureFlag),
 				logger:    logger,
 				deps:      rt.deps,
+				screenshots: rt.screenshots,
 			})
 			return errors.Join(runErr, rt.close())
 		},
@@ -201,6 +204,12 @@ func serveHTTP(ctx context.Context, ln net.Listener, cfg httpConfig) error {
 	// demo identity is installed only after the verifier succeeds.
 	if cfg.authToken != "" {
 		rootHandler = requireBearerToken(cfg.authToken, cfg.addr)(rootHandler)
+	}
+	if cfg.screenshots != nil {
+		mux := http.NewServeMux()
+		mux.Handle(desktop.ScreenshotPath, cfg.screenshots)
+		mux.Handle("/", rootHandler)
+		rootHandler = mux
 	}
 
 	srv := &http.Server{

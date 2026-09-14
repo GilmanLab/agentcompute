@@ -20,7 +20,9 @@ func TestExecTimeoutSetsFlagNotCancellation(t *testing.T) {
 
 	tc := newTestContext(t)
 	ref := compute.Ref{Sandbox: "demo", Name: "web"}
-	tc.backend.EXPECT().GetInstance(mock.Anything, ref).Return(runningInstance(), nil)
+	inst := runningInstance()
+	inst.Status = "Ready"
+	tc.backend.EXPECT().GetInstance(mock.Anything, ref).Return(inst, nil)
 	tc.backend.EXPECT().Exec(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		RunAndReturn(func(ctx context.Context, _ compute.ExecRequest, stdout, stderr io.Writer) (int64, error) {
 			_, _ = stdout.Write([]byte("out"))
