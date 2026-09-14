@@ -34,7 +34,10 @@ func TestDesktopAcceptance(t *testing.T) {
 	config := writeOVNConfig(t, dir, root, fx)
 	imageName := envOr("AGENTCOMPUTE_TEST_DESKTOP_IMAGE", "ubuntu/24.04/desktop")
 	name := fmt.Sprintf("desktop-%x", time.Now().UnixNano())
-	backend, err := incus.New(ctx, incus.Options{Remote: fx.Remote, Pool: "data", OVNUplink: fx.Uplink, OVNRanges: fx.Ranges})
+	backend, err := incus.New(
+		ctx,
+		incus.Options{Remote: fx.Remote, Pool: "data", OVNUplink: fx.Uplink, OVNRanges: fx.Ranges},
+	)
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, backend.Close()) })
 	t.Cleanup(func() {
@@ -127,7 +130,12 @@ func TestDesktopAcceptance(t *testing.T) {
 	windowScaled := asMap(t, interaction["window_scaled"])
 	_, windowDimensions := fetchDesktopPNG(t, asString(t, windowScaled["url"]))
 	assert.LessOrEqual(t, max(windowDimensions.Width, windowDimensions.Height), 640)
-	assert.InDelta(t, float64(jsonInt(t, interaction["window_width"]))/float64(windowDimensions.Width), windowScaled["scale"], 1e-9)
+	assert.InDelta(
+		t,
+		float64(jsonInt(t, interaction["window_width"]))/float64(windowDimensions.Width),
+		windowScaled["scale"],
+		1e-9,
+	)
 	t.Logf("token click native outcome (state verified separately): %v", interaction["click"])
 	if evidence := os.Getenv("AGENTCOMPUTE_TEST_DESKTOP_EVIDENCE"); evidence != "" {
 		require.NoError(t, os.MkdirAll(evidence, 0o700))
@@ -154,7 +162,11 @@ func TestDesktopAcceptance(t *testing.T) {
 	assert.Len(t, asSlice(t, asMap(t, viewer["private_client"])["nics"]), 1)
 	forward := asMap(t, viewer["forward"])
 	vncAddress := asString(t, afterInfo["vnc"])
-	assert.Equal(t, net.JoinHostPort(asString(t, forward["address"]), fmt.Sprint(jsonInt(t, forward["port"]))), vncAddress)
+	assert.Equal(
+		t,
+		net.JoinHostPort(asString(t, forward["address"]), fmt.Sprint(jsonInt(t, forward["port"]))),
+		vncAddress,
+	)
 	vnc, err := net.DialTimeout("tcp", vncAddress, 10*time.Second)
 	require.NoError(t, err)
 	defer vnc.Close()

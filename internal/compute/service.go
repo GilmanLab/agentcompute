@@ -54,9 +54,9 @@ type Service struct {
 	defaultTTL         time.Duration
 	maxTTL             time.Duration
 	defaultNetworkKind string
-	onSandboxExpired func(string)
-	onReap func()
-	desktopReady func(context.Context, Ref) (bool, error)
+	onSandboxExpired   func(string)
+	onReap             func()
+	desktopReady       func(context.Context, Ref) (bool, error)
 }
 
 // New constructs a Service. Bridge defaults require Host; zero TTLs select the documented defaults.
@@ -101,9 +101,9 @@ func New(backend Backend, catalog *Catalog, opts Options) (*Service, error) {
 		defaultTTL:         resolvedDefault,
 		maxTTL:             resolvedMax,
 		defaultNetworkKind: kind,
-		onSandboxExpired: opts.OnSandboxExpired,
-		onReap: opts.OnReap,
-		desktopReady: opts.DesktopReady,
+		onSandboxExpired:   opts.OnSandboxExpired,
+		onReap:             opts.OnReap,
+		desktopReady:       opts.DesktopReady,
 	}, nil
 }
 

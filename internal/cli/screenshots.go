@@ -10,7 +10,13 @@ import (
 	"net/http"
 )
 
-func (rt *runtime) runStdio(ctx context.Context, logger *slog.Logger, build BuildInfo, in io.Reader, out io.Writer) error {
+func (rt *runtime) runStdio(
+	ctx context.Context,
+	logger *slog.Logger,
+	build BuildInfo,
+	in io.Reader,
+	out io.Writer,
+) error {
 	if rt.screenshots == nil {
 		return runStdio(ctx, logger, build, in, out, rt.deps)
 	}
