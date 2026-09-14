@@ -114,6 +114,18 @@ files:
   source: nat
   path: /opt/router/nat
   mode: "0755"
+- generator: copy
+  source: route
+  path: /opt/router/route
+  mode: "0755"
+- generator: copy
+  source: dhcp
+  path: /opt/router/dhcp
+  mode: "0755"
+- generator: copy
+  source: wg
+  path: /opt/router/wg
+  mode: "0755"
 actions:
 - trigger: post-unpack
   action: '#!/bin/sh

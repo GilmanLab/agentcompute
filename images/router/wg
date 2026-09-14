@@ -1,0 +1,202 @@
+#!/bin/bash
+# WireGuard endpoint for the router image.
+#
+# Representative invocation:
+#   /opt/router/wg --interface wg0 --address 10.8.0.1/24 \
+#     --private-key-file /run/wg0.key --peer <pubkey> \
+#     --endpoint 203.0.113.5:51820 --allowed-ips 10.8.0.0/24
+#
+# Creates or reconfigures one WireGuard interface. Does not flush nftables or
+# rewrite wg-quick config. OS routes for allowed-ips are left to /opt/router/route.
+set -euo pipefail
+
+usage() {
+	printf 'usage: %s --interface <if> --address <cidr> --private-key-file <path> --peer <pubkey> --endpoint <host:port> --allowed-ips <prefix>\n' "${0##*/}"
+}
+
+err() {
+	printf 'wg: %s\n' "$*" >&2
+	exit 1
+}
+
+valid_ifname() {
+	case "$1" in
+	"" | -* | *[!A-Za-z0-9._-]*)
+		return 1
+		;;
+	esac
+	[ "${#1}" -le 15 ]
+}
+
+valid_ipv4() {
+	local octet dots
+	case "$1" in
+	"" | *[!0-9.]* | .* | *. | *..*)
+		return 1
+		;;
+	esac
+	dots=${1//[^.]/}
+	[ "${#dots}" -eq 3 ] || return 1
+	IFS=.
+	set -- $1
+	unset IFS
+	[ "$#" -eq 4 ] || return 1
+	for octet in "$1" "$2" "$3" "$4"; do
+		case "$octet" in
+		"" | *[!0-9]*)
+			return 1
+			;;
+		esac
+		[ "$octet" -ge 0 ] && [ "$octet" -le 255 ] || return 1
+		[ "$octet" = "0" ] || [ "${octet#0}" = "$octet" ] || return 1
+	done
+}
+
+valid_prefix() {
+	local addr len
+	if [ "$1" = "default" ] || [ "$1" = "0.0.0.0/0" ]; then
+		return 0
+	fi
+	case "$1" in
+	*/*) ;;
+	*)
+		return 1
+		;;
+	esac
+	addr=${1%/*}
+	len=${1##*/}
+	valid_ipv4 "$addr" || return 1
+	case "$len" in
+	"" | *[!0-9]*)
+		return 1
+		;;
+	esac
+	[ "$len" -ge 0 ] && [ "$len" -le 32 ]
+}
+
+valid_port() {
+	case "$1" in
+	"" | *[!0-9]*)
+		return 1
+		;;
+	esac
+	[ "$1" -ge 1 ] && [ "$1" -le 65535 ]
+}
+
+valid_pubkey() {
+	[ "${#1}" -eq 44 ] || return 1
+	case "$1" in
+	*[!A-Za-z0-9+/=]*)
+		return 1
+		;;
+	esac
+}
+
+iface=""
+address=""
+keyfile=""
+peer=""
+endpoint=""
+allowed=""
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--interface)
+		[ "$#" -ge 2 ] || err "--interface requires an interface name"
+		[ -z "$iface" ] || err "--interface specified more than once"
+		iface=$2
+		shift 2
+		;;
+	--address)
+		[ "$#" -ge 2 ] || err "--address requires a CIDR"
+		[ -z "$address" ] || err "--address specified more than once"
+		address=$2
+		shift 2
+		;;
+	--private-key-file)
+		[ "$#" -ge 2 ] || err "--private-key-file requires a path"
+		[ -z "$keyfile" ] || err "--private-key-file specified more than once"
+		keyfile=$2
+		shift 2
+		;;
+	--peer)
+		[ "$#" -ge 2 ] || err "--peer requires a public key"
+		[ -z "$peer" ] || err "--peer specified more than once"
+		peer=$2
+		shift 2
+		;;
+	--endpoint)
+		[ "$#" -ge 2 ] || err "--endpoint requires host:port"
+		[ -z "$endpoint" ] || err "--endpoint specified more than once"
+		endpoint=$2
+		shift 2
+		;;
+	--allowed-ips)
+		[ "$#" -ge 2 ] || err "--allowed-ips requires a prefix"
+		[ -z "$allowed" ] || err "--allowed-ips specified more than once"
+		allowed=$2
+		shift 2
+		;;
+	--)
+		shift
+		[ "$#" -eq 0 ] || err "unexpected argument: $1"
+		break
+		;;
+	-*)
+		err "unknown option: $1"
+		;;
+	*)
+		err "unexpected argument: $1"
+		;;
+	esac
+done
+
+[ -n "$iface" ] && [ -n "$address" ] && [ -n "$keyfile" ] && [ -n "$peer" ] &&
+	[ -n "$endpoint" ] && [ -n "$allowed" ] || {
+	usage >&2
+	err "required flags: --interface, --address, --private-key-file, --peer, --endpoint, --allowed-ips"
+}
+
+valid_ifname "$iface" || err "invalid interface name: $iface"
+valid_prefix "$address" || err "invalid address CIDR: $address"
+[ "$address" != "default" ] && [ "$address" != "0.0.0.0/0" ] || err "invalid address CIDR: $address"
+valid_pubkey "$peer" || err "invalid peer public key"
+valid_prefix "$allowed" || err "invalid allowed-ips prefix: $allowed"
+
+case "$endpoint" in
+*:*) ;;
+*)
+	err "invalid endpoint $endpoint (expected host:port)"
+	;;
+esac
+eport=${endpoint##*:}
+ehost=${endpoint%:*}
+[ -n "$ehost" ] || err "invalid endpoint host: $endpoint"
+valid_port "$eport" || err "invalid endpoint port: $eport"
+case "$ehost" in
+"" | *[[:space:]]* | *[\[\]]*)
+	err "invalid endpoint host: $ehost"
+	;;
+esac
+
+[ -f "$keyfile" ] || err "private key file not found: $keyfile"
+[ -r "$keyfile" ] || err "private key file not readable: $keyfile"
+
+command -v wg >/dev/null 2>&1 || err "missing required command: wg"
+command -v ip >/dev/null 2>&1 || err "missing required command: ip"
+[ "$(id -u)" -eq 0 ] || err "must run as root"
+
+if [ ! -e "/sys/class/net/$iface" ]; then
+	ip link add dev "$iface" type wireguard || err "failed to create wireguard interface: $iface"
+fi
+
+wg set "$iface" private-key "$keyfile" peer "$peer" endpoint "$endpoint" allowed-ips "$allowed" ||
+	err "failed to configure wireguard peer on $iface"
+ip address replace "$address" dev "$iface" || err "failed to assign $address on $iface"
+ip link set dev "$iface" up || err "failed to bring up $iface"
+
+printf 'wg: interface=%s address=%s endpoint=%s\n' "$iface" "$address" "$endpoint" >&2

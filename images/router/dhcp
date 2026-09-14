@@ -1,0 +1,177 @@
+#!/bin/bash
+# DHCP for one inside interface via dnsmasq.
+#
+# Representative invocation:
+#   /opt/router/dhcp --interface eth0 --range 192.168.50.100,192.168.50.200
+#
+# Binds only to the named interface, owns a per-interface pid/lease file, and
+# does not flush nftables or kill unrelated dnsmasq processes. Reruns replace
+# the helper-owned daemon for that interface.
+set -euo pipefail
+
+usage() {
+	printf 'usage: %s --interface <if> --range <start,end> [--gateway <ip>] [--lease <time>]\n' "${0##*/}"
+}
+
+err() {
+	printf 'dhcp: %s\n' "$*" >&2
+	exit 1
+}
+
+valid_ifname() {
+	case "$1" in
+	"" | -* | *[!A-Za-z0-9._-]*)
+		return 1
+		;;
+	esac
+	[ "${#1}" -le 15 ]
+}
+
+valid_ipv4() {
+	local octet dots
+	case "$1" in
+	"" | *[!0-9.]* | .* | *. | *..*)
+		return 1
+		;;
+	esac
+	dots=${1//[^.]/}
+	[ "${#dots}" -eq 3 ] || return 1
+	IFS=.
+	set -- $1
+	unset IFS
+	[ "$#" -eq 4 ] || return 1
+	for octet in "$1" "$2" "$3" "$4"; do
+		case "$octet" in
+		"" | *[!0-9]*)
+			return 1
+			;;
+		esac
+		[ "$octet" -ge 0 ] && [ "$octet" -le 255 ] || return 1
+		[ "$octet" = "0" ] || [ "${octet#0}" = "$octet" ] || return 1
+	done
+}
+
+valid_lease() {
+	case "$1" in
+	"" | *[!A-Za-z0-9]*)
+		return 1
+		;;
+	esac
+	[ "${#1}" -le 16 ]
+}
+
+iface=""
+range=""
+gateway=""
+lease="12h"
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--interface)
+		[ "$#" -ge 2 ] || err "--interface requires an interface name"
+		[ -z "$iface" ] || err "--interface specified more than once"
+		iface=$2
+		shift 2
+		;;
+	--range)
+		[ "$#" -ge 2 ] || err "--range requires start,end"
+		[ -z "$range" ] || err "--range specified more than once"
+		range=$2
+		shift 2
+		;;
+	--gateway)
+		[ "$#" -ge 2 ] || err "--gateway requires an address"
+		[ -z "$gateway" ] || err "--gateway specified more than once"
+		gateway=$2
+		shift 2
+		;;
+	--lease)
+		[ "$#" -ge 2 ] || err "--lease requires a duration"
+		lease=$2
+		shift 2
+		;;
+	--)
+		shift
+		[ "$#" -eq 0 ] || err "unexpected argument: $1"
+		break
+		;;
+	-*)
+		err "unknown option: $1"
+		;;
+	*)
+		err "unexpected argument: $1"
+		;;
+	esac
+done
+
+[ -n "$iface" ] && [ -n "$range" ] || {
+	usage >&2
+	err "required flags: --interface, --range"
+}
+
+valid_ifname "$iface" || err "invalid interface name: $iface"
+[ -e "/sys/class/net/$iface" ] || err "interface not found: $iface"
+
+start=${range%%,*}
+end=${range#*,}
+[ "$start" != "$range" ] && [ -n "$start" ] && [ -n "$end" ] && [ "$end" = "${end%,*}" ] ||
+	err "invalid range $range (expected start,end)"
+valid_ipv4 "$start" || err "invalid range start: $start"
+valid_ipv4 "$end" || err "invalid range end: $end"
+if [ -n "$gateway" ]; then
+	valid_ipv4 "$gateway" || err "invalid gateway address: $gateway"
+fi
+valid_lease "$lease" || err "invalid lease duration: $lease"
+
+command -v dnsmasq >/dev/null 2>&1 || err "missing required command: dnsmasq"
+command -v ip >/dev/null 2>&1 || err "missing required command: ip"
+[ "$(id -u)" -eq 0 ] || err "must run as root"
+
+ip link set dev "$iface" up || err "failed to bring up interface: $iface"
+
+pidfile=/run/router-dhcp.${iface}.pid
+leasefile=/run/router-dhcp.${iface}.leases
+mkdir -p /run
+
+if [ -f "$pidfile" ]; then
+	oldpid=$(cat "$pidfile" 2>/dev/null || true)
+	if [ -n "${oldpid:-}" ] && [ -d "/proc/$oldpid" ]; then
+		kill "$oldpid" 2>/dev/null || true
+		i=0
+		while [ "$i" -lt 20 ] && [ -d "/proc/$oldpid" ]; do
+			sleep 0.1
+			i=$((i + 1))
+		done
+		if [ -d "/proc/$oldpid" ]; then
+			kill -9 "$oldpid" 2>/dev/null || true
+		fi
+	fi
+	rm -f "$pidfile"
+fi
+set -- dnsmasq \
+	--pid-file="$pidfile" \
+	--dhcp-leasefile="$leasefile" \
+	--interface="$iface" \
+	--bind-interfaces \
+	--except-interface=lo \
+	--port=0 \
+	--no-resolv \
+	--dhcp-range="$start,$end,$lease"
+if [ -n "$gateway" ]; then
+	set -- "$@" --dhcp-option="3,$gateway"
+fi
+
+"$@" || err "dnsmasq failed on $iface"
+
+i=0
+while [ "$i" -lt 20 ] && [ ! -f "$pidfile" ]; do
+	sleep 0.1
+	i=$((i + 1))
+done
+
+[ -f "$pidfile" ] || err "dnsmasq did not write pid file $pidfile"
+printf 'dhcp: interface=%s range=%s-%s lease=%s\n' "$iface" "$start" "$end" "$lease" >&2
