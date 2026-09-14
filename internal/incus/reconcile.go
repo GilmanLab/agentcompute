@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -45,6 +46,7 @@ const (
 	startAction          = "start"
 	stopAction           = "stop"
 	trueCommand          = "/bin/true"
+	desktopAutomationID  = 1000
 )
 
 const (
@@ -122,7 +124,7 @@ func (c *Client) ensureDigestImage(ctx context.Context, image compute.CatalogIma
 	if err != nil {
 		return "", fmt.Errorf("catalog image %q: %w", image.Name, err)
 	}
-	if err := smokeLaunch(ctx, server, image.Name, fingerprint, image.Kind == kindVM); err != nil {
+	if err := smokeLaunch(ctx, server, image, fingerprint); err != nil {
 		return "", fmt.Errorf("catalog image %q: %w", image.Name, err)
 	}
 	if err := recordDigest(server, fingerprint, digest); err != nil {
@@ -343,10 +345,10 @@ func recordDigest(server incusclient.InstanceServer, fingerprint, digest string)
 func smokeLaunch(
 	ctx context.Context,
 	server incusclient.InstanceServer,
-	imageName, fingerprint string,
-	vm bool,
+	image compute.CatalogImage,
+	fingerprint string,
 ) (err error) {
-	name, err := smokeInstanceName(imageName)
+	name, err := smokeInstanceName(image.Name)
 	if err != nil {
 		return err
 	}
@@ -356,13 +358,17 @@ func smokeLaunch(
 		Source: api.InstanceSource{Type: sourceTypeImage, Fingerprint: fingerprint},
 	}
 	req.Profiles = []string{imageBuildProfile}
-	checks := routerChecks()
-	if vm {
+	if image.Kind == kindVM {
 		req.Type = api.InstanceTypeVM
 		req.Profiles = []string{"runner-smoke"}
-		checks = [][]string{
-			{"systemctl", "is-active", "incus-gh-runner-guest.path"},
-			{"test", "-x", "/opt/actions-runner/bin/Runner.Listener"},
+	}
+	if image.Desktop {
+		req.Config = api.ConfigMap{}
+		if image.CPUs > 0 {
+			req.Config["limits.cpu"] = strconv.FormatInt(image.CPUs, 10)
+		}
+		if image.MemoryMB > 0 {
+			req.Config["limits.memory"] = fmt.Sprintf("%dMiB", image.MemoryMB)
 		}
 	}
 	op, err := server.CreateInstance(req)
@@ -388,12 +394,53 @@ func smokeLaunch(
 	if err = startOp.WaitContext(smokeCtx); err != nil {
 		return err
 	}
-	if err = waitGuestReady(smokeCtx, server, name); err != nil {
+	if err = waitGuestCommand(
+		smokeCtx,
+		server,
+		name,
+		api.InstanceExecPost{Command: []string{trueCommand}},
+	); err != nil {
 		return err
 	}
+	if image.Desktop {
+		return smokeDesktop(smokeCtx, server, name)
+	}
+	var checks [][]string
+	if image.Kind == kindVM {
+		checks = [][]string{
+			{"systemctl", "is-active", "incus-gh-runner-guest.path"},
+			{"test", "-x", "/opt/actions-runner/bin/Runner.Listener"},
+		}
+	} else {
+		checks = routerChecks()
+	}
 	for _, command := range checks {
-		if err = execCommand(smokeCtx, server, name, command); err != nil {
+		if err = execCommand(smokeCtx, server, name, api.InstanceExecPost{Command: command}); err != nil {
 			return fmt.Errorf("smoke check %s: %w", strings.Join(command, " "), err)
+		}
+	}
+	return nil
+}
+
+func smokeDesktop(ctx context.Context, server incusclient.InstanceServer, name string) error {
+	checks := []api.InstanceExecPost{
+		{Command: []string{"test", "-S", "/tmp/.X11-unix/X0"}},
+		{Command: []string{"systemctl", "--user", "--machine=automation@", "is-active", "cua-driver.service"}},
+		{
+			Command: []string{
+				"/usr/local/bin/cua-driver", "call", "--socket", "/run/user/1000/cua-driver.sock", "list_apps", "{}",
+			},
+			User: desktopAutomationID, Group: desktopAutomationID, Cwd: "/home/automation",
+			Environment: map[string]string{
+				"HOME":                     "/home/automation",
+				"XDG_RUNTIME_DIR":          "/run/user/1000",
+				"DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus",
+			},
+		},
+	}
+	for _, check := range checks {
+		if err := waitGuestCommand(ctx, server, name, check); err != nil {
+			return fmt.Errorf("desktop smoke check %s: %w", strings.Join(check.Command, " "), err)
 		}
 	}
 	return nil
@@ -457,8 +504,13 @@ func imageWithDigest(server incusclient.InstanceServer, digest string) (string, 
 	return "", false, nil
 }
 
-func waitGuestReady(ctx context.Context, server incusclient.InstanceServer, name string) error {
-	if err := execCommand(ctx, server, name, []string{trueCommand}); err == nil {
+func waitGuestCommand(
+	ctx context.Context,
+	server incusclient.InstanceServer,
+	name string,
+	request api.InstanceExecPost,
+) error {
+	if err := execCommand(ctx, server, name, request); err == nil {
 		return nil
 	}
 	ticker := time.NewTicker(readyPollInterval)
@@ -466,16 +518,21 @@ func waitGuestReady(ctx context.Context, server incusclient.InstanceServer, name
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("instance %s was not reachable: %w", name, ctx.Err())
+			return fmt.Errorf("instance %s did not pass guest check: %w", name, ctx.Err())
 		case <-ticker.C:
-			if err := execCommand(ctx, server, name, []string{trueCommand}); err == nil {
+			if err := execCommand(ctx, server, name, request); err == nil {
 				return nil
 			}
 		}
 	}
 }
 
-func execCommand(ctx context.Context, server incusclient.InstanceServer, name string, command []string) error {
+func execCommand(
+	ctx context.Context,
+	server incusclient.InstanceServer,
+	name string,
+	request api.InstanceExecPost,
+) error {
 	done := make(chan bool)
 	args := &incusclient.InstanceExecArgs{
 		Stdin:    bytes.NewReader(nil),
@@ -483,10 +540,8 @@ func execCommand(ctx context.Context, server incusclient.InstanceServer, name st
 		Stderr:   io.Discard,
 		DataDone: done,
 	}
-	op, err := server.ExecInstance(name, api.InstanceExecPost{
-		Command:   command,
-		WaitForWS: true,
-	}, args)
+	request.WaitForWS = true
+	op, err := server.ExecInstance(name, request, args)
 	if err != nil {
 		return err
 	}
