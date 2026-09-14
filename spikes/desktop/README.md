@@ -1,6 +1,6 @@
 # Desktop Phase 6 spike
 
-**2026-09-14 — direct native probing passed on a repaired first-build guest, and the corrected rebuild passed its X11/Driver boot smoke. Live MCP acceptance is blocked by OVN infrastructure.** The native probe exercised Cua Driver 0.28.1 through its session socket, including a token-addressed GUI change, bounded screenshots, VNC, and restart recovery.
+**2026-09-14 — the corrected image passed X11/Driver boot qualification and the complete production-stdio MCP acceptance scenario.** One-shot Driver calls retain token continuity through the persistent guest daemon. Screenshots remain URL-only; the adapter neither retries input nor silently changes delivery mode.
 
 ## Evidence and scope
 
@@ -13,6 +13,7 @@ The results use these evidence sources:
 | `/tmp/agentcompute-desktop-phase6-final/metrics.json` | Corrected local rebuild measurements and artifact hashes. It is build evidence, not live Driver or MCP acceptance evidence. |
 | `internal/desktop/testdata/` | Captured Driver catalog and result fixtures used by the host adapter, including the missing-`pid` diagnostic and successful click response. |
 | `/tmp/agentcompute-desktop-corrected-smoke/` | Corrected image boot: X11, active Driver user service, 234 apps from `list_apps`, and cleanup of smoke-owned resources. |
+| `/tmp/agentcompute-desktop-mcp-evidence/` | Before/after PNGs from the corrected image's real MCP token interaction. The full acceptance run passed in 158.45 s after OVN recovery. |
 
 The first guest did not acquire its network until `/etc/netplan/10-incus.yaml` was repaired with `renderer: networkd`. The current recipe embeds that renderer and enables `systemd-networkd`. The corrected image passed the dedicated boot smoke with fingerprint `9d0da557210766289d59823a540050c3e7f328af66380974cc1ebd08e877bd11`; the token, screenshot, timing, and restart measurements below remain attributed to the repaired first guest.
 
@@ -57,6 +58,8 @@ Calling `click` again with PID 1220 and the token returned structured JSON:
 
 That response records delivery, not the GUI effect. A separate `get_window_state` call returned snapshot ID `s00000002`, 19 elements, and two `tab panel = "New Document"` entries. The before and after PNGs also differ. The state and image snapshots, not `effect: "unverifiable"`, prove that the tab count changed from one to two across calls.
 
+The corrected image also completed this interaction through `desktop.call` in one MCP `execute` program. A background attempt exposed an upstream delivery limitation: `click` returned `effect: "unverifiable"` with `route: "global_input"` but the next snapshot still showed one tab. The acceptance program therefore supplies the native `window_id` and explicitly requests `delivery_mode: "foreground"`. Its single click returned the same unverifiable effect, routed through accessibility; subsequent tree and PNG observations proved two tabs. No host-side retry or implicit foreground fallback was added.
+
 Representative single-operation timings from the repaired guest:
 
 | Operation | Total | Driver exec | PNG pull |
@@ -95,6 +98,8 @@ The final recipe runs X0tigervnc on guest TCP port 5900 with no baked reusable c
 
 The direct spike reached the management-network VNC endpoint at `10.10.40.65:5900`. It read the RFB banner `RFB 003.008\n` before restart and again after restart. Restart-to-Driver-ready took 12.117 seconds, after which `list_apps` returned structured JSON in 347 ms and X0tigervnc was running under a new PID. This proves recovery for the repaired first guest only.
 
+The corrected-image MCP acceptance created a separate viewer on the default OVN network, created a TCP forward, restarted the guest, and observed `desktop.info.ready == true` again. The address reported by `desktop.info.vnc`, `10.10.40.67:5900`, answered with `RFB 003.008\n`. The representative client retained only its private LAN NIC. Its complete create/wait/screenshot/list-apps program took 23.624 s. After shortening sandbox lifetime, the running reaper made the original screenshot URL return 404 at 27.120 s after expiry.
+
 ## Build measurements and release status
 
 Both local builds used fresh work and output directories. Download time includes the Go toolchain, vendored distrobuilder source, Ubuntu base, snapshot CA package, and full Cua Driver archive. Compile time excludes downloads and assembly. Scratch usage was sampled every 100 ms, so an interval peak can be missed.
@@ -108,4 +113,6 @@ The first image artifacts were `incus.tar.xz` SHA-256 `3174b0a6e76d6e1b3e601a7ff
 
 Protected bootstrap PR #23 and private bake run 34854323245 completed successfully. The desktop-aware publisher awaits deployment before the four-image bake. Desktop publication and catalog promotion remain pending; no desktop GHCR digest is claimed.
 
-The real MCP acceptance lane passed capability registration and reached sandbox creation. OVN rejected the create because `/var/lib/ovn/ovnnb_db.db` could not write: `ovncentral01` had filled its 20 GiB root filesystem, with approximately 19 GiB in logs. This is a Phase 5 infrastructure defect, not a desktop result. The companion fleet work preserves evidence before the explicitly approved log truncation and addresses recurrence.
+The original MCP blocker was a Phase 5 OVN outage: 19,307,134,976 bytes of logs filled central's 20 GiB root. The approved fleet recovery preserved complete signature counts and log boundaries before truncation, then recycled only the three Incus daemons retaining stale CA trust. No central database or northd process restarted. Logging limits are now active; details are in [fleet PR #20](https://github.com/GilmanLab/fleet/pull/20) and the central OVN runbook.
+
+Live acceptance also corrected two adapter boundaries. Native private Incus images need an image-access secret in the create request; the image existed even though the unauthenticated pull reported it missing. VNC forward discovery must use the same DHCP-lease fallback as forward creation because guest NIC state can briefly lack addresses after reboot. The passing run exercised both corrections without publishing the temporary image or delaying Driver readiness for networking.

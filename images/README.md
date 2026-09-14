@@ -236,11 +236,18 @@ entries. The smoke removed its own VM and imported image.
 
 Protected bootstrap PR #23 and private bake run 34854323245 completed
 successfully. The desktop-aware publisher must be deployed before the
-four-image bake. Desktop publication, verified fetch-back, live MCP acceptance,
-and the public catalog update remain pending; no desktop GHCR digest is claimed.
-Live MCP acceptance reached the server but was blocked before sandbox creation
-by the full root filesystem on `ovncentral01`. Recovery is tracked separately
-in the companion fleet change.
+four-image bake. Desktop publication, verified fetch-back, and the public
+catalog update remain pending; no desktop GHCR digest is claimed.
+
+The corrected image passed the complete production-stdio MCP acceptance run
+after OVN recovery: private-only client, desktop readiness, native `list_apps`,
+PNG URL fetch/decode, one foreground token click changing one editor tab to
+two, reboot recovery, and the VNC endpoint reported by `desktop.info`.
+The representative program took 23.624 s; the full run took 158.45 s.
+The running reaper returned 404 for the original screenshot 27.120 s after
+the shortened sandbox expiry. See the spike report for the native background
+delivery limitation and [fleet PR #20](https://github.com/GilmanLab/fleet/pull/20)
+for the separately recovered stale-CA reconnect storm and active log limits.
 
 ### Reproducibility
 
