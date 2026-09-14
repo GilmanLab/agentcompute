@@ -5,10 +5,9 @@
 #   /opt/router/nat --mode port-restricted --inside eth0 --outside eth1
 #
 # --mode masquerade: SNAT via nft masquerade on the outside interface.
-# --mode port-restricted: endpoint-independent mapping (masquerade persistent)
-# plus inbound filtering that only accepts replies from the original remote
-# endpoint. Conntrack ESTABLISHED is a 5-tuple, so a different remote address
-# or port cannot use the mapped public port.
+# --mode port-restricted: persistent masquerade with inbound filtering that
+# accepts replies only from the original remote endpoint. Conntrack tracks
+# both the remote address and port; persistent does not guarantee stable ports.
 #
 # Mapping and timeouts are whatever Linux conntrack provides; this helper does
 # not claim full-cone, hairpin, or stable port assignments. Only the
@@ -127,8 +126,12 @@ if [ -w /proc/sys/net/netfilter/nf_conntrack_helper ]; then
 fi
 
 masq_stmt="oifname \"${outside}\" masquerade"
+input_stmt=""
 if [ "$mode" = "port-restricted" ]; then
 	masq_stmt="oifname \"${outside}\" masquerade persistent"
+	# Unsolicited packets addressed to the router hit INPUT, not FORWARD.
+	# Drop before conntrack confirmation so they cannot occupy a reply tuple.
+	input_stmt="iifname \"${outside}\" ct state new drop"
 fi
 
 # Replace only the helper-owned table. Other nft tables are left untouched.
@@ -141,6 +144,11 @@ table ip router_nat {
 		ct state established,related accept
 		iifname "${inside}" oifname "${outside}" accept
 		iifname "${outside}" ct state new drop
+	}
+	chain input {
+		type filter hook input priority filter; policy accept;
+		iifname "${outside}" udp sport 67 udp dport 68 accept
+		${input_stmt}
 	}
 	chain postrouting {
 		type nat hook postrouting priority srcnat; policy accept;

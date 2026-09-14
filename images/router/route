@@ -144,14 +144,6 @@ case "$existing" in
 	err "refusing to replace kernel connected route $to"
 	;;
 esac
-if [ -n "$existing" ] && printf '%s\n' "$existing" | grep -Fq "via $via"; then
-	if [ -n "$dev" ]; then
-		printf 'route: %s via %s dev %s\n' "$to" "$via" "$dev" >&2
-	else
-		printf 'route: %s via %s\n' "$to" "$via" >&2
-	fi
-	exit 0
-fi
 
 if [ -n "$dev" ]; then
 	ip route replace "$to" via "$via" dev "$dev" || err "failed to replace route $to via $via dev $dev"

@@ -139,7 +139,17 @@ mkdir -p /run
 
 if [ -f "$pidfile" ]; then
 	oldpid=$(cat "$pidfile" 2>/dev/null || true)
+	case "$oldpid" in
+	"" | *[!0-9]* | 0* | 1) err "invalid daemon PID in $pidfile" ;;
+	esac
 	if [ -n "${oldpid:-}" ] && [ -d "/proc/$oldpid" ]; then
+		mapfile -d '' -t oldargs < "/proc/$oldpid/cmdline"
+		[ "${oldargs[0]:-}" = "dnsmasq" ] || err "$pidfile refers to an unrelated process"
+		owned=false
+		for arg in "${oldargs[@]}"; do
+			[ "$arg" != "--pid-file=$pidfile" ] || owned=true
+		done
+		[ "$owned" = true ] || err "$pidfile refers to another dnsmasq instance"
 		kill "$oldpid" 2>/dev/null || true
 		i=0
 		while [ "$i" -lt 20 ] && [ -d "/proc/$oldpid" ]; do
