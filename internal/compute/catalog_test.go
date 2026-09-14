@@ -160,6 +160,7 @@ func TestWindowsCatalogRequiresLocalAlias(t *testing.T) {
 		{name: "registry", reference: "ghcr.io/example/windows@sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			image := CatalogImage{
 				Name: "windows/11/desktop", OS: "Windows", Version: "11",
 				Kind: "vm", Kinds: []string{"vm"}, Desktop: true,

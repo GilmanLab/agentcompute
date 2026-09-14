@@ -106,8 +106,8 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 		Source: source,
 		InstancePut: api.InstancePut{
 			Profiles: []string{},
-			Config: config,
-			Devices: devices,
+			Config:   config,
+			Devices:  devices,
 		},
 	})
 	if err != nil {

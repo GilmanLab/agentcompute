@@ -84,7 +84,12 @@ func (c *Client) ensureImage(ctx context.Context, image compute.CatalogImage) (c
 	case image.Alias != "":
 		alias, _, err := c.Scoped(ctx, imageBuildProject, "").GetImageAlias(image.Alias)
 		if err != nil {
-			return compute.CatalogImage{}, fmt.Errorf("catalog image %q: resolve local alias %q: %w", image.Name, image.Alias, err)
+			return compute.CatalogImage{}, fmt.Errorf(
+				"catalog image %q: resolve local alias %q: %w",
+				image.Name,
+				image.Alias,
+				err,
+			)
 		}
 		out.Fingerprint = alias.Target
 		return out, nil

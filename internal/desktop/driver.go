@@ -31,9 +31,10 @@ const (
 	driverHome            = "/home/automation"
 	driverRuntime         = "/run/user/1000"
 	driverUID             = "1000"
-	windowsDriverBin       = `C:\ProgramData\agentcompute\cua-driver\cua-driver.exe`
-	windowsDriverSocket    = `\\.\pipe\cua-driver`
-	windowsDriverHome      = `C:\ProgramData\agentcompute`
+	driverCommandOverhead = 3
+	windowsDriverBin      = `C:\ProgramData\agentcompute\cua-driver\cua-driver.exe`
+	windowsDriverSocket   = `\\.\pipe\cua-driver`
+	windowsDriverHome     = `C:\ProgramData\agentcompute`
 	vncPort               = "5900"
 	vncTargetPort         = int64(5900)
 	nativeOKText          = "[OK]"
@@ -334,7 +335,12 @@ func (d *Driver) vncEndpoint(ctx context.Context, ref compute.Ref, inst compute.
 	return "", nil
 }
 
-func (d *Driver) execDriver(ctx context.Context, ref compute.Ref, osName string, args []string) (compute.ExecResult, error) {
+func (d *Driver) execDriver(
+	ctx context.Context,
+	ref compute.Ref,
+	osName string,
+	args []string,
+) (compute.ExecResult, error) {
 	bin, socket := driverBin, driverSocket
 	req := compute.ExecRequest{Ref: ref}
 	if strings.HasPrefix(strings.ToLower(osName), "windows") {
@@ -343,7 +349,7 @@ func (d *Driver) execDriver(ctx context.Context, ref compute.Ref, osName string,
 	} else {
 		req.User, req.Cwd, req.Env = driverUID, driverHome, driverEnv()
 	}
-	req.Argv = make([]string, 0, len(args)+3)
+	req.Argv = make([]string, 0, len(args)+driverCommandOverhead)
 	req.Argv = append(req.Argv, bin)
 	req.Argv = append(req.Argv, args...)
 	if args[0] != "dump-docs" {

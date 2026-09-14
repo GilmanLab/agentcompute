@@ -57,7 +57,6 @@ func TestImpairRejectsNonLinuxUname(t *testing.T) {
 	requireAgentContains(t, err, "non-Linux")
 }
 
-
 func TestImpairSurfacesGuestStderr(t *testing.T) {
 	t.Parallel()
 
@@ -87,15 +86,15 @@ func newWindowsImpairContext(t *testing.T) *testContext {
 
 	backend := mocks.NewMockBackend(t)
 	catalog, err := compute.NewCatalog([]compute.CatalogImage{{
-		Name:      "windows/11/desktop",
-		OS:        "windows",
-		Version:   "11",
-		Kind:      "vm",
-		Kinds:     []string{"vm"},
-		Alias:     "windows/11/desktop",
-		CPUs:      2,
-		MemoryMB:  4096,
-		DiskGB:    40,
+		Name:     "windows/11/desktop",
+		OS:       "windows",
+		Version:  "11",
+		Kind:     "vm",
+		Kinds:    []string{"vm"},
+		Alias:    "windows/11/desktop",
+		CPUs:     2,
+		MemoryMB: 4096,
+		DiskGB:   40,
 	}})
 	require.NoError(t, err)
 	service, err := compute.New(backend, catalog, compute.Options{Host: "lab01"})

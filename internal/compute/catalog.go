@@ -164,7 +164,7 @@ func normalizeCatalogImage(image CatalogImage) (CatalogImage, error) {
 		return CatalogImage{}, errors.New("alias must be a cluster-local image alias")
 	}
 	if strings.HasPrefix(strings.ToLower(image.OS), "windows") && image.Reference != "" {
-		return CatalogImage{}, errors.New("Windows images must use a cluster-local alias")
+		return CatalogImage{}, errors.New("windows images must use a cluster-local alias")
 	}
 	if image.Reference != "" && !validReference(image.Reference) {
 		return CatalogImage{}, fmt.Errorf("reference %q is neither a digest nor a remote alias", image.Reference)
