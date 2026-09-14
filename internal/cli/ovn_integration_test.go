@@ -522,7 +522,12 @@ func writeOVNConfig(t *testing.T, dir, root string, fx ovnFixture) string {
 		fmt.Fprintf(&b, "  ovn_ranges: %q\n", fx.Ranges)
 	}
 	b.WriteString("sandbox:\n  default_network_kind: ovn\n  default_ttl_minutes: 30\n")
-	fmt.Fprintf(&b, "images_file: %q\n", filepath.Join(root, "images", "catalog.yaml"))
+	fmt.Fprintf(
+		&b,
+		"images_file: %q\n",
+		envOr("AGENTCOMPUTE_TEST_CATALOG", filepath.Join(root, "images", "catalog.yaml")),
+	)
+	b.WriteString(integrationScreenshotConfig(t))
 	path := filepath.Join(dir, "config.yaml")
 	require.NoError(t, os.WriteFile(path, []byte(b.String()), 0o600))
 	return path

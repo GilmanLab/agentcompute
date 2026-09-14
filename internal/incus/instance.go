@@ -55,7 +55,11 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 		return nil, err
 	}
 
-	source, err := c.instanceSource(ctx, projectName(req.Ref.Sandbox), req.Image)
+	kind := api.InstanceTypeContainer
+	if req.Kind == kindVM {
+		kind = api.InstanceTypeVM
+	}
+	source, err := c.instanceSource(ctx, projectName(req.Ref.Sandbox), req.Image, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +86,6 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 			deviceNetworkKey: physical,
 			"name":           defaultNICName,
 		}
-	}
-
-	kind := api.InstanceTypeContainer
-	if req.Kind == kindVM {
-		kind = api.InstanceTypeVM
 	}
 
 	op, err := c.Scoped(ctx, projectName(req.Ref.Sandbox), host).CreateInstance(api.InstancesPost{
@@ -368,6 +367,7 @@ func (c *Client) instanceSource(
 	ctx context.Context,
 	project string,
 	image compute.CatalogImage,
+	kind api.InstanceType,
 ) (api.InstanceSource, error) {
 	if isSandboxImage(image) {
 		return api.InstanceSource{
@@ -376,27 +376,7 @@ func (c *Client) instanceSource(
 		}, nil
 	}
 	if isUpstreamRef(image.Reference) {
-		remote, alias, _ := splitRemoteAlias(image.Reference)
-		server, err := c.RemoteImage(ctx, remote)
-		if err != nil {
-			return api.InstanceSource{}, err
-		}
-		info, err := server.GetConnectionInfo()
-		if err != nil {
-			return api.InstanceSource{}, mapError(err)
-		}
-		source := api.InstanceSource{
-			Type:        sourceTypeImage,
-			Alias:       alias,
-			Server:      info.URL,
-			Protocol:    info.Protocol,
-			Certificate: info.Certificate,
-		}
-		if image.Fingerprint != "" {
-			source.Fingerprint = image.Fingerprint
-			source.Alias = ""
-		}
-		return source, nil
+		return c.upstreamInstanceSource(ctx, image, kind)
 	}
 
 	fingerprint, err := c.copyImage(ctx, project, image)
@@ -407,6 +387,87 @@ func (c *Client) instanceSource(
 		Type:        sourceTypeImage,
 		Fingerprint: fingerprint,
 	}, nil
+}
+
+func (c *Client) upstreamInstanceSource(
+	ctx context.Context,
+	image compute.CatalogImage,
+	kind api.InstanceType,
+) (api.InstanceSource, error) {
+	remote, alias, _ := splitRemoteAlias(image.Reference)
+	server, err := c.RemoteImage(ctx, remote)
+	if err != nil {
+		return api.InstanceSource{}, err
+	}
+	info, err := server.GetConnectionInfo()
+	if err != nil {
+		return api.InstanceSource{}, mapError(err)
+	}
+	source := api.InstanceSource{
+		Type:        sourceTypeImage,
+		Alias:       alias,
+		Server:      info.URL,
+		Protocol:    info.Protocol,
+		Certificate: info.Certificate,
+	}
+	if image.Fingerprint != "" {
+		source.Fingerprint = image.Fingerprint
+		source.Alias = ""
+	}
+	if _, native := server.(*incusclient.ProtocolIncus); !native {
+		return source, nil
+	}
+	return nativeInstanceSource(server, source, kind, info.Project)
+}
+
+func nativeInstanceSource(
+	server incusclient.ImageServer,
+	source api.InstanceSource,
+	kind api.InstanceType,
+	project string,
+) (api.InstanceSource, error) {
+	target := source.Alias
+	if source.Fingerprint != "" {
+		target = source.Fingerprint
+	}
+	resolved, err := resolveNativeImage(server, target, source.Alias, kind)
+	if err != nil {
+		return api.InstanceSource{}, err
+	}
+	source.Fingerprint = resolved.Fingerprint
+	source.Alias = ""
+	source.Project = project
+	if resolved.Public {
+		return source, nil
+	}
+	source.Secret, err = server.GetImageSecret(resolved.Fingerprint)
+	if err != nil {
+		return api.InstanceSource{}, mapError(err)
+	}
+	return source, nil
+}
+
+func resolveNativeImage(
+	server incusclient.ImageServer,
+	target, alias string,
+	kind api.InstanceType,
+) (*api.Image, error) {
+	resolved, _, err := server.GetImage(target)
+	if err == nil {
+		return resolved, nil
+	}
+	if !errors.Is(mapError(err), compute.ErrNotFound) || alias == "" {
+		return nil, mapError(err)
+	}
+	entry, _, aliasErr := server.GetImageAliasType(string(kind), alias)
+	if aliasErr != nil {
+		return nil, mapError(aliasErr)
+	}
+	resolved, _, err = server.GetImage(entry.Target)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return resolved, nil
 }
 
 func isSandboxImage(image compute.CatalogImage) bool {

@@ -77,7 +77,7 @@ type MockBackend_AddACLRule_Call struct {
 //   - s string
 //   - s1 string
 //   - aCLRule compute.ACLRule
-func (_e *MockBackend_Expecter) AddACLRule(context1 interface{}, s interface{}, s1 interface{}, aCLRule interface{}) *MockBackend_AddACLRule_Call {
+func (_e *MockBackend_Expecter) AddACLRule(context1 any, s any, s1 any, aCLRule any) *MockBackend_AddACLRule_Call {
 	return &MockBackend_AddACLRule_Call{Call: _e.mock.On("AddACLRule", context1, s, s1, aCLRule)}
 }
 
@@ -157,7 +157,7 @@ type MockBackend_AttachNIC_Call struct {
 //   - s1 string
 //   - s2 string
 //   - s3 string
-func (_e *MockBackend_Expecter) AttachNIC(context1 interface{}, ref interface{}, s interface{}, s1 interface{}, s2 interface{}, s3 interface{}) *MockBackend_AttachNIC_Call {
+func (_e *MockBackend_Expecter) AttachNIC(context1 any, ref any, s any, s1 any, s2 any, s3 any) *MockBackend_AttachNIC_Call {
 	return &MockBackend_AttachNIC_Call{Call: _e.mock.On("AttachNIC", context1, ref, s, s1, s2, s3)}
 }
 
@@ -245,7 +245,7 @@ type MockBackend_BeginCreateInstance_Call struct {
 // BeginCreateInstance is a helper method to define mock.On call
 //   - context1 context.Context
 //   - createInstance compute.CreateInstance
-func (_e *MockBackend_Expecter) BeginCreateInstance(context1 interface{}, createInstance interface{}) *MockBackend_BeginCreateInstance_Call {
+func (_e *MockBackend_Expecter) BeginCreateInstance(context1 any, createInstance any) *MockBackend_BeginCreateInstance_Call {
 	return &MockBackend_BeginCreateInstance_Call{Call: _e.mock.On("BeginCreateInstance", context1, createInstance)}
 }
 
@@ -316,7 +316,7 @@ type MockBackend_CreateForward_Call struct {
 //   - n int64
 //   - n1 int64
 //   - s2 string
-func (_e *MockBackend_Expecter) CreateForward(context1 interface{}, s interface{}, s1 interface{}, ref interface{}, n interface{}, n1 interface{}, s2 interface{}) *MockBackend_CreateForward_Call {
+func (_e *MockBackend_Expecter) CreateForward(context1 any, s any, s1 any, ref any, n any, n1 any, s2 any) *MockBackend_CreateForward_Call {
 	return &MockBackend_CreateForward_Call{Call: _e.mock.On("CreateForward", context1, s, s1, ref, n, n1, s2)}
 }
 
@@ -408,7 +408,7 @@ type MockBackend_CreateNetwork_Call struct {
 //   - context1 context.Context
 //   - s string
 //   - network compute.Network
-func (_e *MockBackend_Expecter) CreateNetwork(context1 interface{}, s interface{}, network interface{}) *MockBackend_CreateNetwork_Call {
+func (_e *MockBackend_Expecter) CreateNetwork(context1 any, s any, network any) *MockBackend_CreateNetwork_Call {
 	return &MockBackend_CreateNetwork_Call{Call: _e.mock.On("CreateNetwork", context1, s, network)}
 }
 
@@ -470,7 +470,7 @@ type MockBackend_CreateSandbox_Call struct {
 // CreateSandbox is a helper method to define mock.On call
 //   - context1 context.Context
 //   - sandbox compute.Sandbox
-func (_e *MockBackend_Expecter) CreateSandbox(context1 interface{}, sandbox interface{}) *MockBackend_CreateSandbox_Call {
+func (_e *MockBackend_Expecter) CreateSandbox(context1 any, sandbox any) *MockBackend_CreateSandbox_Call {
 	return &MockBackend_CreateSandbox_Call{Call: _e.mock.On("CreateSandbox", context1, sandbox)}
 }
 
@@ -528,7 +528,7 @@ type MockBackend_CreateSnapshot_Call struct {
 //   - context1 context.Context
 //   - ref compute.Ref
 //   - s string
-func (_e *MockBackend_Expecter) CreateSnapshot(context1 interface{}, ref interface{}, s interface{}) *MockBackend_CreateSnapshot_Call {
+func (_e *MockBackend_Expecter) CreateSnapshot(context1 any, ref any, s any) *MockBackend_CreateSnapshot_Call {
 	return &MockBackend_CreateSnapshot_Call{Call: _e.mock.On("CreateSnapshot", context1, ref, s)}
 }
 
@@ -590,7 +590,7 @@ type MockBackend_DeleteInstance_Call struct {
 // DeleteInstance is a helper method to define mock.On call
 //   - context1 context.Context
 //   - ref compute.Ref
-func (_e *MockBackend_Expecter) DeleteInstance(context1 interface{}, ref interface{}) *MockBackend_DeleteInstance_Call {
+func (_e *MockBackend_Expecter) DeleteInstance(context1 any, ref any) *MockBackend_DeleteInstance_Call {
 	return &MockBackend_DeleteInstance_Call{Call: _e.mock.On("DeleteInstance", context1, ref)}
 }
 
@@ -648,7 +648,7 @@ type MockBackend_DeleteNetwork_Call struct {
 //   - context1 context.Context
 //   - s string
 //   - s1 string
-func (_e *MockBackend_Expecter) DeleteNetwork(context1 interface{}, s interface{}, s1 interface{}) *MockBackend_DeleteNetwork_Call {
+func (_e *MockBackend_Expecter) DeleteNetwork(context1 any, s any, s1 any) *MockBackend_DeleteNetwork_Call {
 	return &MockBackend_DeleteNetwork_Call{Call: _e.mock.On("DeleteNetwork", context1, s, s1)}
 }
 
@@ -710,7 +710,7 @@ type MockBackend_DeleteSandbox_Call struct {
 // DeleteSandbox is a helper method to define mock.On call
 //   - context1 context.Context
 //   - s string
-func (_e *MockBackend_Expecter) DeleteSandbox(context1 interface{}, s interface{}) *MockBackend_DeleteSandbox_Call {
+func (_e *MockBackend_Expecter) DeleteSandbox(context1 any, s any) *MockBackend_DeleteSandbox_Call {
 	return &MockBackend_DeleteSandbox_Call{Call: _e.mock.On("DeleteSandbox", context1, s)}
 }
 
@@ -768,7 +768,7 @@ type MockBackend_DeleteSnapshot_Call struct {
 //   - context1 context.Context
 //   - ref compute.Ref
 //   - s string
-func (_e *MockBackend_Expecter) DeleteSnapshot(context1 interface{}, ref interface{}, s interface{}) *MockBackend_DeleteSnapshot_Call {
+func (_e *MockBackend_Expecter) DeleteSnapshot(context1 any, ref any, s any) *MockBackend_DeleteSnapshot_Call {
 	return &MockBackend_DeleteSnapshot_Call{Call: _e.mock.On("DeleteSnapshot", context1, ref, s)}
 }
 
@@ -831,7 +831,7 @@ type MockBackend_DetachNIC_Call struct {
 //   - context1 context.Context
 //   - ref compute.Ref
 //   - s string
-func (_e *MockBackend_Expecter) DetachNIC(context1 interface{}, ref interface{}, s interface{}) *MockBackend_DetachNIC_Call {
+func (_e *MockBackend_Expecter) DetachNIC(context1 any, ref any, s any) *MockBackend_DetachNIC_Call {
 	return &MockBackend_DetachNIC_Call{Call: _e.mock.On("DetachNIC", context1, ref, s)}
 }
 
@@ -904,7 +904,7 @@ type MockBackend_Exec_Call struct {
 //   - execRequest compute.ExecRequest
 //   - writer io.Writer
 //   - writer1 io.Writer
-func (_e *MockBackend_Expecter) Exec(context1 interface{}, execRequest interface{}, writer interface{}, writer1 interface{}) *MockBackend_Exec_Call {
+func (_e *MockBackend_Expecter) Exec(context1 any, execRequest any, writer any, writer1 any) *MockBackend_Exec_Call {
 	return &MockBackend_Exec_Call{Call: _e.mock.On("Exec", context1, execRequest, writer, writer1)}
 }
 
@@ -981,7 +981,7 @@ type MockBackend_ExtendSandbox_Call struct {
 //   - context1 context.Context
 //   - s string
 //   - time1 time.Time
-func (_e *MockBackend_Expecter) ExtendSandbox(context1 interface{}, s interface{}, time1 interface{}) *MockBackend_ExtendSandbox_Call {
+func (_e *MockBackend_Expecter) ExtendSandbox(context1 any, s any, time1 any) *MockBackend_ExtendSandbox_Call {
 	return &MockBackend_ExtendSandbox_Call{Call: _e.mock.On("ExtendSandbox", context1, s, time1)}
 }
 
@@ -1052,7 +1052,7 @@ type MockBackend_GetInstance_Call struct {
 // GetInstance is a helper method to define mock.On call
 //   - context1 context.Context
 //   - ref compute.Ref
-func (_e *MockBackend_Expecter) GetInstance(context1 interface{}, ref interface{}) *MockBackend_GetInstance_Call {
+func (_e *MockBackend_Expecter) GetInstance(context1 any, ref any) *MockBackend_GetInstance_Call {
 	return &MockBackend_GetInstance_Call{Call: _e.mock.On("GetInstance", context1, ref)}
 }
 
@@ -1119,7 +1119,7 @@ type MockBackend_GetNetwork_Call struct {
 //   - context1 context.Context
 //   - s string
 //   - s1 string
-func (_e *MockBackend_Expecter) GetNetwork(context1 interface{}, s interface{}, s1 interface{}) *MockBackend_GetNetwork_Call {
+func (_e *MockBackend_Expecter) GetNetwork(context1 any, s any, s1 any) *MockBackend_GetNetwork_Call {
 	return &MockBackend_GetNetwork_Call{Call: _e.mock.On("GetNetwork", context1, s, s1)}
 }
 
@@ -1190,7 +1190,7 @@ type MockBackend_GetSandbox_Call struct {
 // GetSandbox is a helper method to define mock.On call
 //   - context1 context.Context
 //   - s string
-func (_e *MockBackend_Expecter) GetSandbox(context1 interface{}, s interface{}) *MockBackend_GetSandbox_Call {
+func (_e *MockBackend_Expecter) GetSandbox(context1 any, s any) *MockBackend_GetSandbox_Call {
 	return &MockBackend_GetSandbox_Call{Call: _e.mock.On("GetSandbox", context1, s)}
 }
 
@@ -1257,7 +1257,7 @@ type MockBackend_GetSandboxImage_Call struct {
 //   - context1 context.Context
 //   - s string
 //   - s1 string
-func (_e *MockBackend_Expecter) GetSandboxImage(context1 interface{}, s interface{}, s1 interface{}) *MockBackend_GetSandboxImage_Call {
+func (_e *MockBackend_Expecter) GetSandboxImage(context1 any, s any, s1 any) *MockBackend_GetSandboxImage_Call {
 	return &MockBackend_GetSandboxImage_Call{Call: _e.mock.On("GetSandboxImage", context1, s, s1)}
 }
 
@@ -1290,6 +1290,84 @@ func (_c *MockBackend_GetSandboxImage_Call) Return(catalogImage compute.CatalogI
 }
 
 func (_c *MockBackend_GetSandboxImage_Call) RunAndReturn(run func(context1 context.Context, s string, s1 string) (compute.CatalogImage, error)) *MockBackend_GetSandboxImage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// InstanceForward provides a mock function for the type MockBackend
+func (_mock *MockBackend) InstanceForward(context1 context.Context, ref compute.Ref, n int64, s string) (compute.Forward, error) {
+	ret := _mock.Called(context1, ref, n, s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InstanceForward")
+	}
+
+	var r0 compute.Forward
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, int64, string) (compute.Forward, error)); ok {
+		return returnFunc(context1, ref, n, s)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, int64, string) compute.Forward); ok {
+		r0 = returnFunc(context1, ref, n, s)
+	} else {
+		r0 = ret.Get(0).(compute.Forward)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref, int64, string) error); ok {
+		r1 = returnFunc(context1, ref, n, s)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBackend_InstanceForward_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InstanceForward'
+type MockBackend_InstanceForward_Call struct {
+	*mock.Call
+}
+
+// InstanceForward is a helper method to define mock.On call
+//   - context1 context.Context
+//   - ref compute.Ref
+//   - n int64
+//   - s string
+func (_e *MockBackend_Expecter) InstanceForward(context1 any, ref any, n any, s any) *MockBackend_InstanceForward_Call {
+	return &MockBackend_InstanceForward_Call{Call: _e.mock.On("InstanceForward", context1, ref, n, s)}
+}
+
+func (_c *MockBackend_InstanceForward_Call) Run(run func(context1 context.Context, ref compute.Ref, n int64, s string)) *MockBackend_InstanceForward_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBackend_InstanceForward_Call) Return(forward compute.Forward, err error) *MockBackend_InstanceForward_Call {
+	_c.Call.Return(forward, err)
+	return _c
+}
+
+func (_c *MockBackend_InstanceForward_Call) RunAndReturn(run func(context1 context.Context, ref compute.Ref, n int64, s string) (compute.Forward, error)) *MockBackend_InstanceForward_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1330,7 +1408,7 @@ type MockBackend_ListInstances_Call struct {
 // ListInstances is a helper method to define mock.On call
 //   - context1 context.Context
 //   - s string
-func (_e *MockBackend_Expecter) ListInstances(context1 interface{}, s interface{}) *MockBackend_ListInstances_Call {
+func (_e *MockBackend_Expecter) ListInstances(context1 any, s any) *MockBackend_ListInstances_Call {
 	return &MockBackend_ListInstances_Call{Call: _e.mock.On("ListInstances", context1, s)}
 }
 
@@ -1398,7 +1476,7 @@ type MockBackend_ListNetworks_Call struct {
 // ListNetworks is a helper method to define mock.On call
 //   - context1 context.Context
 //   - s string
-func (_e *MockBackend_Expecter) ListNetworks(context1 interface{}, s interface{}) *MockBackend_ListNetworks_Call {
+func (_e *MockBackend_Expecter) ListNetworks(context1 any, s any) *MockBackend_ListNetworks_Call {
 	return &MockBackend_ListNetworks_Call{Call: _e.mock.On("ListNetworks", context1, s)}
 }
 
@@ -1465,7 +1543,7 @@ type MockBackend_ListSandboxes_Call struct {
 
 // ListSandboxes is a helper method to define mock.On call
 //   - context1 context.Context
-func (_e *MockBackend_Expecter) ListSandboxes(context1 interface{}) *MockBackend_ListSandboxes_Call {
+func (_e *MockBackend_Expecter) ListSandboxes(context1 any) *MockBackend_ListSandboxes_Call {
 	return &MockBackend_ListSandboxes_Call{Call: _e.mock.On("ListSandboxes", context1)}
 }
 
@@ -1528,7 +1606,7 @@ type MockBackend_ListSnapshots_Call struct {
 // ListSnapshots is a helper method to define mock.On call
 //   - context1 context.Context
 //   - ref compute.Ref
-func (_e *MockBackend_Expecter) ListSnapshots(context1 interface{}, ref interface{}) *MockBackend_ListSnapshots_Call {
+func (_e *MockBackend_Expecter) ListSnapshots(context1 any, ref any) *MockBackend_ListSnapshots_Call {
 	return &MockBackend_ListSnapshots_Call{Call: _e.mock.On("ListSnapshots", context1, ref)}
 }
 
@@ -1587,7 +1665,7 @@ type MockBackend_PeerNetworks_Call struct {
 //   - s string
 //   - s1 string
 //   - s2 string
-func (_e *MockBackend_Expecter) PeerNetworks(context1 interface{}, s interface{}, s1 interface{}, s2 interface{}) *MockBackend_PeerNetworks_Call {
+func (_e *MockBackend_Expecter) PeerNetworks(context1 any, s any, s1 any, s2 any) *MockBackend_PeerNetworks_Call {
 	return &MockBackend_PeerNetworks_Call{Call: _e.mock.On("PeerNetworks", context1, s, s1, s2)}
 }
 
@@ -1664,7 +1742,7 @@ type MockBackend_PublishInstance_Call struct {
 //   - context1 context.Context
 //   - ref compute.Ref
 //   - s string
-func (_e *MockBackend_Expecter) PublishInstance(context1 interface{}, ref interface{}, s interface{}) *MockBackend_PublishInstance_Call {
+func (_e *MockBackend_Expecter) PublishInstance(context1 any, ref any, s any) *MockBackend_PublishInstance_Call {
 	return &MockBackend_PublishInstance_Call{Call: _e.mock.On("PublishInstance", context1, ref, s)}
 }
 
@@ -1697,6 +1775,80 @@ func (_c *MockBackend_PublishInstance_Call) Return(s1 string, err error) *MockBa
 }
 
 func (_c *MockBackend_PublishInstance_Call) RunAndReturn(run func(context1 context.Context, ref compute.Ref, s string) (string, error)) *MockBackend_PublishInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadBinaryFile provides a mock function for the type MockBackend
+func (_mock *MockBackend) ReadBinaryFile(context1 context.Context, ref compute.Ref, s string) (io.ReadCloser, error) {
+	ret := _mock.Called(context1, ref, s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadBinaryFile")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) (io.ReadCloser, error)); ok {
+		return returnFunc(context1, ref, s)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) io.ReadCloser); ok {
+		r0 = returnFunc(context1, ref, s)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref, string) error); ok {
+		r1 = returnFunc(context1, ref, s)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBackend_ReadBinaryFile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadBinaryFile'
+type MockBackend_ReadBinaryFile_Call struct {
+	*mock.Call
+}
+
+// ReadBinaryFile is a helper method to define mock.On call
+//   - context1 context.Context
+//   - ref compute.Ref
+//   - s string
+func (_e *MockBackend_Expecter) ReadBinaryFile(context1 any, ref any, s any) *MockBackend_ReadBinaryFile_Call {
+	return &MockBackend_ReadBinaryFile_Call{Call: _e.mock.On("ReadBinaryFile", context1, ref, s)}
+}
+
+func (_c *MockBackend_ReadBinaryFile_Call) Run(run func(context1 context.Context, ref compute.Ref, s string)) *MockBackend_ReadBinaryFile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBackend_ReadBinaryFile_Call) Return(readCloser io.ReadCloser, err error) *MockBackend_ReadBinaryFile_Call {
+	_c.Call.Return(readCloser, err)
+	return _c
+}
+
+func (_c *MockBackend_ReadBinaryFile_Call) RunAndReturn(run func(context1 context.Context, ref compute.Ref, s string) (io.ReadCloser, error)) *MockBackend_ReadBinaryFile_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1735,7 +1887,7 @@ type MockBackend_ReadFile_Call struct {
 // ReadFile is a helper method to define mock.On call
 //   - context1 context.Context
 //   - fileReadRequest compute.FileReadRequest
-func (_e *MockBackend_Expecter) ReadFile(context1 interface{}, fileReadRequest interface{}) *MockBackend_ReadFile_Call {
+func (_e *MockBackend_Expecter) ReadFile(context1 any, fileReadRequest any) *MockBackend_ReadFile_Call {
 	return &MockBackend_ReadFile_Call{Call: _e.mock.On("ReadFile", context1, fileReadRequest)}
 }
 
@@ -1794,7 +1946,7 @@ type MockBackend_RemoveACLRule_Call struct {
 //   - s string
 //   - s1 string
 //   - s2 string
-func (_e *MockBackend_Expecter) RemoveACLRule(context1 interface{}, s interface{}, s1 interface{}, s2 interface{}) *MockBackend_RemoveACLRule_Call {
+func (_e *MockBackend_Expecter) RemoveACLRule(context1 any, s any, s1 any, s2 any) *MockBackend_RemoveACLRule_Call {
 	return &MockBackend_RemoveACLRule_Call{Call: _e.mock.On("RemoveACLRule", context1, s, s1, s2)}
 }
 
@@ -1871,7 +2023,7 @@ type MockBackend_RestartInstance_Call struct {
 //   - context1 context.Context
 //   - ref compute.Ref
 //   - b bool
-func (_e *MockBackend_Expecter) RestartInstance(context1 interface{}, ref interface{}, b interface{}) *MockBackend_RestartInstance_Call {
+func (_e *MockBackend_Expecter) RestartInstance(context1 any, ref any, b any) *MockBackend_RestartInstance_Call {
 	return &MockBackend_RestartInstance_Call{Call: _e.mock.On("RestartInstance", context1, ref, b)}
 }
 
@@ -1934,7 +2086,7 @@ type MockBackend_RestoreSnapshot_Call struct {
 //   - context1 context.Context
 //   - ref compute.Ref
 //   - s string
-func (_e *MockBackend_Expecter) RestoreSnapshot(context1 interface{}, ref interface{}, s interface{}) *MockBackend_RestoreSnapshot_Call {
+func (_e *MockBackend_Expecter) RestoreSnapshot(context1 any, ref any, s any) *MockBackend_RestoreSnapshot_Call {
 	return &MockBackend_RestoreSnapshot_Call{Call: _e.mock.On("RestoreSnapshot", context1, ref, s)}
 }
 
@@ -2006,7 +2158,7 @@ type MockBackend_StartInstance_Call struct {
 //   - context1 context.Context
 //   - ref compute.Ref
 //   - b bool
-func (_e *MockBackend_Expecter) StartInstance(context1 interface{}, ref interface{}, b interface{}) *MockBackend_StartInstance_Call {
+func (_e *MockBackend_Expecter) StartInstance(context1 any, ref any, b any) *MockBackend_StartInstance_Call {
 	return &MockBackend_StartInstance_Call{Call: _e.mock.On("StartInstance", context1, ref, b)}
 }
 
@@ -2078,7 +2230,7 @@ type MockBackend_StopInstance_Call struct {
 //   - context1 context.Context
 //   - ref compute.Ref
 //   - b bool
-func (_e *MockBackend_Expecter) StopInstance(context1 interface{}, ref interface{}, b interface{}) *MockBackend_StopInstance_Call {
+func (_e *MockBackend_Expecter) StopInstance(context1 any, ref any, b any) *MockBackend_StopInstance_Call {
 	return &MockBackend_StopInstance_Call{Call: _e.mock.On("StopInstance", context1, ref, b)}
 }
 
@@ -2149,7 +2301,7 @@ type MockBackend_WaitInstance_Call struct {
 // WaitInstance is a helper method to define mock.On call
 //   - context1 context.Context
 //   - waitRequest compute.WaitRequest
-func (_e *MockBackend_Expecter) WaitInstance(context1 interface{}, waitRequest interface{}) *MockBackend_WaitInstance_Call {
+func (_e *MockBackend_Expecter) WaitInstance(context1 any, waitRequest any) *MockBackend_WaitInstance_Call {
 	return &MockBackend_WaitInstance_Call{Call: _e.mock.On("WaitInstance", context1, waitRequest)}
 }
 
@@ -2215,7 +2367,7 @@ type MockBackend_WriteFile_Call struct {
 // WriteFile is a helper method to define mock.On call
 //   - context1 context.Context
 //   - fileWriteRequest compute.FileWriteRequest
-func (_e *MockBackend_Expecter) WriteFile(context1 interface{}, fileWriteRequest interface{}) *MockBackend_WriteFile_Call {
+func (_e *MockBackend_Expecter) WriteFile(context1 any, fileWriteRequest any) *MockBackend_WriteFile_Call {
 	return &MockBackend_WriteFile_Call{Call: _e.mock.On("WriteFile", context1, fileWriteRequest)}
 }
 

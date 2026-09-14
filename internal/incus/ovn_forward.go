@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	incusclient "github.com/lxc/incus/v7/client"
 	"github.com/lxc/incus/v7/shared/api"
 
 	"github.com/GilmanLab/agentcompute/internal/compute"
@@ -27,16 +28,18 @@ func (c *Client) CreateForward(
 	if _, err := c.ownedProjectNetwork(ctx, sandbox, network); err != nil {
 		return compute.Forward{}, err
 	}
-	target, err := c.forwardTargetAddress(ctx, sandbox, network, ref)
+	instance, err := c.GetInstance(ctx, ref)
 	if err != nil {
 		return compute.Forward{}, err
 	}
-	listen := strconv.FormatInt(listenPort, 10)
-	targetPort := strconv.FormatInt(port, 10)
+	target, err := c.forwardTargetAddress(ctx, sandbox, network, instance)
+	if err != nil {
+		return compute.Forward{}, err
+	}
 	portSpec := api.NetworkForwardPort{
 		Protocol:      protocol,
-		ListenPort:    listen,
-		TargetPort:    targetPort,
+		ListenPort:    strconv.FormatInt(listenPort, 10),
+		TargetPort:    strconv.FormatInt(port, 10),
 		TargetAddress: target,
 	}
 
@@ -46,29 +49,50 @@ func (c *Client) CreateForward(
 		return compute.Forward{}, mapOVNError(err)
 	}
 	if len(forwards) > 0 {
-		existing := forwards[0]
-		if forwardHasPort(existing, protocol, listen) {
-			return compute.Forward{}, fmt.Errorf(
-				"listen port %s/%s is already forwarded on %s",
-				listen,
-				protocol,
-				existing.ListenAddress,
-			)
-		}
-		writable := existing.Writable()
-		writable.Ports = append(writable.Ports, portSpec)
-		if err := srv.UpdateNetworkForward(network, existing.ListenAddress, writable, ""); err != nil {
-			return compute.Forward{}, mapOVNError(err)
-		}
-		return compute.Forward{
-			Address:  existing.ListenAddress,
-			Port:     listenPort,
-			Protocol: protocol,
-			Network:  network,
-			Instance: ref.Name,
-		}, nil
+		return addForwardPort(srv, network, forwards[0], portSpec, listenPort, protocol, ref.Name)
 	}
+	return c.createAllocatedForward(ctx, srv, sandbox, network, ref, portSpec, listenPort, protocol)
+}
 
+func addForwardPort(
+	srv incusclient.InstanceServer,
+	network string,
+	existing api.NetworkForward,
+	portSpec api.NetworkForwardPort,
+	listenPort int64,
+	protocol, instance string,
+) (compute.Forward, error) {
+	if forwardHasPort(existing, protocol, portSpec.ListenPort) {
+		return compute.Forward{}, fmt.Errorf(
+			"listen port %s/%s is already forwarded on %s",
+			portSpec.ListenPort,
+			protocol,
+			existing.ListenAddress,
+		)
+	}
+	writable := existing.Writable()
+	writable.Ports = append(writable.Ports, portSpec)
+	if err := srv.UpdateNetworkForward(network, existing.ListenAddress, writable, ""); err != nil {
+		return compute.Forward{}, mapOVNError(err)
+	}
+	return compute.Forward{
+		Address:  existing.ListenAddress,
+		Port:     listenPort,
+		Protocol: protocol,
+		Network:  network,
+		Instance: instance,
+	}, nil
+}
+
+func (c *Client) createAllocatedForward(
+	ctx context.Context,
+	srv incusclient.InstanceServer,
+	sandbox, network string,
+	ref compute.Ref,
+	portSpec api.NetworkForwardPort,
+	listenPort int64,
+	protocol string,
+) (compute.Forward, error) {
 	for {
 		address, err := c.allocateForwardAddress(ctx)
 		if err != nil {
@@ -93,22 +117,30 @@ func (c *Client) CreateForward(
 		}
 		// Retry only a confirmed allocation race. A forward already on this
 		// network may be an uncertain commit; never create a second one.
-		current, inspectErr := srv.GetNetworkForwards(network)
-		if inspectErr != nil || len(current) != 0 {
-			return compute.Forward{}, mapOVNError(err)
-		}
-		used, inspectErr := c.usedOVNAddresses(ctx)
-		if inspectErr != nil || !used[address] {
+		if !c.forwardAllocationRace(ctx, srv, network, address) {
 			return compute.Forward{}, mapOVNError(err)
 		}
 	}
 }
 
-func (c *Client) forwardTargetAddress(ctx context.Context, sandbox, network string, ref compute.Ref) (string, error) {
-	instance, err := c.GetInstance(ctx, ref)
-	if err != nil {
-		return "", err
+func (c *Client) forwardAllocationRace(
+	ctx context.Context,
+	srv incusclient.InstanceServer,
+	network, address string,
+) bool {
+	current, inspectErr := srv.GetNetworkForwards(network)
+	if inspectErr != nil || len(current) != 0 {
+		return false
 	}
+	used, inspectErr := c.usedOVNAddresses(ctx)
+	return inspectErr == nil && used[address]
+}
+
+func (c *Client) forwardTargetAddress(
+	ctx context.Context,
+	sandbox, network string,
+	instance compute.Instance,
+) (string, error) {
 	for _, nic := range instance.NICs {
 		if nic.Network != network {
 			continue
@@ -125,7 +157,7 @@ func (c *Client) forwardTargetAddress(ctx context.Context, sandbox, network stri
 		return "", mapError(err)
 	}
 	for _, lease := range leases {
-		if lease.Hostname != ref.Name {
+		if lease.Hostname != instance.Ref.Name {
 			continue
 		}
 		ip := net.ParseIP(lease.Address)
@@ -133,7 +165,7 @@ func (c *Client) forwardTargetAddress(ctx context.Context, sandbox, network stri
 			return ip.String(), nil
 		}
 	}
-	return "", fmt.Errorf("instance %q has no address on network %q", ref.Name, network)
+	return "", fmt.Errorf("instance %q has no address on network %q", instance.Ref.Name, network)
 }
 
 func (c *Client) allocateForwardAddress(ctx context.Context) (string, error) {
@@ -183,6 +215,106 @@ func (c *Client) usedOVNAddresses(ctx context.Context) (map[string]bool, error) 
 		}
 	}
 	return used, nil
+}
+
+// InstanceForward observes the scalar forward shape created by net.forward.
+func (c *Client) InstanceForward(
+	ctx context.Context,
+	ref compute.Ref,
+	targetPort int64,
+	protocol string,
+) (compute.Forward, error) {
+	inst, err := c.GetInstance(ctx, ref)
+	if err != nil {
+		return compute.Forward{}, err
+	}
+	networks, err := c.ListNetworks(ctx, ref.Sandbox)
+	if err != nil {
+		return compute.Forward{}, err
+	}
+	srv := c.Scoped(ctx, projectName(ref.Sandbox), "")
+	target := strconv.FormatInt(targetPort, 10)
+	for _, network := range networks {
+		forward, found, err := c.instanceForwardOnNetwork(ctx, srv, ref, inst, network, target, protocol)
+		if err != nil || found {
+			return forward, err
+		}
+	}
+	return compute.Forward{}, nil
+}
+
+func (c *Client) instanceForwardOnNetwork(
+	ctx context.Context,
+	srv incusclient.InstanceServer,
+	ref compute.Ref,
+	inst compute.Instance,
+	network compute.Network,
+	target, protocol string,
+) (compute.Forward, bool, error) {
+	if network.Kind != networkKindOVN {
+		return compute.Forward{}, false, nil
+	}
+	for _, nic := range inst.NICs {
+		if nic.Network != network.Name {
+			continue
+		}
+		forwards, err := srv.GetNetworkForwards(network.Name)
+		if err != nil {
+			return compute.Forward{}, false, mapOVNError(err)
+		}
+		if len(forwards) == 0 {
+			continue
+		}
+		targetAddress, err := c.forwardTargetAddress(ctx, ref.Sandbox, network.Name, inst)
+		if err != nil {
+			return compute.Forward{}, false, err
+		}
+		if forward, ok := matchingForward(forwards, protocol, target, targetAddress, network.Name, ref.Name); ok {
+			return forward, true, nil
+		}
+	}
+	return compute.Forward{}, false, nil
+}
+
+func matchingForward(
+	forwards []api.NetworkForward,
+	protocol, target, targetAddress, network, instance string,
+) (compute.Forward, bool) {
+	for _, forward := range forwards {
+		for _, port := range forward.Ports {
+			if !forwardPortMatches(forward, port, protocol, target, targetAddress) {
+				continue
+			}
+			listen, err := strconv.ParseInt(port.ListenPort, 10, 64)
+			if err != nil {
+				continue
+			}
+			return compute.Forward{
+				Address:  forward.ListenAddress,
+				Port:     listen,
+				Protocol: protocol,
+				Network:  network,
+				Instance: instance,
+			}, true
+		}
+	}
+	return compute.Forward{}, false
+}
+
+func forwardPortMatches(
+	forward api.NetworkForward,
+	port api.NetworkForwardPort,
+	protocol, target, targetAddress string,
+) bool {
+	address := port.TargetAddress
+	if address == "" {
+		address = forward.Config["target_address"]
+	}
+	mapped := port.TargetPort
+	if mapped == "" {
+		mapped = port.ListenPort
+	}
+	return port.Protocol == protocol && mapped == target && address == targetAddress
 }
 
 func (c *Client) deleteForwardsInProject(ctx context.Context, project, network string) []error {

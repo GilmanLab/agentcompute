@@ -309,6 +309,25 @@ func (s *Service) CreateForward(
 	return created, nil
 }
 
+// InstanceForward finds an existing scalar port forward to a guest.
+// An empty Address means no matching forward; this method never exposes a port.
+func (s *Service) InstanceForward(ctx context.Context, ref Ref, targetPort int64, protocol string) (Forward, error) {
+	if err := validateRef(ref); err != nil {
+		return Forward{}, err
+	}
+	if targetPort < 1 || targetPort > 65535 || (protocol != "tcp" && protocol != "udp") {
+		return Forward{}, agentError("forward lookup requires a valid port and tcp or udp protocol")
+	}
+	if _, err := s.SandboxExpiry(ctx, ref.Sandbox); err != nil {
+		return Forward{}, err
+	}
+	forward, err := s.backend.InstanceForward(ctx, ref, targetPort, protocol)
+	if err != nil {
+		return Forward{}, s.mapBackend(ctx, "find instance forward", err)
+	}
+	return forward, nil
+}
+
 // ImpairNIC applies Linux-only tc netem settings inside a guest. It is not gated.
 func (s *Service) ImpairNIC(ctx context.Context, ref Ref, nic string, impairment Impairment) error {
 	if err := validateRef(ref); err != nil {

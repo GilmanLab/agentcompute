@@ -97,6 +97,12 @@ in the restricted `image-build` project, publishes to the existing
 `ghcr.io/gilmanlab/agentcompute/<image>` namespace, and fetches each digest
 back independently before opening a public catalog PR.
 
+A newly created GHCR package starts private. For this public catalog, its
+owner must explicitly make the package public in GitHub's package settings
+after the first publication. This change cannot be reversed to private.
+Verify anonymous access before merging its catalog entry: authenticated
+fetch-back by the publisher does not establish public availability.
+
 The immutable tag hashes definition inputs under `images/`, excluding
 `catalog.yaml` and Markdown. An existing release skips assembly and
 publication but is still fetched and boot-qualified. Registry or
@@ -108,6 +114,9 @@ attestations; new private bakes must not be described as carrying that
 provenance. Digest verification and boot tests establish different properties.
 
 The server's startup reconciler imports catalog digest references into `image-build`, verifies bytes, smoke-launches the image, and moves the alias only after success. It records the imgoci digest in image properties; the Incus fingerprint is derived, not a stable identity across rebuilds.
+Desktop VM qualification waits for X11, the automation user's Driver
+service, and a native `list_apps` call through that user's session. It uses
+the catalog's CPU and memory defaults and does not require the GitHub runner.
 
 For a verified download without import:
 
@@ -217,12 +226,13 @@ Scratch is sampled every 100 ms, so short peaks between samples are missed.
 
 ### Desktop Phase 6
 
-Two local desktop builds used fresh work and output directories:
+The two local builds and protected publication produced these measurements:
 
 | Build evidence | Download | Compile | Assemble | Peak RSS | Scratch high-water | `incus.tar.xz` | `disk.qcow2` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | First image | 5.849 s | 31.670 s | 842.017 s | 507,180 KiB | 7,625,043,968 B | 656 B | 744,611,840 B |
 | Corrected networkd rebuild | 5.824 s | 31.834 s | 392.512 s | 517,712 KiB | 7,621,808,128 B | 640 B | 745,013,248 B |
+| Protected published build | 6.624 s | 33.283 s | 403.364 s | 505,216 KiB | 7,620,071,424 B | 628 B | 742,923,264 B |
 
 Download includes verified retrieval of Go, vendored distrobuilder source,
 Ubuntu base, the snapshot CA package, and the full Cua Driver archive. Compile
@@ -234,18 +244,28 @@ subsequently passed `images/ubuntu-24.04-desktop/smoke.py` in `image-build`:
 X11, the graphical user's active Driver service, and 234 native `list_apps`
 entries. The smoke removed its own VM and imported image.
 
-Protected bootstrap PR #23 and private bake run 34854323245 completed
-successfully. The desktop-aware publisher must be deployed before the
-four-image bake. Desktop publication, verified fetch-back, and the public
-catalog update remain pending; no desktop GHCR digest is claimed.
+The desktop-aware publisher is deployed. Image PR #25 merged as
+`e4333f245b4e81c8d7753038f0ddf04a620bd0a2`, and
+[protected bake 34872818589](https://github.com/GilmanLab/agentcompute-images/actions/runs/34872818589)
+built, boot-qualified, published, and fetched back all four images.
+The desktop pipeline took 674.806 s and produced:
+
+```text
+ghcr.io/gilmanlab/agentcompute/ubuntu-24.04-desktop@sha256:5dc4e120a79dd06ad6784e69474f0617387f74cb98685af8844170b7165ea8e2
+```
+
+[Catalog PR #27](https://github.com/GilmanLab/agentcompute/pull/27) records
+this digest and remains unmerged by request. Published artifact hashes and
+the independent publisher rollout evidence are in the spike report.
 
 The corrected image passed the complete production-stdio MCP acceptance run
 after OVN recovery: private-only client, desktop readiness, native `list_apps`,
-PNG URL fetch/decode, one foreground token click changing one editor tab to
-two, reboot recovery, and the VNC endpoint reported by `desktop.info`.
-The representative program took 23.624 s; the full run took 158.45 s.
-The running reaper returned 404 for the original screenshot 27.120 s after
-the shortened sandbox expiry. See the spike report for the native background
+PNG URL fetch/decode, one foreground token click changing a single document
+to two document tabs, reboot recovery, and the VNC endpoint reported by
+`desktop.info`. The post-refactor repeat's representative program took
+22.764 s; full acceptance took 160.32 s. The running reaper returned 404 for
+the original screenshot 26.804 s after the shortened sandbox expiry.
+See the spike report for the native background
 delivery limitation and [fleet PR #20](https://github.com/GilmanLab/fleet/pull/20)
 for the separately recovered stale-CA reconnect storm and active log limits.
 

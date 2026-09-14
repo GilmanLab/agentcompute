@@ -17,7 +17,7 @@ const (
 	WaitUntilAgent = "agent"
 	// WaitUntilNetwork means at least one NIC has a non-link address.
 	WaitUntilNetwork = "network"
-	// WaitUntilDesktop is reserved for Phase 6.
+	// WaitUntilDesktop means the Driver answers in the guest graphical session.
 	WaitUntilDesktop = "desktop"
 	// WaitUntilStopped means the guest has reached Stopped.
 	WaitUntilStopped = "stopped"
@@ -122,7 +122,13 @@ func (s *Service) WaitInstance(ctx context.Context, req WaitRequest) (WaitResult
 	waitCtx, cancel := execContext(ctx, req.Timeout)
 	defer cancel()
 	started := time.Now()
-	result, err := s.backend.WaitInstance(waitCtx, req)
+	var result WaitResult
+	var err error
+	if req.Until == WaitUntilDesktop {
+		result, err = s.waitDesktop(waitCtx, req.Ref)
+	} else {
+		result, err = s.backend.WaitInstance(waitCtx, req)
+	}
 	result.Elapsed = time.Since(started)
 	if err == nil {
 		return result, nil
@@ -365,10 +371,8 @@ func (s *Service) mapBackend(ctx context.Context, op string, err error) error {
 
 func validateWaitUntil(until string) error {
 	switch until {
-	case WaitUntilRunning, WaitUntilAgent, WaitUntilNetwork, WaitUntilStopped:
+	case WaitUntilRunning, WaitUntilAgent, WaitUntilNetwork, WaitUntilStopped, WaitUntilDesktop:
 		return nil
-	case WaitUntilDesktop:
-		return agentErrorf("until %q is not available yet", until)
 	default:
 		return agentErrorf("until %q is not available yet", until)
 	}

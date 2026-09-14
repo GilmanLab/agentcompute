@@ -36,6 +36,12 @@ type Options struct {
 	DefaultNetworkKind string
 	// Logger receives operational logs. Nil selects a no-op logger.
 	Logger *slog.Logger
+	// OnSandboxExpired purges transient artifacts once a sandbox is expired.
+	OnSandboxExpired func(string)
+	// OnReap expires transient artifacts before each backend reaper scan.
+	OnReap func()
+	// DesktopReady probes the guest session after Incus agent readiness.
+	DesktopReady func(context.Context, Ref) (bool, error)
 }
 
 // Service orchestrates sandboxes against a Backend and an immutable catalog.
@@ -48,6 +54,9 @@ type Service struct {
 	defaultTTL         time.Duration
 	maxTTL             time.Duration
 	defaultNetworkKind string
+	onSandboxExpired   func(string)
+	onReap             func()
+	desktopReady       func(context.Context, Ref) (bool, error)
 }
 
 // New constructs a Service. Bridge defaults require Host; zero TTLs select the documented defaults.
@@ -92,6 +101,9 @@ func New(backend Backend, catalog *Catalog, opts Options) (*Service, error) {
 		defaultTTL:         resolvedDefault,
 		maxTTL:             resolvedMax,
 		defaultNetworkKind: kind,
+		onSandboxExpired:   opts.OnSandboxExpired,
+		onReap:             opts.OnReap,
+		desktopReady:       opts.DesktopReady,
 	}, nil
 }
 
@@ -217,6 +229,9 @@ func (s *Service) DeleteSandbox(ctx context.Context, name string) error {
 		}
 		return s.backendError(ctx, "expire sandbox", err)
 	}
+	if s.onSandboxExpired != nil {
+		s.onSandboxExpired(name)
+	}
 	if err := s.backend.DeleteSandbox(ctx, name); err != nil {
 		return s.backendError(ctx, "delete sandbox", err)
 	}
@@ -244,6 +259,12 @@ func (s *Service) CreateInstance(ctx context.Context, req CreateInstance) (Insta
 			return Instance{}, instanceNotFound(req.Ref)
 		}
 		return Instance{}, s.backendError(ctx, "wait instance", err)
+	}
+	if inst.Desktop && req.Start {
+		if _, err := s.WaitInstance(createCtx, WaitRequest{Ref: req.Ref, Until: WaitUntilDesktop}); err != nil {
+			return Instance{}, err
+		}
+		return s.GetInstance(createCtx, req.Ref)
 	}
 	return inst, nil
 }
@@ -303,6 +324,10 @@ func (s *Service) DeleteInstance(ctx context.Context, ref Ref) error {
 
 // Exec runs a bounded command without holding the mutation gate.
 func (s *Service) Exec(ctx context.Context, req ExecRequest) (ExecResult, error) {
+	return s.exec(ctx, req, execOutputLimit)
+}
+
+func (s *Service) exec(ctx context.Context, req ExecRequest, outputLimit int) (ExecResult, error) {
 	if err := validateRef(req.Ref); err != nil {
 		return ExecResult{}, err
 	}
@@ -313,12 +338,12 @@ func (s *Service) Exec(ctx context.Context, req ExecRequest) (ExecResult, error)
 	if err != nil {
 		return ExecResult{}, err
 	}
-	if inst.Status != statusRunning {
+	if inst.Status != statusRunning && inst.Status != "Ready" {
 		return ExecResult{}, agentErrorf("instance %q in sandbox %q is not running", req.Ref.Name, req.Ref.Sandbox)
 	}
 
-	stdout := newDrainingWriter(execOutputLimit)
-	stderr := newDrainingWriter(execOutputLimit)
+	stdout := newDrainingWriter(outputLimit)
+	stderr := newDrainingWriter(outputLimit)
 	execCtx, cancel := execContext(ctx, req.Timeout)
 	defer cancel()
 

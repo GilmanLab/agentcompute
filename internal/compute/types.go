@@ -209,11 +209,13 @@ type Backend interface {
 	AddACLRule(context.Context, string, string, ACLRule) (ACLRule, error)
 	RemoveACLRule(context.Context, string, string, string) error
 	CreateForward(context.Context, string, string, Ref, int64, int64, string) (Forward, error)
+	InstanceForward(context.Context, Ref, int64, string) (Forward, error)
 	StartInstance(context.Context, Ref, bool) (Instance, error)
 	StopInstance(context.Context, Ref, bool) (Instance, error)
 	RestartInstance(context.Context, Ref, bool) (Instance, error)
 	WaitInstance(context.Context, WaitRequest) (WaitResult, error)
 	ReadFile(context.Context, FileReadRequest) (FileReadResult, error)
+	ReadBinaryFile(context.Context, Ref, string) (io.ReadCloser, error)
 	WriteFile(context.Context, FileWriteRequest) (FileWriteResult, error)
 	CreateSnapshot(context.Context, Ref, string) error
 	RestoreSnapshot(context.Context, Ref, string) error

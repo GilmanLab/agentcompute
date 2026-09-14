@@ -41,6 +41,10 @@ sandbox:
   max_ttl_minutes: 1440
   default_network_kind: bridge
 images_file: images/catalog.yaml
+screenshots:
+  base_url: http://127.0.0.1:8081
+  listen: 127.0.0.1:8081
+  dir: screenshots
 ```
 
 | Field | Contract |
@@ -53,11 +57,25 @@ images_file: images/catalog.yaml
 | `incus.pool` | Required storage pool for instance root disks. |
 | `sandbox.default_ttl_minutes` | Positive creation default, 240 minutes if omitted. |
 | `sandbox.max_ttl_minutes` | Positive upper bound, 1440 minutes if omitted; must be at least the default. |
-| `sandbox.default_network_kind` | `bridge` (default) or `ovn`. OVN requires an existing central, configured chassis, and physical uplink. |
+| `sandbox.default_network_kind` | `ovn` (default) or `bridge`. OVN requires an existing central, configured chassis, and physical uplink. |
 | `images_file` | Schema-version-1 catalog path; defaults to `images/catalog.yaml`. |
-| `screenshots.dir`, `screenshots.base_url` | Accepted schema fields reserved for desktop integration; the screenshot service is not implemented. |
+| `screenshots.base_url` | Required absolute HTTP(S) URL reachable from the agent host, without credentials, query, or fragment. Never derived from the request's `Host` header. |
+| `screenshots.dir` | Scratch parent directory; defaults to `screenshots` beside the configuration file. Each process locks the parent and clears only its owned child directory. |
+| `screenshots.listen` | Separate screenshot listener in STDIO mode; defaults to `127.0.0.1:8081`. HTTP mode instead mounts screenshots beside MCP on `--addr`. |
 
 `sandbox.extend` replaces the expiry with **now + TTL**, rather than adding time to the old expiry. Explicit deletion first expires the project so a partial failure is retried by the reaper. The reaper scans at startup and every 30 seconds.
+
+The example above targets STDIO. For `agentcompute http --addr localhost:8080`,
+set `screenshots.base_url` to the agent-reachable URL for port 8080 instead.
+Configure a reverse proxy consistently if the public URL has a path prefix.
+An unreachable URL is a network configuration error; there is no base64 fallback.
+
+Screenshot URLs are bearer capabilities with 128-bit random identifiers. They
+do not require the MCP bearer token. Only GET and HEAD are accepted; responses
+use `image/png`, `Cache-Control: no-store`, and `X-Content-Type-Options: nosniff`.
+Retention is five minutes or sandbox expiry, whichever is earlier. Sandbox
+deletion and reaping purge associated screenshots. A PNG may use at most 16 MiB;
+the store rejects new publications at 128 MiB rather than evicting live images.
 
 In OVN mode, sandbox projects own their logical networks and NICs use managed networks only. Networks span members. A `nat=false` network is isolated, has no external allocation or direct outside path, and requires peering or a dual-NIC router for reachability. External forwards require NAT-enabled networks. Automatic instance placement prefers free RAM, then one-minute load, then member name; explicit online hosts take precedence.
 
