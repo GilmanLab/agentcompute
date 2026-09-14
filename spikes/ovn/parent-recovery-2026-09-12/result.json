@@ -1,0 +1,34 @@
+{
+  "verdict": "PROCEED",
+  "root_cause": "default/soak01 raw macvlan eth1 and OVS compete for fast40 RX handler",
+  "cycle": {
+    "cycle": "cycle-1",
+    "ok": true,
+    "seconds": 31.018,
+    "router": "incus-net39-lr",
+    "gateway_chassis": "lab01.glab.lol",
+    "external_ip": "10.10.40.64",
+    "router_mac": "10:66:6a:66:eb:74",
+    "teardown": "done",
+    "network_create_seconds": 0.669
+  },
+  "ovs_busy_errors": 0,
+  "ovs_fast40_events": [
+    {
+      "at": "1789233168919953",
+      "member": "lab01.glab.lol",
+      "boot_id": "b5e39bb2a73f421c9b89a935f9f116b2",
+      "message": "ovs|00218|bridge|INFO|bridge incusovn16: added interface fast40 on port 1"
+    },
+    {
+      "at": "1789233195484344",
+      "member": "lab01.glab.lol",
+      "boot_id": "b5e39bb2a73f421c9b89a935f9f116b2",
+      "message": "ovs|00227|bridge|INFO|bridge incusovn16: deleted interface fast40 on port 1"
+    }
+  ],
+  "required_rules": [
+    "Exclusive fast40-uplink parent ownership; managed-only sandbox NICs and fleet default-project check",
+    "Central up for OVN control-plane operations; Errored networks reaper-deletable after recovery"
+  ]
+}

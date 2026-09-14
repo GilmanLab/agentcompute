@@ -1,0 +1,436 @@
+=== incus network show exit=0 ===
+config:
+  bridge.mtu: "1442"
+  dns.nameservers: 10.10.40.1
+  ipv4.address: 10.253.73.1/24
+  ipv4.dhcp: "true"
+  ipv4.nat: "true"
+  ipv6.address: none
+  network: fast40-uplink
+  volatile.network.ipv4.address: 10.10.40.65
+description: ""
+name: default
+type: ovn
+used_by:
+  - /1.0/instances/one?project=ac-ovn-spike
+  - /1.0/instances/two?project=ac-ovn-spike
+managed: true
+status: Created
+locations:
+  - nas01
+  - lab01
+  - lab02
+  - lab03
+project: ac-ovn-spike
+=== incus network list-allocations exit=0 ===
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+|                             USED BY                             |    ADDRESS     | NETWORK |      TYPE       | NAT |    MAC ADDRESS    |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+| /1.0/instances/one?project=ac-ovn-spike                         | 10.253.73.2/32 | default | instance        | YES | 10:66:6a:b7:f2:39 |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+| /1.0/instances/two?project=ac-ovn-spike                         | 10.253.73.3/32 | default | instance        | YES | 10:66:6a:6f:4a:91 |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+| /1.0/networks/default/forwards/10.10.40.79?project=ac-ovn-spike | 10.10.40.79/32 | default | network-forward | NO  |                   |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+| /1.0/networks/default?project=ac-ovn-spike                      | 10.253.73.1/24 | default | network         | YES |                   |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+=== sandbox01 nb/sb/neigh exit=0 ===
+=== ovn-nbctl show ===
+switch 6430010c-10da-4ccb-bf7c-21d047adad24 (incus-net27-ls-int)
+    port incus-net27-ls-int-lsp-router
+        type: router
+        router-port: incus-net27-lr-lrp-int
+    port incus-net27-instance-60f44a7e-701e-4fb8-a297-15c7494f0fbf-eth0
+        addresses: ["10:66:6a:6f:4a:91 dynamic"]
+    port incus-net27-instance-23118153-0b00-400d-badb-e44ba120d12f-eth0
+        addresses: ["10:66:6a:b7:f2:39 dynamic"]
+switch f046d2bd-f4a8-4b32-a828-ca8be5810acd (incus-net25-ls-ext)
+    port incus-net25-ls-ext-lsp-router
+        type: router
+        router-port: incus-net25-lr-lrp-ext
+    port incus-net25-ls-ext-lsp-provider
+        type: localnet
+        addresses: ["unknown"]
+switch f63c7c52-7dfa-48df-9ac4-d4a0b682408f (incus-net27-ls-ext)
+    port incus-net27-ls-ext-lsp-router
+        type: router
+        router-port: incus-net27-lr-lrp-ext
+    port incus-net27-ls-ext-lsp-provider
+        type: localnet
+        addresses: ["unknown"]
+switch 8f57dfa7-81c9-46e3-a2e8-d2a69f506da9 (incus-net25-ls-int)
+    port incus-net25-ls-int-lsp-router
+        type: router
+        router-port: incus-net25-lr-lrp-int
+router 2eaa7e25-aeb5-4fa9-adac-31c81c57a2fb (incus-net25-lr)
+    port incus-net25-lr-lrp-int
+        mac: "10:66:6a:70:1e:0b"
+        ipv6-lla: "fe80::1266:6aff:fe70:1e0b"
+        networks: ["10.253.72.1/24"]
+    port incus-net25-lr-lrp-ext
+        mac: "10:66:6a:70:1e:0b"
+        ipv6-lla: "fe80::1266:6aff:fe70:1e0b"
+        networks: ["10.10.40.64/24"]
+    nat 4ec00a90-5592-43ac-b4ad-64d0ccb37946
+        external ip: "10.10.40.64"
+        logical ip: "10.253.72.0/24"
+        type: "snat"
+router 1205bbee-2400-4483-b1eb-ae248961a3d2 (incus-net27-lr)
+    port incus-net27-lr-lrp-int
+        mac: "10:66:6a:6c:ad:18"
+        ipv6-lla: "fe80::1266:6aff:fe6c:ad18"
+        networks: ["10.253.73.1/24"]
+    port incus-net27-lr-lrp-ext
+        mac: "10:66:6a:6c:ad:18"
+        ipv6-lla: "fe80::1266:6aff:fe6c:ad18"
+        networks: ["10.10.40.65/24"]
+    nat 873e144a-9aa1-4c68-9aea-fbfbc2a892b1
+        external ip: "10.10.40.65"
+        logical ip: "10.253.73.0/24"
+        type: "snat"
+=== ovn-sbctl show ===
+Chassis "5ec8d171-fbe4-49cf-9923-9d21f9c5d29b"
+    hostname: lab03.glab.lol
+    Encap geneve
+        ip: "10.10.30.13"
+        options: {csum="true"}
+    Port_Binding cr-incus-net27-lr-lrp-ext
+    Port_Binding incus-net27-instance-60f44a7e-701e-4fb8-a297-15c7494f0fbf-eth0
+Chassis "c2919898-1135-4799-80cf-860ae7e7ef9e"
+    hostname: nas01.glab.lol
+    Encap geneve
+        ip: "10.10.30.14"
+        options: {csum="true"}
+    Port_Binding cr-incus-net25-lr-lrp-ext
+Chassis "67314e94-b0b4-4c97-8146-0c67aff4d585"
+    hostname: lab02.glab.lol
+    Encap geneve
+        ip: "10.10.30.12"
+        options: {csum="true"}
+Chassis "2da6738c-78eb-4738-98be-0898402c0eaa"
+    hostname: lab01.glab.lol
+    Encap geneve
+        ip: "10.10.30.11"
+        options: {csum="true"}
+    Port_Binding incus-net27-instance-23118153-0b00-400d-badb-e44ba120d12f-eth0
+=== ovn-nbctl list Logical_Router_Port ===
+_uuid               : 3560a748-fd5b-44b5-ad95-485444a35d8c
+dhcp_relay          : []
+enabled             : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : fca3c7b3-d9cf-44a8-9d37-9968cafee7a1
+ipv6_prefix         : []
+ipv6_ra_configs     : {}
+mac                 : "10:66:6a:6c:ad:18"
+name                : incus-net27-lr-lrp-ext
+networks            : ["10.10.40.65/24"]
+options             : {gateway_mtu="1442"}
+peer                : []
+status              : {hosting-chassis="5ec8d171-fbe4-49cf-9923-9d21f9c5d29b"}
+
+_uuid               : 0acff935-6775-4d8a-ac11-902fa4246526
+dhcp_relay          : []
+enabled             : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : []
+ipv6_prefix         : []
+ipv6_ra_configs     : {send_periodic="false"}
+mac                 : "10:66:6a:6c:ad:18"
+name                : incus-net27-lr-lrp-int
+networks            : ["10.253.73.1/24"]
+options             : {gateway_mtu="1442"}
+peer                : []
+status              : {}
+
+_uuid               : aaf81b99-01ec-463e-85f2-af131a1a29c8
+dhcp_relay          : []
+enabled             : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : c13b6fd6-e52d-4ac5-bd68-008c146bf1fa
+ipv6_prefix         : []
+ipv6_ra_configs     : {}
+mac                 : "10:66:6a:70:1e:0b"
+name                : incus-net25-lr-lrp-ext
+networks            : ["10.10.40.64/24"]
+options             : {gateway_mtu="1442"}
+peer                : []
+status              : {hosting-chassis="c2919898-1135-4799-80cf-860ae7e7ef9e"}
+
+_uuid               : 24771756-817b-4cbd-b664-58fbd3d9a377
+dhcp_relay          : []
+enabled             : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : []
+ipv6_prefix         : []
+ipv6_ra_configs     : {send_periodic="false"}
+mac                 : "10:66:6a:70:1e:0b"
+name                : incus-net25-lr-lrp-int
+networks            : ["10.253.72.1/24"]
+options             : {gateway_mtu="1442"}
+peer                : []
+status              : {}
+=== ovn-sbctl find Port_Binding type=chassisredirect ===
+_uuid               : d740ae00-07c8-4056-b1b3-1f19ca56e9b8
+additional_chassis  : []
+additional_encap    : []
+chassis             : 6d5bda8d-4911-4009-98ed-81ad0f344956
+datapath            : 936eae27-2fc0-476c-b34a-a6e190436038
+encap               : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : 0a7d4358-5ce2-4052-a851-49d42e6b7b45
+logical_port        : cr-incus-net27-lr-lrp-ext
+mac                 : ["10:66:6a:6c:ad:18 10.10.40.65/24"]
+mirror_port         : []
+mirror_rules        : []
+nat_addresses       : []
+options             : {always-redirect="true", distributed-port=incus-net27-lr-lrp-ext}
+parent_port         : []
+port_security       : []
+requested_additional_chassis: []
+requested_chassis   : []
+tag                 : []
+tunnel_key          : 2
+type                : chassisredirect
+up                  : true
+virtual_parent      : []
+
+_uuid               : 023a18f3-acd5-4bb9-a42c-8f493cae24ca
+additional_chassis  : []
+additional_encap    : []
+chassis             : 1e4eb895-1d17-4859-9e5b-0454f8482291
+datapath            : db7925f7-c524-4a0a-b84c-5ee7aec48844
+encap               : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : dc0e73d8-c24e-4f20-8384-5c87ec576925
+logical_port        : cr-incus-net25-lr-lrp-ext
+mac                 : ["10:66:6a:70:1e:0b 10.10.40.64/24"]
+mirror_port         : []
+mirror_rules        : []
+nat_addresses       : []
+options             : {always-redirect="true", distributed-port=incus-net25-lr-lrp-ext}
+parent_port         : []
+port_security       : []
+requested_additional_chassis: []
+requested_chassis   : []
+tag                 : []
+tunnel_key          : 2
+type                : chassisredirect
+up                  : true
+virtual_parent      : []
+=== ip neigh ===
+=== gateway neigh exit=0 ===
+10.10.40.65 dev br40 lladdr 10:66:6a:6c:ad:18 REACHABLE 
+=== lab01 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192875200784",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02994|dpif|WARN|Dropped 2120 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192875200897",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02995|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192876200951",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02996|dpif|WARN|Dropped 2111 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192876201151",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02997|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192877200621",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02998|dpif|WARN|Dropped 2100 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192877200791",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|02999|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192877299410",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03000|bridge|INFO|bridge incusovn16: added interface patch-incus-net27-ls-ext-lsp-provider-to-br-int on port 3"
+  },
+  {
+    "at": "1789192877299621",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03001|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net27-ls-ext-lsp-provider on port 19"
+  },
+  {
+    "at": "1789192878200785",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03002|dpif|WARN|Dropped 2046 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192878200899",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03003|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192878796143",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03004|bridge|INFO|bridge br-int: added interface veth010203a2 on port 20"
+  },
+  {
+    "at": "1789192879200767",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03005|dpif|WARN|Dropped 1983 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192879200877",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03006|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192879258591",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03007|poll_loop|INFO|Dropped 12483 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192879258656",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03008|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (98% CPU usage)"
+  },
+  {
+    "at": "1789192880201059",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03009|dpif|WARN|Dropped 1977 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192880201380",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03010|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192881200639",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03011|dpif|WARN|Dropped 2002 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192881200760",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03012|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192882200654",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03013|dpif|WARN|Dropped 2012 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192882200878",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03014|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192883200693",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03015|dpif|WARN|Dropped 2042 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192883201126",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03016|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192884200728",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03017|dpif|WARN|Dropped 2010 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192884200929",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03018|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  }
+]
+
+=== lab02 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192877292307",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00137|bridge|INFO|bridge incusovn16: added interface patch-incus-net27-ls-ext-lsp-provider-to-br-int on port 4"
+  },
+  {
+    "at": "1789192877292673",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00138|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net27-ls-ext-lsp-provider on port 13"
+  }
+]
+
+=== lab03 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192877296494",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00145|bridge|INFO|bridge incusovn16: added interface patch-incus-net27-ls-ext-lsp-provider-to-br-int on port 4"
+  },
+  {
+    "at": "1789192877296674",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00146|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net27-ls-ext-lsp-provider on port 17"
+  },
+  {
+    "at": "1789192879799198",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00147|bridge|INFO|bridge br-int: added interface veth31450499 on port 18"
+  }
+]
+
+=== nas01 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192877284005",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00141|bridge|INFO|bridge incusovn16: added interface patch-incus-net27-ls-ext-lsp-provider-to-br-int on port 4"
+  },
+  {
+    "at": "1789192877284330",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00142|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net27-ls-ext-lsp-provider on port 15"
+  }
+]
+

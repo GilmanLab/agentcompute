@@ -1,6 +1,14 @@
 # OVN mechanism spike
 
-**2026-09-12 — NOT SMOOTH.** Step 6 did not fail cleanly with central down:
+**Current verdict: PROCEED.** Removing the conflicting `default/soak01`
+macvlan fixture restored lab01's uplink. The first post-removal lab01-gateway
+cycle passed every check in **31.018 s**, with successful OVS parent attachment
+and no EBUSY retries. The two operating requirements are exclusive
+`fast40-uplink` ownership of `fast40` and central availability for OVN
+control-plane operations. See the parent-conflict recovery section at the end
+and its [evidence](parent-recovery-2026-09-12/).
+
+**Initial 2026-09-12 verdict — NOT SMOOTH (superseded below).** Step 6 did not fail cleanly with central down:
 network creation timed out and left an `Errored` network. Step 7 recreated
 cross-member connectivity, but gateway and internet egress failed without
 manual repair. The first pass's dataplane worked. This verdict uses steps
@@ -11,13 +19,13 @@ manual repair. The first pass's dataplane worked. This verdict uses steps
 - [Report and probe PR #15](https://github.com/GilmanLab/agentcompute/pull/15)
 - [Northbound-unset reproduction](https://github.com/lxc/incus/issues/3948#issuecomment-5642832127)
 
-The owner decides whether to use the documented bridge alternative. This
-experiment does not change the design draft or choose another architecture.
+The owner authorized proceeding with OVN after the parent-conflict recovery.
+Historical failed runs remain recorded below; no bridge alternative was implemented.
 
 ## Retained state and Phase 5 handoff
 
-The resume instruction supersedes the original rollback requirement. These
-resources remain deliberately enabled despite the negative verdict:
+The resume instruction superseded the original rollback requirement. These
+resources remain enabled for Phase 5 under the current PROCEED requirements:
 
 | Resource | Retained configuration |
 | --- | --- |
@@ -350,3 +358,283 @@ resources. Both guests need curl and the HTTP fixture prepared by the helper.
 
 The retained configuration is converged. OVN lifecycle repeatability is not
 qualified by this spike.
+
+## 2026-09-12 — recreate and gateway diagnosis
+
+**Verdict: FALLBACK**, under the owner's follow-up rule. A fresh nas01-gateway
+cycle passed; a lab01-gateway cycle failed before and after one authorized
+reboot. No fallback architecture was implemented. The failed keeper was removed
+through fleet; the uplink, chassis configuration, central, and unrelated
+instances were otherwise left in place as requested.
+
+### One-command cycle
+
+From this repository, with the existing Incus remote and SSH access to
+`sandbox01` and gw01:
+
+```sh
+bash spikes/ovn/probe.sh cycle --evidence-dir "$(mktemp -d)"
+```
+
+This creates, probes, and destroys the owned disposable topology. It records
+commands, elapsed times, network/router identity, NB/SB state, gateway neighbor
+state, OVS journals, Incus debug monitors, and a bounded ARP capture. Monitor
+readiness requires the client's successful `/1.0/events?all-projects=true`
+WebSocket connection, not a sleep or a running PID.
+
+The probe checks both directions of cross-member ping and 100 MB HTTP transfers
+with SHA-256, both guests' gateway ping, DNS and HTTPS, and the workstation's
+exact forward body. Probe-tool packages are downloaded on the workstation and
+installed with signature verification through Incus file transfer: broken guest
+egress must not prevent the remaining datapath checks from running.
+
+There is one create attempt and no automatic recovery. The cycle never stops
+central, creates a keeper, changes chassis configuration, or clears neighbors.
+`--keep-on-failure` explicitly preserves failed resources for diagnosis;
+otherwise teardown runs even after a failed probe.
+
+### Cycle results
+
+[Structured cycle table](diagnosis-2026-09-12/cycle-table.json). External
+addresses below are in `10.10.40.0/24`; router names are NB logical routers.
+Gateway placement comes from SB binding, not the container's member.
+
+| Run | NB router | Gateway | External IP | Router MAC | Result | Seconds |
+| --- | --- | --- | --- | --- | --- | ---: |
+| clean-1 | incus-net24-lr | lab01 | .64 | 10:66:6a:49:f5:82 | Fail; bootstrap blocked by egress | 50.489 |
+| keeper-1 | incus-net26-lr | nas01 | .65 | 10:66:6a:ed:13:7f | Pass | 29.756 |
+| keeper-2 | incus-net27-lr | lab03 | .65 | 10:66:6a:6c:ad:18 | Pass | 32.190 |
+| keeper-3 | incus-net28-lr | lab01 | .65 | 10:66:6a:14:21:7e | Fail; north-south only | 61.306 |
+| outage-fixture | incus-net29-lr | lab01 | .65 | 10:66:6a:ab:ba:f8 | Fail; north-south only | 55.432 |
+| post-outage | incus-net31-lr | nas01 | .65 | 10:66:6a:ea:40:3b | Pass | 31.078 |
+| gateway-pre-1 | incus-net32-lr | lab02 | .64 | 10:66:6a:33:3f:c7 | Pass | 33.092 |
+| gateway-pre-2 | incus-net33-lr | lab02 | .64 | 10:66:6a:74:95:5e | Pass | 29.904 |
+| gateway-pre-3 | incus-net34-lr | lab02 | .64 | 10:66:6a:1f:21:eb | Pass | 31.142 |
+| gateway-pre-4 | incus-net35-lr | lab02 | .64 | 10:66:6a:97:88:42 | Pass | 32.274 |
+| gateway-pre-5 | incus-net36-lr | nas01 | .64 | 10:66:6a:ef:03:ee | Pass | 32.470 |
+| gateway-pre-6 | incus-net37-lr | lab01 | .64 | 10:66:6a:b2:7a:65 | Fail; north-south only | 60.817 |
+| gateway-post-1 | incus-net38-lr | lab01 | .64 | 10:66:6a:43:84:fe | Fail; north-south only | 61.572 |
+
+All full probes after `clean-1` passed east-west ping and both 100 MB hash
+checks, including the failed lab01-gateway cycles. Those failures comprised
+gateway ping, DNS and HTTPS from both guests, plus the workstation forward.
+The first cycle used guest-side package bootstrap; fallback checks established
+cross-member ping but no 100 MB or forward fixture was installed.
+
+Times include capture/setup/probe/cleanup work, except the explicitly retained
+`clean-1` and `outage-fixture`. The former was deleted after the neighbor-clear
+test; the latter after the outage experiment. All other cycles completed their
+own teardown. No disposable topology remains.
+
+### Hypotheses and bounded recovery
+
+- **H3, stale gw01 neighbor state:** clearing only `.64` on gw01 did not restore
+  gateway ping in the unchanged failed clean topology. With the keeper holding
+  `.64`, clearing only the failed router's `.65` entry also did not restore
+  connectivity. Both bounded sandbox01 ARP captures remained empty. A stale
+  gw01 entry is not a sufficient explanation for these failures.
+- **H1, last-consumer uplink teardown:** the keeper kept an OVN consumer alive,
+  but its three cycles were pass/pass/fail. Failure followed lab01 gateway
+  placement even without last-consumer teardown. H1 was not established as a
+  teardown regression; the keeper did not qualify and was removed.
+- **H2, reboot-recoverable chassis corruption:** the requested recovery criterion
+  failed. Lab01 still failed as gateway after reboot. Do not interpret the
+  successful nas01 control as lab01 recovery.
+
+The original OVS journal, before sustained rate limiting, reports:
+
+```text
+system@ovs-system: failed to add fast40 as port: Device or resource busy
+could not add network device fast40 to ofproto (Device or resource busy)
+```
+
+Incus lists `fast40-uplink` and `soak01` as consumers of lab01's `fast40`.
+`soak01` has an active raw macvlan NIC on that parent. Its configuration was
+unchanged, and the NIC was up before and after reboot. The same OVS errors
+recurred in the fresh-boot cycle. **Inference:** the active macvlan is the likely
+competing attachment; IncusOS's supported API does not expose kernel RX-handler
+ownership or an `ovs-vsctl show` equivalent. We did not remove that NIC to test
+the inference and do not claim a confirmed kernel/OVS corruption cause.
+
+Evidence: [parent consumer](diagnosis-2026-09-12/lab01-parent-consumer.json),
+[original journal](diagnosis-2026-09-12/lab01-original-ovs-journal.json),
+[post-reboot errors](diagnosis-2026-09-12/lab01-post-reboot-ovs-conflict.json).
+Persistent gateway failure reported as
+[lxc/incus#3986](https://github.com/lxc/incus/issues/3986), including the
+macvlan precondition and the distinction between unsupported parent sharing and
+silently accepting/selecting an unprogrammable gateway.
+
+### Reboot evidence
+
+Fleet submitted exactly one lab01 reboot, request
+`phase3-recreate-lab01-20260912`. ONLINE status and a different boot ID were both
+required before the post-reboot cycle.
+
+| Observation | Before | After |
+| --- | --- | --- |
+| Boot ID | f9f71dd5a051466283d7da6fb860c528 | b5e39bb2a73f421c9b89a935f9f116b2 |
+| Incus | 7.4 | 7.4 |
+| IncusOS | 202608242359 | 202609100026 |
+| Kernel | 7.1.10-zabbly+ | 7.2.4-zabbly+ |
+| soak01 macvlan eth1 | Up | Up |
+| lab01 gateway probe | Fail | Fail |
+
+Lab01 returned ONLINE after **146.549 s**. The reboot activated an OS/kernel
+update, so this was not a same-software reboot comparison. The failure persisted
+across that change. See [reboot comparison](diagnosis-2026-09-12/reboot-comparison.json)
+and [readiness observation](diagnosis-2026-09-12/reboot-watch/reboot.json).
+
+### Northbound outage
+
+The single follow-up central outage reproduced the creation problem: the client
+deadline expired after **60.019 s**, leaving an `Errored` network reserving `.66`.
+Restarting central did not change that state. Explicit deletion succeeded;
+without a service, chassis, uplink, or neighbor repair, the subsequent fresh
+cycle passed on nas01 in **31.078 s**.
+
+This outage fixture already had broken north-south traffic before central was
+stopped; it is not new evidence of egress surviving an outage. The original
+spike's outage observations remain separate.
+
+Reported as [lxc/incus#3985](https://github.com/lxc/incus/issues/3985).
+See [outage results](diagnosis-2026-09-12/outage/outage.json) and its command and
+monitor logs. The hypothesis that connection initialization escapes the
+transaction timeout remains source-based, not a stack-trace diagnosis.
+
+### Address accounting and final state
+
+A tested sandbox consumes **two external addresses**: one NAT router address
+and one forward listen address. Multiple ports on the same forward address do
+not require additional addresses. The 16-address allocation has capacity for
+eight such sandboxes with no keeper, or seven plus one spare while a keeper
+reserves one address. The keeper was removed and now consumes zero.
+
+After the final failed cycle:
+
+- All four cluster members ONLINE; central's four units active; four SB chassis.
+- No disposable project, keeper, NB logical topology, or Errored network remains.
+- Fleet OVN dry-run: all ten operations unchanged, **3.429 s**.
+- Fleet keeper dry-run: absent and unchanged, **0.696 s**.
+- Uplink/chassis/central retained as the owner requested; `soak01` unchanged
+  apart from its authorized host reboot and automatic restart.
+
+The [execution log](diagnosis-2026-09-12/execution.jsonl) records fleet
+operations and final checks. Per-cycle directories contain the command,
+probe, monitor, ARP, and NB/SB evidence. Published OVS journal responses retain
+timestamp, host, boot ID when available, and message; unrelated journal
+metadata is projected out and marked in command records. Original raw captures
+were preserved privately before this reduction.
+
+Publication checks: fleet pytest **39 passed**; mypy passed **17 source files**;
+Ruff passed for the new fleet deploy and both Python probe helpers; Bash syntax,
+Python compilation, and the actual cycle CLI help passed. The companion
+address-plan site built successfully with `moon run docs:build`. No additional
+live cycle was run after the owner's FALLBACK condition was established.
+
+## 2026-09-12 — parent conflict resolved
+
+**PROCEED** under the owner's final decision rule. `soak01` was an authorized
+03c fixture, not a durable workload. Its raw macvlan `eth1` and OVS competed for
+the same `fast40` RX handler. Fleet stopped and deleted only `default/soak01`
+on lab01. Graceful stop reached its 30-second deadline; a fleet force-stop
+then succeeded, followed by deletion of the stopped VM. The API returned
+`Instance not found`, and `fast40.used_by` then contained only
+`/1.0/networks/fast40-uplink`.
+
+No reboot, central restart, chassis change, or neighbor clear accompanied this
+recovery. Lab01 kept boot ID `b5e39bb2a73f421c9b89a935f9f116b2`.
+
+### Attachment and qualification evidence
+
+The first new cycle selected **lab01** as gateway:
+
+| Field | Observed value |
+| --- | --- |
+| NB router | `incus-net39-lr` |
+| Router external address | `10.10.40.64` |
+| Router MAC | `10:66:6a:66:eb:74` |
+| Network creation | 0.669 s |
+| Complete create/probe/diagnose/destroy cycle | **31.018 s** |
+| Probe, capture, and cleanup failures | None |
+
+All checks passed: cross-member ping, both 100 MB SHA-256 transfers, both guests'
+gateway ping, DNS and HTTPS egress, and the workstation forward. The cycle
+destroyed its disposable project and network normally.
+
+Lab01's OVS journal records:
+
+```text
+ovs|00218|bridge|INFO|bridge incusovn16: added interface fast40 on port 1
+```
+
+There were **zero `Device or resource busy` messages** in the captured
+post-removal interval. After the successful workload checks, normal
+last-consumer teardown logged:
+
+```text
+ovs|00227|bridge|INFO|bridge incusovn16: deleted interface fast40 on port 1
+```
+
+Thus the port was present for the active OVN topology, not left artificially
+attached after teardown. The earlier gateway failure was fixture-induced
+parent contention, not a demonstrated OVN recreate regression.
+
+See [cycle output](parent-recovery-2026-09-12/cycle-1/cycle.json),
+[probe transcript](parent-recovery-2026-09-12/cycle-1/probe.stdout.txt),
+[attachment journal](parent-recovery-2026-09-12/lab01-attachment-journal.json),
+and [fleet command transcript](parent-recovery-2026-09-12/execution.jsonl).
+The temporary fixture-removal deploy is retained as evidence text, not a
+permanent deploy that could delete a future instance with the same name.
+
+### Required operating rules
+
+1. **Exclusive parent ownership.** Only default-project `fast40-uplink` may
+   attach to `fast40` on any member. No instance or profile may attach a raw
+   macvlan/physical NIC to that parent, and no competing managed network may
+   claim it. Sandbox projects use `restricted.devices.nic=managed`; this is
+   already set by both the production sandbox adapter and spike helper.
+   Fleet checks default-project instances (including expanded devices),
+   profiles, and member-specific network configuration before OVN convergence.
+   The check reports conflicts and refuses to proceed; it never deletes them.
+   Default-project administrator changes must pass that fleet check.
+2. **Central-up control plane.** OVN create/update/delete operations require
+   central to be available. A timed-out create may leave an `Errored` network
+   and an external address reservation. After central recovers, the reaper
+   can delete that network and retry cleanup; the experiment demonstrated
+   deletion-only recovery. Existing forwarding during an outage is a separate
+   dataplane property, not permission to perform control-plane operations.
+
+These rules are also recorded in session 019's `ARCHITECTURE_GO.md` and
+`prompts/05-durable-ovn.md`. Incus
+[#3986](https://github.com/lxc/incus/issues/3986) remains a legitimate report:
+the parent conflict explains the attachment failure, but selecting that
+unusable gateway without an actionable API error remains the reported behavior.
+The northbound creation issue [#3985](https://github.com/lxc/incus/issues/3985)
+is independent. Both #3985 and #3986 were automatically closed by the
+repository's web-interface-only issue submission policy, not a technical
+resolution. The root-cause update was posted to the existing #3986 as
+requested; neither report has been resubmitted or reopened.
+
+### Ownership check and final verification
+
+The fleet OVN deploy now runs the read-only ownership check before any
+convergence. It also rejects direct physical-uplink NICs and
+`bridge.external_interfaces` claims, not only raw NIC `parent` fields.
+Run the check independently from `fleet/cluster`:
+
+```sh
+uv run --locked pyinfra inventory.py src/fleet_cluster/deploys/ovn_parent_check.py -v --yes
+```
+
+The final live check passed without changes in **2.434 s**. The full fleet OVN
+dry-run passed with **11 unchanged operations** in **4.514 s**. Fleet pytest
+passed **47 tests**; mypy passed **18 source files**; Ruff passed. Regression
+cases cover inherited/stopped-instance NICs, profile NICs, member-specific
+network parents, direct physical-uplink NICs, bridge external interfaces,
+allowed logical OVN NICs, and missing inspection data. The bridge-interface
+case failed before the guard covered that attachment path and passed afterward.
+
+All four members remain ONLINE. Central's four units are active; no disposable
+NB topology, keeper, or `soak01` remains. The address-plan site built with
+`moon run docs:build`. Architecture and Phase 5 requirements were committed
+to the personal journal branch without changing other session files.

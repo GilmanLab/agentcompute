@@ -1,0 +1,9 @@
+{
+  "text": "tcpdump: verbose output suppressed, use -v[v]... for full protocol decode\nlistening on enp2s0, link-type EN10MB (Ethernet), snapshot length 262144 bytes\n\n0 packets captured\n0 packets received by filter\n0 packets dropped by kernel\nConnection to sandbox01 closed.\n[ovn-h3-arp: failed; cursor=269]",
+  "details": {
+    "op": "logs",
+    "cursor": 269,
+    "timedOut": false,
+    "state": "failed"
+  }
+}

@@ -1,0 +1,3 @@
+{
+  "error": "WARNING: fetching https://dl-cdn.alpinelinux.org/alpine/v3.22/main: temporary error (try again later)\nERROR: unable to select packages:\n  busybox-extras (no such package):\n    required by: world[busybox-extras]\n  curl (no such package):\n    required by: world[curl]"
+}
