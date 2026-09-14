@@ -366,7 +366,11 @@ func (s *Service) ImpairNIC(ctx context.Context, ref Ref, nic string, impairment
 		return s.backendError(ctx, "impair", execErr)
 	}
 	if code != 0 {
-		return agentErrorf("impair failed on nic %q of instance %q", nic, ref.Name)
+		detail := strings.TrimSpace(stderr.String())
+		if detail == "" {
+			return agentErrorf("impair failed on nic %q of instance %q", nic, ref.Name)
+		}
+		return agentErrorf("impair failed on nic %q of instance %q: %s", nic, ref.Name, detail)
 	}
 	return nil
 }
