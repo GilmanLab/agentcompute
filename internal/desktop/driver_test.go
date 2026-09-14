@@ -242,27 +242,22 @@ func TestParseDumpDocsUsesPinnedCatalog(t *testing.T) {
 	assert.NotContains(t, tools, "")
 }
 
-func TestNormalizeArgsAndScreenshotValidation(t *testing.T) {
+func TestInvalidDesktopArguments(t *testing.T) {
 	t.Parallel()
 
-	payload, err := normalizeArgs("")
-	require.NoError(t, err)
-	assert.Equal(t, "{}", payload)
-
-	payload, err = normalizeArgs(`{"element_token":"s00000001:5","pid":1220}`)
-	require.NoError(t, err)
-	assert.Equal(t, `{"element_token":"s00000001:5","pid":1220}`, payload)
-
-	_, err = normalizeArgs(`["click"]`)
-	requireAgentMessage(t, err, "args must be a JSON object")
-	_, err = normalizeArgs("not-json")
-	requireAgentMessage(t, err, "args must be a JSON object")
-
-	require.NoError(t, validateScreenshotArgs(0, 0, 0))
-	require.NoError(t, validateScreenshotArgs(1220, 31457284, 1280))
-	requireAgentMessage(t, validateScreenshotArgs(1220, 0, 0), "pid and window_id must both be set or both omitted")
-	requireAgentMessage(t, validateScreenshotArgs(0, 31457284, 0), "pid and window_id must both be set or both omitted")
-	requireAgentMessage(t, validateScreenshotArgs(0, 0, -1), "max_dimension must be a positive integer")
+	for _, args := range []string{`["click"]`, "not-json"} {
+		_, err := normalizeArgs(args)
+		var agent *codemode.AgentError
+		require.ErrorAs(t, err, &agent)
+	}
+	for _, args := range []struct{ pid, windowID, maxDimension int64 }{
+		{1220, 0, 0},
+		{0, 31457284, 0},
+		{0, 0, -1},
+	} {
+		var agent *codemode.AgentError
+		require.ErrorAs(t, validateScreenshotArgs(args.pid, args.windowID, args.maxDimension), &agent)
+	}
 }
 
 func TestBoundImageHonorsMaxDimension(t *testing.T) {

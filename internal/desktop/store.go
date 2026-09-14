@@ -25,6 +25,7 @@ const (
 	maxStoreBytes       = 128 << 20
 	maxImagePixels      = 32 << 20
 	screenshotRetention = 5 * time.Minute
+	pngFormat           = "png"
 	// ScreenshotPath is the HTTP route shared by both transports.
 	ScreenshotPath = "/screenshots/"
 )
@@ -64,33 +65,42 @@ type Store struct {
 // Unrelated contents of dir are preserved; another live store is refused.
 func NewStore(dir, baseURL string) (*Store, error) {
 	u, err := url.Parse(baseURL)
-	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-		return nil, errors.New("screenshots.base_url must be an absolute HTTP or HTTPS URL without credentials, query, or fragment")
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" ||
+		u.Fragment != "" {
+		return nil, errors.New(
+			"screenshots.base_url must be an absolute HTTP or HTTPS URL without credentials, query, or fragment",
+		)
 	}
 	if dir == "" {
 		return nil, errors.New("screenshots.dir is required")
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err = os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("create screenshot directory: %w", err)
 	}
 	lock, err := os.OpenFile(filepath.Join(dir, ".agentcompute-screenshots.lock"), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open screenshot lock: %w", err)
 	}
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		_ = lock.Close()
 		return nil, fmt.Errorf("screenshot directory is already in use: %w", err)
 	}
 	scratch := filepath.Join(dir, ".agentcompute-screenshots")
-	if err := os.RemoveAll(scratch); err != nil {
+	if err = os.RemoveAll(scratch); err != nil {
 		_ = lock.Close()
 		return nil, fmt.Errorf("clear screenshot scratch: %w", err)
 	}
-	if err := os.Mkdir(scratch, 0o700); err != nil {
+	if err = os.Mkdir(scratch, 0o700); err != nil {
 		_ = lock.Close()
 		return nil, fmt.Errorf("create screenshot scratch: %w", err)
 	}
-	return &Store{dir: scratch, lock: lock, baseURL: strings.TrimRight(baseURL, "/"), images: make(map[string]storedImage), now: time.Now}, nil
+	return &Store{
+		dir:     scratch,
+		lock:    lock,
+		baseURL: strings.TrimRight(baseURL, "/"),
+		images:  make(map[string]storedImage),
+		now:     time.Now,
+	}, nil
 }
 
 // Publish stores one PNG until five minutes or sandbox expiry, whichever is sooner.
@@ -126,26 +136,26 @@ func (s *Store) Publish(sandbox string, sandboxExpiry time.Time, source io.Reade
 	if n > maxStoreBytes-s.bytes {
 		return Screenshot{}, errors.New("screenshot store exceeds 128 MiB")
 	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
+	if _, err = file.Seek(0, io.SeekStart); err != nil {
 		return Screenshot{}, fmt.Errorf("rewind screenshot: %w", err)
 	}
 	config, format, err := image.DecodeConfig(file)
-	if err != nil || format != "png" {
+	if err != nil || format != pngFormat {
 		return Screenshot{}, errors.New("screenshot is not a valid PNG header")
 	}
 	if config.Width <= 0 || config.Height <= 0 || int64(config.Width) > maxImagePixels/int64(config.Height) {
 		return Screenshot{}, errors.New("screenshot exceeds pixel bounds")
 	}
-	if err := file.Close(); err != nil {
+	if err = file.Close(); err != nil {
 		return Screenshot{}, fmt.Errorf("close screenshot: %w", err)
 	}
 	var token [16]byte
-	if _, err := rand.Read(token[:]); err != nil {
+	if _, err = rand.Read(token[:]); err != nil {
 		return Screenshot{}, fmt.Errorf("generate screenshot identifier: %w", err)
 	}
 	id := hex.EncodeToString(token[:])
 	path := filepath.Join(s.dir, id)
-	if err := os.Rename(pending, path); err != nil {
+	if err = os.Rename(pending, path); err != nil {
 		return Screenshot{}, fmt.Errorf("publish screenshot: %w", err)
 	}
 	s.images[id] = storedImage{path: path, sandbox: sandbox, expires: expires, bytes: n}

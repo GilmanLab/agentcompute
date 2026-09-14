@@ -29,6 +29,7 @@ const (
 	defaultTTLMinutes = 240
 	maxTTLMinutes     = 1440
 	yamlExtension     = ".yaml"
+	tomlExtension     = ".toml"
 )
 
 // runtime owns backend connections and the reaper, not individual MCP sessions.
@@ -67,7 +68,7 @@ type sandboxConfig struct {
 type screenshotConfig struct {
 	Dir     string `yaml:"dir"      toml:"dir"`
 	BaseURL string `yaml:"base_url" toml:"base_url"`
-	Listen  string `yaml:"listen" toml:"listen"`
+	Listen  string `yaml:"listen"   toml:"listen"`
 }
 
 func loadRuntimeConfig(path string) (runtimeConfig, error) {
@@ -100,7 +101,7 @@ func decodeRuntimeConfig(path string, cfg *runtimeConfig) error {
 	}
 	defer file.Close()
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".toml":
+	case tomlExtension:
 		err = toml.NewDecoder(file).DisallowUnknownFields().Decode(cfg)
 	case yamlExtension, ".yml":
 		err = decodeYAMLConfig(file, cfg)
@@ -219,11 +220,16 @@ func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime
 			logger.ErrorContext(lifecycle, "reaper stopped", "err", reapErr)
 		}
 	}()
-	return &runtime{deps: mcpserver.NewDependencies(service, driver), screenshots: screenshots, screenshotListen: cfg.Screenshots.Listen, close: func() error {
-		cancel()
-		<-done
-		return errors.Join(screenshots.Close(), client.Close())
-	}}, nil
+	return &runtime{
+		deps:             mcpserver.NewDependencies(service, driver),
+		screenshots:      screenshots,
+		screenshotListen: cfg.Screenshots.Listen,
+		close: func() error {
+			cancel()
+			<-done
+			return errors.Join(screenshots.Close(), client.Close())
+		},
+	}, nil
 }
 
 func (o Options) openRuntime(ctx context.Context, logger *slog.Logger) (*runtime, error) {

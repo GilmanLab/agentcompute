@@ -376,53 +376,7 @@ func (c *Client) instanceSource(
 		}, nil
 	}
 	if isUpstreamRef(image.Reference) {
-		remote, alias, _ := splitRemoteAlias(image.Reference)
-		server, err := c.RemoteImage(ctx, remote)
-		if err != nil {
-			return api.InstanceSource{}, err
-		}
-		info, err := server.GetConnectionInfo()
-		if err != nil {
-			return api.InstanceSource{}, mapError(err)
-		}
-		source := api.InstanceSource{
-			Type:        sourceTypeImage,
-			Alias:       alias,
-			Server:      info.URL,
-			Protocol:    info.Protocol,
-			Certificate: info.Certificate,
-		}
-		if image.Fingerprint != "" {
-			source.Fingerprint = image.Fingerprint
-			source.Alias = ""
-		}
-		if _, native := server.(*incusclient.ProtocolIncus); native {
-			target := alias
-			if source.Fingerprint != "" {
-				target = source.Fingerprint
-			}
-			resolved, _, err := server.GetImage(target)
-			if errors.Is(mapError(err), compute.ErrNotFound) && source.Alias != "" {
-				entry, _, aliasErr := server.GetImageAliasType(string(kind), alias)
-				if aliasErr != nil {
-					return api.InstanceSource{}, mapError(aliasErr)
-				}
-				resolved, _, err = server.GetImage(entry.Target)
-			}
-			if err != nil {
-				return api.InstanceSource{}, mapError(err)
-			}
-			source.Fingerprint = resolved.Fingerprint
-			source.Alias = ""
-			source.Project = info.Project
-			if !resolved.Public {
-				source.Secret, err = server.GetImageSecret(resolved.Fingerprint)
-				if err != nil {
-					return api.InstanceSource{}, mapError(err)
-				}
-			}
-		}
-		return source, nil
+		return c.upstreamInstanceSource(ctx, image, kind)
 	}
 
 	fingerprint, err := c.copyImage(ctx, project, image)
@@ -433,6 +387,87 @@ func (c *Client) instanceSource(
 		Type:        sourceTypeImage,
 		Fingerprint: fingerprint,
 	}, nil
+}
+
+func (c *Client) upstreamInstanceSource(
+	ctx context.Context,
+	image compute.CatalogImage,
+	kind api.InstanceType,
+) (api.InstanceSource, error) {
+	remote, alias, _ := splitRemoteAlias(image.Reference)
+	server, err := c.RemoteImage(ctx, remote)
+	if err != nil {
+		return api.InstanceSource{}, err
+	}
+	info, err := server.GetConnectionInfo()
+	if err != nil {
+		return api.InstanceSource{}, mapError(err)
+	}
+	source := api.InstanceSource{
+		Type:        sourceTypeImage,
+		Alias:       alias,
+		Server:      info.URL,
+		Protocol:    info.Protocol,
+		Certificate: info.Certificate,
+	}
+	if image.Fingerprint != "" {
+		source.Fingerprint = image.Fingerprint
+		source.Alias = ""
+	}
+	if _, native := server.(*incusclient.ProtocolIncus); !native {
+		return source, nil
+	}
+	return nativeInstanceSource(server, source, kind, info.Project)
+}
+
+func nativeInstanceSource(
+	server incusclient.ImageServer,
+	source api.InstanceSource,
+	kind api.InstanceType,
+	project string,
+) (api.InstanceSource, error) {
+	target := source.Alias
+	if source.Fingerprint != "" {
+		target = source.Fingerprint
+	}
+	resolved, err := resolveNativeImage(server, target, source.Alias, kind)
+	if err != nil {
+		return api.InstanceSource{}, err
+	}
+	source.Fingerprint = resolved.Fingerprint
+	source.Alias = ""
+	source.Project = project
+	if resolved.Public {
+		return source, nil
+	}
+	source.Secret, err = server.GetImageSecret(resolved.Fingerprint)
+	if err != nil {
+		return api.InstanceSource{}, mapError(err)
+	}
+	return source, nil
+}
+
+func resolveNativeImage(
+	server incusclient.ImageServer,
+	target, alias string,
+	kind api.InstanceType,
+) (*api.Image, error) {
+	resolved, _, err := server.GetImage(target)
+	if err == nil {
+		return resolved, nil
+	}
+	if !errors.Is(mapError(err), compute.ErrNotFound) || alias == "" {
+		return nil, mapError(err)
+	}
+	entry, _, aliasErr := server.GetImageAliasType(string(kind), alias)
+	if aliasErr != nil {
+		return nil, mapError(aliasErr)
+	}
+	resolved, _, err = server.GetImage(entry.Target)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return resolved, nil
 }
 
 func isSandboxImage(image compute.CatalogImage) bool {
