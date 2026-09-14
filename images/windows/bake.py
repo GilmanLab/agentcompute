@@ -831,6 +831,24 @@ def bake(args: argparse.Namespace) -> int:
                   project=args.project, check=False)
             evidence.record("clone-deleted", {"instance": clone})
 
+    # The golden source has served its purpose: the image is captured and a
+    # clone qualified from it. It must go before the next bake, because the
+    # shared build project caps concurrent virtual machines (stopped ones
+    # included) and the next image's clone would otherwise exceed the quota.
+    if not args.keep_golden:
+        incus(["delete", f"{args.remote}:{golden}", "--force"],
+              project=args.project, check=False)
+        evidence.record("golden-deleted", {
+            "instance": golden,
+            "note": "captured image retained; generalized source never booted again",
+        })
+
+    probe = f"{run_prefix(args)}-probe"
+    if incus_json(["list", f"{args.remote}:", probe], project=args.project):
+        incus(["delete", f"{args.remote}:{probe}", "--force"],
+              project=args.project, check=False)
+        evidence.record("probe-deleted", {"instance": probe})
+
     candidate = copy_to_image_build(published["fingerprint"], args.image, args, evidence)
 
     evidence.set("status", "ok")
@@ -997,6 +1015,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     bake_cmd.add_argument("--create-project", action="store_true")
     bake_cmd.add_argument("--keep-clone", action="store_true",
                           help="leave the qualification clone running for an external GUI gate")
+    bake_cmd.add_argument("--keep-golden", action="store_true",
+                          help="keep the stopped generalized source (it counts against the "
+                               "project's virtual-machine quota)")
 
 
     project_cmd = sub.add_parser("project", help="create the disposable build project")
