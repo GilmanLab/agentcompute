@@ -41,7 +41,7 @@ func TestClusterLifecycle(t *testing.T) {
 	require.NoError(t, err, "%s", output)
 	config := filepath.Join(dir, "config.yaml")
 	text := fmt.Sprintf(
-		"incus:\n  remote: %q\n  host: %q\n  pool: data\nimages_file: %q\n",
+		"incus:\n  remote: %q\n  host: %q\n  pool: data\nsandbox:\n  default_network_kind: bridge\nimages_file: %q\n",
 		remote,
 		host,
 		filepath.Join(root, "images", "catalog.yaml"),
@@ -58,6 +58,7 @@ func TestClusterLifecycle(t *testing.T) {
 `)
 	t.Logf("MCP sandbox creation: %s", time.Since(createStarted))
 	name := sandbox["name"].(string)
+	require.Equal(t, "bridge", sandbox["network"].(map[string]any)["kind"])
 	expires := sandbox["expires_at"].(string)
 	t.Cleanup(func() {
 		cleanup, stop := context.WithTimeout(context.Background(), time.Minute)
@@ -78,6 +79,14 @@ func TestClusterLifecycle(t *testing.T) {
 	observedNICs := created["observed"].(map[string]any)["nics"].([]any)
 	require.Len(t, observedNICs, 1)
 	assert.Equal(t, "default", observedNICs[0].(map[string]any)["network"])
+	mixed, err := first.CallTool(ctx, &mcp.CallToolParams{
+		Name: "execute",
+		Arguments: map[string]any{"source": fmt.Sprintf(`def main():
+    return net.create(sandbox=%q, name="ovn-mixed", kind="ovn")
+`, name)},
+	})
+	require.NoError(t, err)
+	require.True(t, mixed.IsError, "OVN networks must not mix into a bridge sandbox")
 	duplicate, err := first.CallTool(ctx, &mcp.CallToolParams{
 		Name: "execute",
 		Arguments: map[string]any{"source": fmt.Sprintf(`def main():
@@ -156,15 +165,36 @@ func TestClusterLifecycle(t *testing.T) {
 	}
 }
 
-func startClusterClient(ctx context.Context, t *testing.T, binary, config string) (*mcp.ClientSession, *exec.Cmd) {
+func startClusterClient(
+	ctx context.Context,
+	t *testing.T,
+	binary, config string,
+	names ...string,
+) (*mcp.ClientSession, *exec.Cmd) {
 	t.Helper()
+	if len(names) == 0 {
+		names = []string{
+			"sandbox.create",
+			"sandbox.list",
+			"instance.create",
+			"instance.get",
+			"instance.exec",
+			"net.attach",
+		}
+	}
 	command := exec.CommandContext(ctx, binary, "stdio", "--config", config)
 	command.Stderr = os.Stderr
 	client := mcp.NewClient(&mcp.Implementation{Name: "integration", Version: "1"}, nil)
 	session, err := client.Connect(ctx, &mcp.CommandTransport{Command: command, TerminateDuration: time.Second}, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = session.Close() })
-	for _, name := range []string{"sandbox.create", "sandbox.list", "instance.create", "instance.get", "instance.exec", "net.attach"} {
+	discoverCapabilities(ctx, t, session, names)
+	return session, command
+}
+
+func discoverCapabilities(ctx context.Context, t *testing.T, session *mcp.ClientSession, names []string) {
+	t.Helper()
+	for _, name := range names {
 		for _, tool := range []struct{ name, key string }{{"search_api", "query"}, {"describe_api", "name"}} {
 			result, err := session.CallTool(
 				ctx,
@@ -174,7 +204,6 @@ func startClusterClient(ctx context.Context, t *testing.T, binary, config string
 			require.False(t, result.IsError, "%v", result.Content)
 		}
 	}
-	return session, command
 }
 
 func integrationExecute(ctx context.Context, t *testing.T, session *mcp.ClientSession, source string) map[string]any {
@@ -192,4 +221,87 @@ func integrationExecute(ctx context.Context, t *testing.T, session *mcp.ClientSe
 	}
 	require.NoError(t, json.Unmarshal(data, &envelope))
 	return envelope.Result
+}
+
+func integrationExecuteError(ctx context.Context, t *testing.T, session *mcp.ClientSession, source string) {
+	t.Helper()
+	result, err := session.CallTool(
+		ctx,
+		&mcp.CallToolParams{Name: "execute", Arguments: map[string]any{"source": source}},
+	)
+	require.NoError(t, err)
+	require.True(t, result.IsError, "expected an agent-facing error, content: %v", result.Content)
+}
+
+func requireTestRemote(t *testing.T) string {
+	t.Helper()
+	remote := os.Getenv("AGENTCOMPUTE_TEST_REMOTE")
+	if remote == "" {
+		t.Skip("set AGENTCOMPUTE_TEST_REMOTE to opt into disposable cluster resources")
+	}
+	return remote
+}
+
+func integrationRoot(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	require.NoError(t, err)
+	return root
+}
+
+func buildAgentcompute(ctx context.Context, t *testing.T, root, dir string) string {
+	t.Helper()
+	binary := filepath.Join(dir, "agentcompute")
+	build := exec.CommandContext(ctx, "go", "build", "-o", binary, "./cmd/agentcompute")
+	build.Dir = root
+	output, err := build.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	return binary
+}
+
+func asMap(t *testing.T, value any) map[string]any {
+	t.Helper()
+	out, ok := value.(map[string]any)
+	require.True(t, ok, "expected object, got %T", value)
+	return out
+}
+
+func asSlice(t *testing.T, value any) []any {
+	t.Helper()
+	out, ok := value.([]any)
+	require.True(t, ok, "expected list, got %T", value)
+	return out
+}
+
+func asString(t *testing.T, value any) string {
+	t.Helper()
+	out, ok := value.(string)
+	require.True(t, ok, "expected string, got %T", value)
+	return out
+}
+
+func jsonInt(t *testing.T, value any) int64 {
+	t.Helper()
+	switch n := value.(type) {
+	case int64:
+		return n
+	case float64:
+		return int64(n)
+	case json.Number:
+		parsed, err := n.Int64()
+		require.NoError(t, err)
+		return parsed
+	case int:
+		return int64(n)
+	default:
+		t.Fatalf("expected integer, got %T", value)
+		return 0
+	}
+}
+
+func jsonBool(t *testing.T, value any) bool {
+	t.Helper()
+	out, ok := value.(bool)
+	require.True(t, ok, "expected bool, got %T", value)
+	return out
 }

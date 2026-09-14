@@ -28,20 +28,34 @@ func (c *Client) ListNetworks(ctx context.Context, sandbox string) ([]compute.Ne
 	return c.listNetworks(ctx, sandbox, project)
 }
 
-// CreateNetwork defines an all-member opaque bridge and reserves its name.
+// CreateNetwork defines a bridge in the default project or an OVN network in the sandbox project.
 func (c *Client) CreateNetwork(ctx context.Context, sandbox string, network compute.Network) (compute.Network, error) {
-	if network.Kind != "" && network.Kind != networkKindBridge {
-		return compute.Network{}, fmt.Errorf("network kind %q is not available", network.Kind)
+	project, _, err := c.getProject(ctx, sandbox)
+	if err != nil {
+		return compute.Network{}, err
+	}
+	fabric := networkKindBridge
+	if featuresNetworks(project) {
+		fabric = networkKindOVN
+	}
+	kind := network.Kind
+	if kind == "" {
+		kind = fabric
+	}
+	if kind != fabric {
+		return compute.Network{}, fmt.Errorf("cannot create a %s network in a %s sandbox", kind, fabric)
+	}
+	if kind == networkKindOVN {
+		return c.createOVNNetwork(ctx, sandbox, network)
+	}
+	if kind != networkKindBridge {
+		return compute.Network{}, fmt.Errorf("network kind %q is not available", kind)
 	}
 	logical := network.Name
 	if logical == "" {
 		return compute.Network{}, errors.New("network name is required")
 	}
 
-	project, _, err := c.getProject(ctx, sandbox)
-	if err != nil {
-		return compute.Network{}, err
-	}
 	host := project.Config[metaHost]
 	if host == "" {
 		host = c.host
@@ -104,7 +118,7 @@ func (c *Client) AttachNIC(ctx context.Context, ref compute.Ref, network, nic, i
 		"name":           nicName,
 	}
 	if ip != "" {
-		device["ipv4.address"] = ip
+		device[ipv4AddressKey] = ip
 	}
 	if mac != "" {
 		device["hwaddr"] = mac
@@ -132,11 +146,88 @@ func (c *Client) AttachNIC(ctx context.Context, ref compute.Ref, network, nic, i
 	return compute.NIC{}, fmt.Errorf("attached NIC %q was not observed", nicName)
 }
 
+// GetNetwork returns one owned agent-facing network.
+func (c *Client) GetNetwork(ctx context.Context, sandbox, name string) (compute.Network, error) {
+	networks, err := c.ListNetworks(ctx, sandbox)
+	if err != nil {
+		return compute.Network{}, err
+	}
+	for _, network := range networks {
+		if network.Name == name {
+			return network, nil
+		}
+	}
+	return compute.Network{}, compute.ErrNotFound
+}
+
+// DeleteNetwork removes an owned network after dependents are gone.
+func (c *Client) DeleteNetwork(ctx context.Context, sandbox, name string) error {
+	network, err := c.GetNetwork(ctx, sandbox, name)
+	if err != nil {
+		return err
+	}
+	if network.Kind == networkKindOVN {
+		return c.deleteOVNNetwork(ctx, sandbox, network.PhysicalName)
+	}
+	if err := c.checkBridgeOwnership(ctx, sandbox, network.PhysicalName); err != nil {
+		return err
+	}
+	if errs := c.deleteForwards(ctx, network.PhysicalName); len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return c.deleteBridge(ctx, network.PhysicalName)
+}
+
+// DetachNIC removes a NIC device from an instance.
+func (c *Client) DetachNIC(ctx context.Context, ref compute.Ref, nic string) error {
+	if ref.Sandbox == "" || ref.Name == "" || nic == "" {
+		return errors.New("instance reference and nic are required")
+	}
+	srv := c.Scoped(ctx, projectName(ref.Sandbox), "")
+	instance, etag, err := srv.GetInstance(ref.Name)
+	if err != nil {
+		return mapError(err)
+	}
+	devices := copyDevices(instance.Devices)
+	if _, exists := devices[nic]; !exists {
+		found := false
+		for name, device := range devices {
+			if device[deviceTypeKey] == deviceTypeNIC && device["name"] == nic {
+				delete(devices, name)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return compute.ErrNotFound
+		}
+	} else {
+		delete(devices, nic)
+	}
+	instance.Devices = devices
+	op, err := srv.UpdateInstance(ref.Name, instance.Writable(), etag)
+	if err != nil {
+		return mapError(err)
+	}
+	return waitOp(ctx, op)
+}
+
 func (c *Client) listNetworks(ctx context.Context, sandbox string, project *api.Project) ([]compute.Network, error) {
 	host := c.host
-	if project != nil {
-		if project.Config[metaHost] != "" {
-			host = project.Config[metaHost]
+	if project != nil && project.Config[metaHost] != "" {
+		host = project.Config[metaHost]
+	}
+
+	out := make([]compute.Network, 0)
+	seen := map[string]struct{}{}
+	if featuresNetworks(project) {
+		ovn, err := c.ownedOVNNetworks(ctx, sandbox)
+		if err != nil {
+			return nil, err
+		}
+		for _, network := range ovn {
+			seen[network.Name] = struct{}{}
+			out = append(out, network)
 		}
 	}
 
@@ -144,14 +235,15 @@ func (c *Client) listNetworks(ctx context.Context, sandbox string, project *api.
 	if err != nil {
 		return nil, mapError(err)
 	}
-
-	out := make([]compute.Network, 0)
 	for _, network := range networks {
 		logical := network.Config[metaName]
 		if network.Config[metaSandbox] != sandbox || network.Config[metaVersion] != versionValue || logical == "" {
 			continue
 		}
-		out = append(out, networkFromAPI(network, logical, host))
+		if _, ok := seen[logical]; ok {
+			continue
+		}
+		out = append(out, networkFromAPI(network, logical, host, api.ProjectDefaultName))
 	}
 	return out, nil
 }
@@ -161,15 +253,52 @@ func (c *Client) ownedBridges(ctx context.Context, sandbox string) ([]compute.Ne
 	if err != nil && !errors.Is(err, compute.ErrNotFound) {
 		return nil, err
 	}
-	return c.listNetworks(ctx, sandbox, project)
+	return c.listDefaultBridges(ctx, sandbox, project)
+}
+
+func (c *Client) listDefaultBridges(
+	ctx context.Context,
+	sandbox string,
+	project *api.Project,
+) ([]compute.Network, error) {
+	host := c.host
+	if project != nil && project.Config[metaHost] != "" {
+		host = project.Config[metaHost]
+	}
+	networks, err := c.Scoped(ctx, api.ProjectDefaultName, "").GetNetworks()
+	if err != nil {
+		return nil, mapError(err)
+	}
+	out := make([]compute.Network, 0)
+	for _, network := range networks {
+		logical := network.Config[metaName]
+		if network.Config[metaSandbox] != sandbox || network.Config[metaVersion] != versionValue || logical == "" {
+			continue
+		}
+		out = append(out, networkFromAPI(network, logical, host, api.ProjectDefaultName))
+	}
+	return out, nil
 }
 
 func (c *Client) resolvePhysical(ctx context.Context, sandbox, logical string) (string, error) {
 	if logical == "" {
 		logical = defaultLogicalNetwork
 	}
-	if _, _, err := c.getProject(ctx, sandbox); err != nil {
+	project, _, err := c.getProject(ctx, sandbox)
+	if err != nil {
 		return "", err
+	}
+	if featuresNetworks(project) {
+		ovns, ovnErr := c.ownedOVNNetworks(ctx, sandbox)
+		if ovnErr != nil {
+			return "", ovnErr
+		}
+		for _, network := range ovns {
+			if network.Name == logical {
+				return network.PhysicalName, nil
+			}
+		}
+		return "", compute.ErrNotFound
 	}
 	networks, err := c.Scoped(ctx, api.ProjectDefaultName, "").GetNetworks()
 	if err != nil {
@@ -386,7 +515,7 @@ func (c *Client) observedNetwork(ctx context.Context, logical, physical, host st
 	if err != nil {
 		return compute.Network{}, mapError(err)
 	}
-	return networkFromAPI(*network, logical, host), nil
+	return networkFromAPI(*network, logical, host, api.ProjectDefaultName), nil
 }
 
 func bridgeConfig(sandbox, logical string, network compute.Network) map[string]string {
@@ -397,45 +526,49 @@ func bridgeConfig(sandbox, logical string, network compute.Network) map[string]s
 	case network.CIDR != "":
 		address = network.CIDR
 	case network.DHCP || network.NAT || network.DNS:
-		address = "auto"
+		address = addressAuto
 	}
 	dnsMode := configNone
 	if network.DNS {
 		dnsMode = configManaged
 	}
 	return map[string]string{
-		"ipv4.address": address,
-		"ipv4.nat":     strconv.FormatBool(network.NAT),
-		"ipv4.dhcp":    strconv.FormatBool(network.DHCP),
+		ipv4AddressKey: address,
+		ipv4NATKey:     strconv.FormatBool(network.NAT),
+		ipv4DHCPKey:    strconv.FormatBool(network.DHCP),
 		"ipv6.address": configNone,
-		"dns.mode":     dnsMode,
+		dnsModeKey:     dnsMode,
 		metaSandbox:    sandbox,
 		metaName:       logical,
 		metaVersion:    versionValue,
 	}
 }
 
-func networkFromAPI(network api.Network, logical, host string) compute.Network {
-	cidr := network.Config["ipv4.address"]
+func networkFromAPI(network api.Network, logical, host, project string) compute.Network {
+	cidr := network.Config[ipv4AddressKey]
 	kind := network.Type
 	if kind == "" {
 		kind = networkKindBridge
 	}
+	if project == "" {
+		project = api.ProjectDefaultName
+	}
 	return compute.Network{
 		Name:         logical,
 		PhysicalName: network.Name,
+		Project:      project,
 		Kind:         kind,
 		CIDR:         cidr,
 		Gateway:      gatewayIP(cidr),
 		Host:         host,
-		DHCP:         isTrue(network.Config["ipv4.dhcp"]),
-		NAT:          isTrue(network.Config["ipv4.nat"]),
-		DNS:          network.Config["dns.mode"] != configNone,
+		DHCP:         isTrue(network.Config[ipv4DHCPKey]),
+		NAT:          isTrue(network.Config[ipv4NATKey]),
+		DNS:          network.Config[dnsModeKey] != configNone,
 	}
 }
 
 func gatewayIP(cidr string) string {
-	if cidr == "" || cidr == "auto" || cidr == configNone {
+	if cidr == "" || cidr == addressAuto || cidr == configNone {
 		return ""
 	}
 	ip, _, err := net.ParseCIDR(cidr)

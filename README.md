@@ -8,7 +8,7 @@ The server exposes exactly three MCP tools:
 - `describe_api` returns the exact input and output shape for one capability.
 - `execute` runs a Starlark program and returns the value from its zero-argument `main()` function.
 
-Slice 1 provides 13 capabilities: sandbox create/list/get/extend/delete, image listing, instance create/list/get/delete/exec, and network create/attach. Sandboxes are restricted Incus projects with persisted TTLs and a default NAT bridge. The startup/30-second reaper deletes expired sandboxes.
+Capabilities cover sandbox TTLs; instance lifecycle, exec, files, snapshots, and sandbox-local image publishing; and network creation, NICs, peering, ACLs, forwards, and Linux link impairment. Sandboxes are restricted Incus projects. OVN provides cross-member networking; member-local bridges remain available. The startup/30-second reaper retries expired sandboxes when their backend becomes available.
 
 ## Local bootstrap
 
@@ -33,14 +33,15 @@ Create `agentcompute.yaml` beside `images/`:
 ```yaml
 incus:
   remote: nas01
-  host: lab01
   pool: data
 sandbox:
   default_ttl_minutes: 240
   max_ttl_minutes: 1440
-  default_network_kind: bridge
+  default_network_kind: ovn
 images_file: images/catalog.yaml
 ```
+
+OVN requires the fleet-managed central, chassis TLS configuration, and physical uplink. To use the bridge fallback, set `default_network_kind: bridge` and configure `incus.host`.
 
 Pass its path with `--config` or `AGENTCOMPUTE_CONFIG`. YAML and TOML are strict: unknown keys fail startup. Catalog and certificate paths resolve relative to the configuration file.
 
@@ -92,9 +93,13 @@ def main():
     return result
 ```
 
-Instances use the sandbox's persisted member. An explicit different `host` is rejected. Bridges have opaque Incus names; capabilities expose only logical names such as `default` and `lan`. Each member's bridge is a separate L2 domain, not a cross-member network.
+OVN instances may use an explicit online `host`. Without one, placement prefers the most free RAM, then the lowest one-minute load, then member name; automatic placement excludes manual/group-only schedulers. Bridge instances remain on the sandbox's persisted member and reject a different host. Bridge names are opaque; capabilities expose logical names such as `default` and `lan`.
 
-Exec retains 64 KiB per stream while draining the rest. `stdout_truncated` and `stderr_truncated` report overflow. An exec-only timeout returns `timed_out=true`; caller cancellation remains an error. `user` accepts a numeric UID or `root`. OVN and macOS are not available in this slice.
+An OVN network with `nat=false` is isolated: it has no direct outside path and consumes no external address. Attach a router instance or use `net.peer` for reachability. Isolated networks reject external forwards. Operator-management and OOB denies are immutable, including against broader user allow rules.
+
+Restoring a snapshot stages a copy before deleting the current instance, then recreates it under the same agent-visible name and ownership. The Incus identity and NIC MAC can change, so the DHCP lease can change too; the original instance's snapshots are consumed. Low-level Incus access remains blocked.
+
+Exec retains 64 KiB per stream while draining the rest. `stdout_truncated` and `stderr_truncated` report overflow. An exec-only timeout returns `timed_out=true`; caller cancellation remains an error. `user` accepts a numeric UID or `root`. macOS is not available.
 
 Only `main()`'s final converted value is returned. Intermediate capability results remain inside the worker and do not enter the model's context.
 
@@ -188,6 +193,13 @@ Run the opt-in production-binary create/exec/restart/TTL-delete integration lane
 ```sh
 AGENTCOMPUTE_TEST_REMOTE=nas01 AGENTCOMPUTE_TEST_HOST=lab01 \
   go test -tags integration ./internal/cli -run TestClusterLifecycle -count=1 -v
+```
+
+Run the cross-member OVN acceptance lane against the durable fleet fabric:
+
+```sh
+AGENTCOMPUTE_TEST_REMOTE=nas01 AGENTCOMPUTE_TEST_MEMBERS=lab01,lab03 \
+  go test -tags integration ./internal/cli -run '^TestOVNAcceptance$' -count=1 -v -timeout 15m
 ```
 
 `root:smoke` and release jobs use offline artifact startup checks, without cluster credentials. Go tests exercise the real CodeMode worker and both MCP transports. Run `.github/scripts/mcp_smoke.py -- bin/agentcompute stdio --config agentcompute.yaml` for read-only live discovery and execution. The combined cluster acceptance program and results are retained under `spikes/`.

@@ -24,6 +24,8 @@ incus:
 images_file: images/catalog.yaml
 ```
 
+This example uses the member-local bridge fallback. For cross-member networking, set `sandbox.default_network_kind` to `ovn`; `incus.host` can then be omitted. OVN requires a provisioned central, chassis configuration, and physical uplink.
+
 The identity must manage sandbox projects and bridges in the default project. The image-build-only CI certificate is insufficient. See [Configuration](configuration.md) for explicit-URL credentials and TTL settings.
 
 ## Connect over STDIO
@@ -41,7 +43,7 @@ Configure an MCP client with absolute paths:
 }
 ```
 
-Startup reconciles the image catalog. The client sees exactly `search_api`, `describe_api`, and `execute`; the 13 compute capabilities live behind those tools. STDIO sends JSON-RPC to stdout and diagnostics to stderr.
+Startup reconciles the image catalog. The client sees exactly `search_api`, `describe_api`, and `execute`; compute capabilities live behind those tools. STDIO sends JSON-RPC to stdout and diagnostics to stderr.
 
 ## Discover the capabilities
 
@@ -72,7 +74,7 @@ def main():
 
 The result contains the command's exit code, stdout, stderr, timeout flag, and per-stream truncation flags. Only the final value returned by `main()` enters the successful MCP result.
 
-An omitted sandbox name is generated. Its default bridge provides DHCP and NAT on the configured member. All its guests stay on that persisted member. If execution fails before explicit deletion, use `sandbox.list` to find the sandbox; its persisted TTL also survives a server restart and is enforced by the reaper.
+An omitted sandbox name is generated. With this bridge configuration, its default network provides DHCP and NAT on the configured member, and all guests stay on that member. If execution fails before explicit deletion, use `sandbox.list` to find the sandbox; its persisted TTL survives a server restart and is enforced by the reaper.
 
 ## Use HTTP
 

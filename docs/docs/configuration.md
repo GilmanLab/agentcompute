@@ -49,17 +49,19 @@ images_file: images/catalog.yaml
 | `incus.url` | Explicit daemon URL instead of a named remote. |
 | `incus.client_cert`, `incus.client_key` | PEM file paths for the explicit-URL client identity. |
 | `incus.server_cert` | Optional PEM file path for a pinned server certificate. Otherwise normal CA verification applies. |
-| `incus.host` | Required member for newly created bridge-backed sandboxes. Placement is persisted in project metadata. |
+| `incus.host` | Required when the default network kind is `bridge`; that member is persisted for the sandbox. OVN supports explicit per-instance hosts or automatic placement. |
 | `incus.pool` | Required storage pool for instance root disks. |
 | `sandbox.default_ttl_minutes` | Positive creation default, 240 minutes if omitted. |
 | `sandbox.max_ttl_minutes` | Positive upper bound, 1440 minutes if omitted; must be at least the default. |
-| `sandbox.default_network_kind` | Only `bridge` is available. |
+| `sandbox.default_network_kind` | `bridge` (default) or `ovn`. OVN requires an existing central, configured chassis, and physical uplink. |
 | `images_file` | Schema-version-1 catalog path; defaults to `images/catalog.yaml`. |
-| `screenshots.dir`, `screenshots.base_url` | Accepted schema fields reserved for the desktop slice; no screenshot service in slice 1. |
+| `screenshots.dir`, `screenshots.base_url` | Accepted schema fields reserved for desktop integration; the screenshot service is not implemented. |
 
 `sandbox.extend` replaces the expiry with **now + TTL**, rather than adding time to the old expiry. Explicit deletion first expires the project so a partial failure is retried by the reaper. The reaper scans at startup and every 30 seconds.
 
-The default bridge enables IPv4 DHCP and NAT. `net.create` without L3 options creates a bare bridge. Physical network names are opaque `ac` plus eight lowercase hex characters; `user.agentcompute.sandbox`, `.name`, and `.version` metadata resolve their logical names. Pending creations also reserve the physical name on the project for cleanup.
+In OVN mode, sandbox projects own their logical networks and NICs use managed networks only. Networks span members. A `nat=false` network is isolated, has no external allocation or direct outside path, and requires peering or a dual-NIC router for reachability. External forwards require NAT-enabled networks. Automatic instance placement prefers free RAM, then one-minute load, then member name; explicit online hosts take precedence.
+
+In bridge mode, the sandbox's default bridge enables IPv4 DHCP and NAT. Additional bridge networks require `kind="bridge"`. Physical network names are opaque `ac` plus eight lowercase hex characters; `user.agentcompute.sandbox`, `.name`, and `.version` metadata resolve their logical names. Pending creations also reserve the physical name on the project for cleanup.
 
 All members receive bridge definitions before activation, but each member has a separate L2/dnsmasq/NAT instance. All guests in a bridge-backed sandbox must use its persisted member. These bridges are not OVN networks.
 

@@ -69,7 +69,6 @@ type sandboxAPI struct {
 	instances instanceService
 }
 
-//nolint:dupl // Explicit typed registrations keep each capability's contract visible.
 func registerSandbox(builder *codemode.Builder, deps Dependencies) {
 	api := sandboxAPI{sandboxes: deps.Sandbox, instances: deps.Instance}
 	codemode.Register(builder, codemode.Capability[sandboxCreateIn, sandboxCreateOut]{

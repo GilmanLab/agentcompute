@@ -54,10 +54,10 @@ func liveSandbox(name string) compute.Sandbox {
 	}
 }
 
-func expiredSandbox(name string) compute.Sandbox {
+func expiredSandbox() compute.Sandbox {
 	now := time.Now()
 	return compute.Sandbox{
-		Name:      name,
+		Name:      "demo",
 		Platform:  "incus",
 		Host:      "lab01",
 		CreatedAt: now.Add(-2 * time.Hour),

@@ -25,6 +25,8 @@ type Sandbox struct {
 	Subject string
 	// Host is the member shared by this sandbox's bridge-backed instances.
 	Host string
+	// NetworkKind records the default fabric; empty denotes a legacy bridge sandbox.
+	NetworkKind string
 	// CreatedAt is the original creation time.
 	CreatedAt time.Time
 	// ExpiresAt is the persisted reaper deadline.
@@ -75,6 +77,8 @@ type Network struct {
 	Name string
 	// PhysicalName is the opaque Incus bridge identifier, never exposed in DTOs.
 	PhysicalName string
+	// Project is the Incus project containing the managed network.
+	Project string
 	// Kind is bridge or ovn.
 	Kind string
 	// CIDR is the configured network prefix.
@@ -198,4 +202,23 @@ type Backend interface {
 	ListNetworks(context.Context, string) ([]Network, error)
 	CreateNetwork(context.Context, string, Network) (Network, error)
 	AttachNIC(context.Context, Ref, string, string, string, string) (NIC, error)
+	GetNetwork(context.Context, string, string) (Network, error)
+	DeleteNetwork(context.Context, string, string) error
+	DetachNIC(context.Context, Ref, string) error
+	PeerNetworks(context.Context, string, string, string) error
+	AddACLRule(context.Context, string, string, ACLRule) (ACLRule, error)
+	RemoveACLRule(context.Context, string, string, string) error
+	CreateForward(context.Context, string, string, Ref, int64, int64, string) (Forward, error)
+	StartInstance(context.Context, Ref, bool) (Instance, error)
+	StopInstance(context.Context, Ref, bool) (Instance, error)
+	RestartInstance(context.Context, Ref, bool) (Instance, error)
+	WaitInstance(context.Context, WaitRequest) (WaitResult, error)
+	ReadFile(context.Context, FileReadRequest) (FileReadResult, error)
+	WriteFile(context.Context, FileWriteRequest) (FileWriteResult, error)
+	CreateSnapshot(context.Context, Ref, string) error
+	RestoreSnapshot(context.Context, Ref, string) error
+	DeleteSnapshot(context.Context, Ref, string) error
+	ListSnapshots(context.Context, Ref) ([]Snapshot, error)
+	PublishInstance(context.Context, Ref, string) (string, error)
+	GetSandboxImage(context.Context, string, string) (CatalogImage, error)
 }

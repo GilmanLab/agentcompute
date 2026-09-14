@@ -47,20 +47,12 @@ func (c *Client) BeginCreateInstance(ctx context.Context, req compute.CreateInst
 	if req.Ref.Sandbox == "" || req.Ref.Name == "" {
 		return nil, errors.New("instance reference is required")
 	}
-	project, _, err := c.getProject(ctx, req.Ref.Sandbox)
-	if err != nil {
+	if _, _, err := c.getProject(ctx, req.Ref.Sandbox); err != nil {
 		return nil, err
 	}
-	sandbox, ok := parseSandbox(*project)
-	if !ok {
-		return nil, compute.ErrNotFound
-	}
-	host := sandbox.Host
-	if host == "" {
-		host = c.host
-	}
-	if req.Host != "" && req.Host != host {
-		return nil, fmt.Errorf("host %q is not the sandbox member %q", req.Host, host)
+	host, err := c.resolveTarget(ctx, req.Host)
+	if err != nil {
+		return nil, err
 	}
 
 	source, err := c.instanceSource(ctx, projectName(req.Ref.Sandbox), req.Image)
@@ -307,7 +299,7 @@ func (c *Client) forceDeleteInstance(ctx context.Context, sandbox, name string) 
 
 	if instance.StatusCode != api.Stopped {
 		op, stopErr := srv.UpdateInstanceState(name, api.InstanceStatePut{
-			Action:  "stop",
+			Action:  stopAction,
 			Timeout: -1,
 			Force:   true,
 		}, "")
@@ -329,16 +321,16 @@ func (c *Client) startInstance(ctx context.Context, project, name string) error 
 	if err != nil {
 		return mapError(err)
 	}
-	if state.StatusCode == api.Running || state.StatusCode == api.Ready {
+	if instanceRunningOrReady(state.StatusCode) {
 		return nil
 	}
 	op, err := srv.UpdateInstanceState(name, api.InstanceStatePut{
-		Action:  "start",
+		Action:  startAction,
 		Timeout: -1,
 	}, "")
 	if err != nil {
 		if state, _, stateErr := srv.GetInstanceState(name); stateErr == nil &&
-			(state.StatusCode == api.Running || state.StatusCode == api.Ready) {
+			instanceRunningOrReady(state.StatusCode) {
 			return nil
 		}
 		return mapError(err)
@@ -356,7 +348,7 @@ func (c *Client) waitRunning(ctx context.Context, project, name string) error {
 		if err != nil {
 			return mapError(err)
 		}
-		if state.StatusCode == api.Running || state.StatusCode == api.Ready {
+		if instanceRunningOrReady(state.StatusCode) {
 			return nil
 		}
 		if state.StatusCode == api.Error {
@@ -377,6 +369,12 @@ func (c *Client) instanceSource(
 	project string,
 	image compute.CatalogImage,
 ) (api.InstanceSource, error) {
+	if isSandboxImage(image) {
+		return api.InstanceSource{
+			Type:        sourceTypeImage,
+			Fingerprint: image.Fingerprint,
+		}, nil
+	}
 	if isUpstreamRef(image.Reference) {
 		remote, alias, _ := splitRemoteAlias(image.Reference)
 		server, err := c.RemoteImage(ctx, remote)
@@ -409,6 +407,10 @@ func (c *Client) instanceSource(
 		Type:        sourceTypeImage,
 		Fingerprint: fingerprint,
 	}, nil
+}
+
+func isSandboxImage(image compute.CatalogImage) bool {
+	return image.Fingerprint != "" && image.Reference == ""
 }
 
 func (c *Client) copyImage(ctx context.Context, project string, image compute.CatalogImage) (string, error) {
@@ -509,7 +511,12 @@ func (c *Client) mapNICs(ctx context.Context, sandbox string, full *api.Instance
 		return nil, err
 	}
 	for _, network := range networks {
-		logicalByPhysical[network.PhysicalName] = network.Name
+		if network.PhysicalName != "" {
+			logicalByPhysical[network.PhysicalName] = network.Name
+		}
+		if network.Name != "" {
+			logicalByPhysical[network.Name] = network.Name
+		}
 	}
 
 	nics := make([]compute.NIC, 0)
