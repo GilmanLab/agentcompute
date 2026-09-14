@@ -80,8 +80,46 @@ Add-Check 'computer-name-present' ([bool]$env:COMPUTERNAME) $env:COMPUTERNAME | 
 $ver = Get-Text "$env:SystemRoot\System32\cmd.exe" @('/c', 'ver')
 Add-Check 'cmd-ver' ($ver -match 'Microsoft Windows') $ver | Out-Null
 
-$bitlocker = Get-Text "$env:SystemRoot\System32\manage-bde.exe" @('-status', 'C:')
-Add-Check 'volume-decrypted' (-not ($bitlocker -match 'Conversion Status:\s*(?!Fully Decrypted)')) $bitlocker | Out-Null
+# Fail closed: a positive numeric statement that C: is fully decrypted, not
+# the absence of a text match, which a swallowed manage-bde error would fake.
+$encryption = [ordered]@{ method = $null; determined = $false; decrypted = $false }
+try {
+    $volume = Get-CimInstance -Namespace 'root\CIMV2\Security\MicrosoftVolumeEncryption' `
+        -ClassName Win32_EncryptableVolume -Filter "DriveLetter='C:'" -ErrorAction Stop
+    $conversion = Invoke-CimMethod -InputObject $volume -MethodName GetConversionStatus -ErrorAction Stop
+    if ($conversion.ReturnValue -ne 0) {
+        throw "GetConversionStatus returned 0x$('{0:X8}' -f $conversion.ReturnValue)"
+    }
+
+    $encryption.method = 'Win32_EncryptableVolume'
+    $encryption['conversion_status'] = [int]$conversion.ConversionStatus
+    $encryption['encryption_percentage'] = [int]$conversion.EncryptionPercentage
+    $encryption['protection_status'] = [int]$volume.ProtectionStatus
+    $encryption.determined = $true
+    $encryption.decrypted = $encryption['conversion_status'] -eq 0 -and
+        $encryption['encryption_percentage'] -eq 0 -and
+        $encryption['protection_status'] -eq 0
+} catch {
+    $encryption['error'] = $_.Exception.Message
+    $manageBde = "$env:SystemRoot\System32\manage-bde.exe"
+    if (Test-Path -LiteralPath $manageBde) {
+        $text = (& $manageBde '-status' 'C:' 2>&1 | Out-String)
+        $encryption['manage_bde_exit'] = $LASTEXITCODE
+        $encryption['status'] = $text.Trim()
+        if ($LASTEXITCODE -eq 0 -and $text -match 'Conversion Status:\s+Fully Decrypted' -and
+            $text -match 'Percentage Encrypted:\s+0([.,]0+)?%') {
+            $encryption.method = 'manage-bde text'
+            $encryption.determined = $true
+            $encryption.decrypted = $true
+        }
+    } else {
+        $encryption.method = 'none (no BitLocker capability present)'
+        $encryption.determined = $true
+        $encryption.decrypted = $true
+    }
+}
+
+Add-Check 'volume-decrypted' ($encryption.determined -and $encryption.decrypted) $encryption | Out-Null
 
 $agentService = Get-CimInstance Win32_Service -Filter "Name='incus-agent'"
 $agentDetail = 'missing'

@@ -74,8 +74,12 @@ images:
 # payload. A separate answer-file CD was tried first and Windows 11 25H2 Setup
 # treated it as an interrupted upgrade, stopping on "It looks like you started
 # an upgrade and booted from installation media".
+# The root disk outranks the installer CD (root 10, installer 1). The empty
+# disk cannot boot, so the firmware falls through to the CD once; afterwards
+# the installed disk boots first and Setup continues instead of re-entering
+# Setup from the CD and reporting an interrupted upgrade.
 build_media:
   - name: installer
     type: disk
-    boot_priority: 10
+    boot_priority: 1
     volume_suffix: installer

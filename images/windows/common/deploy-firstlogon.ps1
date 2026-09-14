@@ -68,6 +68,15 @@ try {
         $repaired = $true
     }
 
+    # The deploy answer file asks for a single logon; make it permanent again
+    # for this clone, with no stored credential.
+    $winlogon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+    Set-ItemProperty -Path $winlogon -Name 'AutoAdminLogon' -Value '1' -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultUserName' -Value $env:USERNAME -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultDomainName' -Value $env:COMPUTERNAME -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultPassword' -Value '' -Type String
+    Remove-ItemProperty -Path $winlogon -Name 'AutoLogonCount' -ErrorAction SilentlyContinue
+
     $after = $null
     for ($attempt = 1; $attempt -le 30; $attempt++) {
         Start-Sleep -Seconds 2

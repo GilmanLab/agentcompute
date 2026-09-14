@@ -273,13 +273,21 @@ def build_vm(
                 "path": "/",
                 "pool": args.pool,
                 "size": build["root_size"],
+                # The disk outranks the installer CD. An empty disk has no
+                # bootloader, so the firmware falls through to the CD for the
+                # first boot; once Setup has applied the image, the disk boots
+                # and Setup continues. Booting the CD a second time instead
+                # makes Setup find its own staged install and stop on "It
+                # looks like you started an upgrade and booted from
+                # installation media" - observed live before this ordering.
+                "boot.priority": "10",
             },
             "eth0": {"type": "nic", "network": args.network},
             "installer": {
                 "type": "disk",
                 "pool": args.pool,
                 "source": f"{args.volume_prefix}-installer",
-                "boot.priority": "10",
+                "boot.priority": "1",
             },
             # The agent CD-ROM is how a Windows guest gets incus-agent at all,
             # and it has to stay attached: Incus refreshes the agent and its
@@ -336,9 +344,29 @@ def wait_for_install(
     })
 
 
+def push_guest_scripts(instance: str, args: argparse.Namespace, evidence: Evidence) -> None:
+    """Run the working tree's guest scripts, not the ones baked earlier.
+
+    finalize.ps1 and deploy-firstlogon.ps1 are copied into the image during
+    bootstrap, so a fix to either would otherwise need a full rebake to take
+    effect in the run that is already in flight.
+    """
+    pushed = {}
+    for script in ("finalize.ps1", "deploy-firstlogon.ps1", "smoke.ps1"):
+        result = incus(
+            ["file", "push", str(WINDOWS_DIR / "common" / script),
+             f"{args.remote}:{instance}/C:/ProgramData/agentcompute/{script}"],
+            project=args.project, check=False, timeout=180,
+        )
+        pushed[script] = {"exit": result.returncode, "stderr": result.stderr.strip()}
+
+    evidence.record("guest-scripts-push", pushed)
+
+
 def finalize_and_seal(
     instance: str, args: argparse.Namespace, evidence: Evidence
 ) -> dict[str, Any]:
+    push_guest_scripts(instance, args, evidence)
     verify = guest_exec(
         instance,
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
@@ -676,9 +704,16 @@ def copy_to_image_build(
 ) -> dict[str, Any]:
     media = load_yaml(PINS_PATH)["media"][image]
     alias = f"{STABLE_ALIASES[image]}-candidate-{media['build']}"
-    incus(["image", "copy", f"{args.remote}:{fingerprint}", f"{args.remote}:",
-           "--target-project", args.promotion_project, "--alias", alias],
-          project=args.project, timeout=7200)
+    if args.project == args.promotion_project:
+        # The bake already ran in the promotion project, which is the only
+        # project a narrowly scoped publisher certificate may reach. Nothing to
+        # copy: just name the fingerprint.
+        incus(["image", "alias", "create", f"{args.remote}:{alias}", fingerprint],
+              project=args.promotion_project)
+    else:
+        incus(["image", "copy", f"{args.remote}:{fingerprint}", f"{args.remote}:",
+               "--target-project", args.promotion_project, "--alias", alias],
+              project=args.project, timeout=7200)
 
     info = incus_json(["image", "list", f"{args.remote}:", alias], project=args.promotion_project)
     if not info:
@@ -775,33 +810,74 @@ def bake(args: argparse.Namespace) -> int:
 
 
 def promote(args: argparse.Namespace) -> int:
-    gui = json.loads(Path(args.gui_evidence).read_text(encoding="utf-8"))
-    if gui.get("status") != "pass":
+    """Move the stable alias, bound to one image and one fingerprint.
+
+    The gate evidence is not a bare pass flag: it has to name the same image
+    and the same fingerprint being promoted, so a stale or unrelated
+    qualification cannot move an alias. The desktop image's gate includes the
+    GUI call; Server Core's is its own headless qualification. The alias is
+    updated in place with a single PUT rather than delete-then-create, so an
+    interrupted promotion cannot leave the catalog with no stable alias.
+    """
+    evidence_path = Path(args.qualification_evidence)
+    gate = json.loads(evidence_path.read_text(encoding="utf-8"))
+    if gate.get("status") != "pass":
         raise Error(
-            f"{args.gui_evidence} reports status {gui.get('status')!r}; "
-            "the stable alias only moves on a GUI gate pass"
+            f"{evidence_path} reports status {gate.get('status')!r}; "
+            "the stable alias only moves on a qualification pass"
+        )
+
+    if gate.get("image") != args.image:
+        raise Error(
+            f"{evidence_path} qualifies image {gate.get('image')!r}, not {args.image!r}"
+        )
+
+    if gate.get("fingerprint") != args.fingerprint:
+        raise Error(
+            f"{evidence_path} qualifies fingerprint {gate.get('fingerprint')!r}, "
+            f"not {args.fingerprint!r}"
+        )
+
+    present = incus_json(["image", "list", f"{args.remote}:", args.fingerprint],
+                         project=args.promotion_project)
+    if not present or present[0]["fingerprint"] != args.fingerprint:
+        raise Error(
+            f"image {args.fingerprint} is not in project {args.promotion_project}; "
+            "copy the candidate there before promoting"
         )
 
     alias = STABLE_ALIASES[args.image]
-    existing = incus_json(["image", "list", f"{args.remote}:", alias], project=args.promotion_project)
-    previous = existing[0]["fingerprint"] if existing else None
+    existing = incus_json(["image", "alias", "list", f"{args.remote}:", alias],
+                          project=args.promotion_project)
+    previous = existing[0]["target"] if existing else None
     if previous == args.fingerprint:
         print(json.dumps({"alias": alias, "fingerprint": args.fingerprint, "changed": False}))
         return 0
 
     if existing:
-        incus(["image", "alias", "delete", f"{args.remote}:{alias}"], project=args.promotion_project)
-    incus(["image", "alias", "create", f"{args.remote}:{alias}", args.fingerprint],
-          project=args.promotion_project)
+        # Atomic retarget through the API: the alias never stops existing.
+        incus(["query", "-X", "PUT",
+               f"{args.remote}:/1.0/images/aliases/{alias}?project={args.promotion_project}",
+               "-d", json.dumps({"target": args.fingerprint,
+                                 "description": existing[0].get("description", "")})])
+    else:
+        incus(["image", "alias", "create", f"{args.remote}:{alias}", args.fingerprint],
+              project=args.promotion_project)
+
+    rollback = None
+    if previous:
+        rollback = (
+            f"incus query -X PUT {args.remote}:/1.0/images/aliases/{alias}"
+            f"?project={args.promotion_project} -d '{{\"target\":\"{previous}\"}}'"
+        )
 
     print(json.dumps({
         "alias": alias,
         "fingerprint": args.fingerprint,
         "previous_fingerprint": previous,
-        "gui_evidence": args.gui_evidence,
+        "qualification_evidence": str(evidence_path),
         "changed": True,
-        "rollback": f"incus image alias delete {alias} && incus image alias create {alias} {previous}"
-        if previous else None,
+        "rollback": rollback,
     }, indent=2))
     return 0
 
@@ -881,8 +957,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     promote_cmd.add_argument("--remote", default="local")
     promote_cmd.add_argument("--promotion-project", default="image-build")
     promote_cmd.add_argument("--fingerprint", required=True)
-    promote_cmd.add_argument("--gui-evidence", required=True,
-                             help="JSON file whose status must be 'pass'")
+    promote_cmd.add_argument(
+        "--qualification-evidence", required=True,
+        help="JSON file with status 'pass' plus the image and fingerprint it qualifies",
+    )
 
     teardown_cmd = sub.add_parser("teardown", help="remove everything the bake created")
     teardown_cmd.add_argument("--remote", default="local")

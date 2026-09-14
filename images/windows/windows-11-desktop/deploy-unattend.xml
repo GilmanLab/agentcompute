@@ -43,8 +43,12 @@
       <TimeZone>UTC</TimeZone>
 
       <AutoLogon>
+        <!-- LogonCount is required by Microsoft's AutoLogon reference. One
+             logon is enough: it runs deploy-firstlogon.ps1, which restores the
+             persistent Winlogon values on the clone. -->
         <Username>automation</Username>
         <Enabled>true</Enabled>
+        <LogonCount>1</LogonCount>
         <Password>
           <Value>AUTOMATION_PASSWORD</Value>
           <PlainText>true</PlainText>

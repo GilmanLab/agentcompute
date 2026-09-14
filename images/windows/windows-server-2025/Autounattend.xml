@@ -118,15 +118,12 @@
       <TimeZone>UTC</TimeZone>
     </component>
 
-    <component name="Microsoft-Windows-Deployment"
-               processorArchitecture="amd64"
-               publicKeyToken="31bf3856ad364e35"
-               language="neutral" versionScope="nonSxS"
-               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-      <Reseal>
-        <Mode>oobe</Mode>
-      </Reseal>
-    </component>
+    <!-- Microsoft-Windows-Deployment/Reseal is deliberately absent: its valid
+         configuration passes are auditUser and oobeSystem, and placing it in
+         specialize made Setup fail the specialize pass with "The computer
+         restarted unexpectedly or encountered an unexpected error. Windows
+         installation cannot proceed", observed live. The bake never enters
+         audit mode, so nothing needs it. -->
   </settings>
 
   <settings pass="oobeSystem">

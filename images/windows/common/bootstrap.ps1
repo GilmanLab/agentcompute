@@ -392,6 +392,36 @@ function Install-UltraVnc {
     }
 }
 
+function Set-PersistentAutoLogon {
+    param([Parameter(Mandatory)] [string] $User)
+
+    <#
+        The answer file only asks for one automatic logon, which is what
+        Microsoft's AutoLogon reference requires it to declare. The image needs
+        one at every boot, because the Cua Driver daemon can only see windows
+        from an interactive session, so the persistent state is written here
+        instead: AutoAdminLogon on, no logon counter left behind, and an empty
+        DefaultPassword so no reusable credential is stored.
+    #>
+    $winlogon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+    Set-ItemProperty -Path $winlogon -Name 'AutoAdminLogon' -Value '1' -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultUserName' -Value $User -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultDomainName' -Value $env:COMPUTERNAME -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultPassword' -Value '' -Type String
+    foreach ($stale in 'AutoLogonCount', 'AutoLogonSID') {
+        Remove-ItemProperty -Path $winlogon -Name $stale -ErrorAction SilentlyContinue
+    }
+
+    $values = Get-ItemProperty -Path $winlogon
+    return [ordered]@{
+        AutoAdminLogon    = $values.AutoAdminLogon
+        DefaultUserName   = $values.DefaultUserName
+        DefaultDomainName = $values.DefaultDomainName
+        AutoLogonCount    = (Get-ItemProperty -Path $winlogon -Name 'AutoLogonCount' -ErrorAction SilentlyContinue).AutoLogonCount
+    }
+}
+
+
 function Copy-CaptureAssets {
     param([Parameter(Mandatory)] [string] $Root)
 
@@ -463,6 +493,9 @@ try {
         $script:Facts['cua_driver'] = Invoke-Step 'cua-driver' {
             Install-CuaDriver -Root $payloadRoot -Pin $config.payload.cua_driver `
                 -InstallDir $config.driver_dir
+        }
+        $script:Facts['autologon'] = Invoke-Step 'persistent-autologon' {
+            Set-PersistentAutoLogon -User $config.automation_user
         }
         $script:Facts['ultravnc'] = Invoke-Step 'ultravnc' {
             Install-UltraVnc -Root $payloadRoot -Pin $config.payload.ultravnc

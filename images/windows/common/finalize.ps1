@@ -48,17 +48,93 @@ function Get-Text {
     }
 }
 
+function Get-NativeText {
+    param([string] $FilePath, [string[]] $Arguments = @())
+
+    $output = (& $FilePath @Arguments 2>&1 | Out-String).Trim()
+    return [ordered]@{ exit = $LASTEXITCODE; text = $output }
+}
+
 function Get-BitLockerState {
-    $manageBde = "$env:SystemRoot\System32\manage-bde.exe"
-    if (-not (Test-Path -LiteralPath $manageBde)) {
-        return [ordered]@{ available = $false; status = 'manage-bde.exe not present'; encrypted = $false }
+    <#
+        Fails closed. A capture must only proceed on a positive statement that
+        the OS volume is fully decrypted, never on the absence of a match: a
+        swallowed manage-bde error would otherwise read as "not encrypted".
+
+        Win32_EncryptableVolume is the authoritative source because its values
+        are numeric (ConversionStatus 0 = FullyDecrypted, EncryptionPercentage
+        0, ProtectionStatus 0) rather than localized text.
+    #>
+    $state = [ordered]@{
+        method                = $null
+        determined            = $false
+        encrypted             = $true
+        conversion_status     = $null
+        encryption_percentage = $null
+        protection_status     = $null
+        manage_bde_exit       = $null
+        status                = $null
+        error                 = $null
     }
 
-    $text = Get-Text $manageBde @('-status')
-    # Anything other than "Fully Decrypted" on any volume means the captured
-    # disk could be sealed to this VM's vTPM, which no clone can unseal.
-    $encrypted = $text -match 'Conversion Status:\s*(?!Fully Decrypted)'
-    return [ordered]@{ available = $true; status = $text; encrypted = [bool]$encrypted }
+    $manageBde = "$env:SystemRoot\System32\manage-bde.exe"
+    $manageBdePresent = Test-Path -LiteralPath $manageBde
+
+    try {
+        $volume = Get-CimInstance -Namespace 'root\CIMV2\Security\MicrosoftVolumeEncryption' `
+            -ClassName Win32_EncryptableVolume -Filter "DriveLetter='C:'" -ErrorAction Stop
+        if (-not $volume) { throw "Win32_EncryptableVolume has no entry for C:" }
+
+        $conversion = Invoke-CimMethod -InputObject $volume -MethodName GetConversionStatus -ErrorAction Stop
+        if ($conversion.ReturnValue -ne 0) {
+            throw "GetConversionStatus returned 0x$('{0:X8}' -f $conversion.ReturnValue)"
+        }
+
+        $state.method = 'Win32_EncryptableVolume'
+        $state.conversion_status = [int]$conversion.ConversionStatus
+        $state.encryption_percentage = [int]$conversion.EncryptionPercentage
+        $state.protection_status = [int]$volume.ProtectionStatus
+        $state.determined = $true
+        $state.encrypted = -not (
+            $state.conversion_status -eq 0 -and
+            $state.encryption_percentage -eq 0 -and
+            $state.protection_status -eq 0
+        )
+    } catch {
+        $state.error = $_.Exception.Message
+        if (-not $manageBdePresent) {
+            # No BitLocker WMI provider and no manage-bde: the guest has no
+            # volume-encryption capability at all, so there is nothing that
+            # could have sealed the disk to this VM's vTPM.
+            $state.method = 'none (no BitLocker capability present)'
+            $state.determined = $true
+            $state.encrypted = $false
+        }
+    }
+
+    if ($manageBdePresent) {
+        $run = Get-NativeText $manageBde @('-status', 'C:')
+        $state.manage_bde_exit = $run.exit
+        $state.status = $run.text
+        if (-not $state.determined) {
+            # Fall back only on an explicit positive pair, and only when the
+            # command itself succeeded.
+            $decrypted = $run.exit -eq 0 -and
+                $run.text -match 'Conversion Status:\s+Fully Decrypted' -and
+                $run.text -match 'Percentage Encrypted:\s+0([.,]0+)?%'
+            if ($decrypted) {
+                $state.method = 'manage-bde text'
+                $state.determined = $true
+                $state.encrypted = $false
+            }
+        }
+    }
+
+    if (-not $state.determined) {
+        $state.error = "could not determine encryption state: $($state.error)"
+    }
+
+    return $state
 }
 
 function Invoke-Decrypt {
@@ -67,11 +143,41 @@ function Invoke-Decrypt {
     for ($attempt = 1; $attempt -le 120; $attempt++) {
         Start-Sleep -Seconds 10
         $state = Get-BitLockerState
-        if (-not $state.encrypted) { return $state }
+        if ($state.determined -and -not $state.encrypted) { return $state }
     }
 
     throw 'C: did not reach Fully Decrypted within 20 minutes'
 }
+
+function Set-PersistentAutoLogon {
+    param([Parameter(Mandatory)] [string] $User)
+
+    <#
+        The answer file only asks for one automatic logon, which is what
+        Microsoft's AutoLogon reference requires it to declare. The image needs
+        one at every boot, because the Cua Driver daemon can only see windows
+        from an interactive session, so the persistent state is written here
+        instead: AutoAdminLogon on, no logon counter left behind, and an empty
+        DefaultPassword so no reusable credential is stored.
+    #>
+    $winlogon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+    Set-ItemProperty -Path $winlogon -Name 'AutoAdminLogon' -Value '1' -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultUserName' -Value $User -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultDomainName' -Value $env:COMPUTERNAME -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultPassword' -Value '' -Type String
+    foreach ($stale in 'AutoLogonCount', 'AutoLogonSID') {
+        Remove-ItemProperty -Path $winlogon -Name $stale -ErrorAction SilentlyContinue
+    }
+
+    $values = Get-ItemProperty -Path $winlogon
+    return [ordered]@{
+        AutoAdminLogon    = $values.AutoAdminLogon
+        DefaultUserName   = $values.DefaultUserName
+        DefaultDomainName = $values.DefaultDomainName
+        AutoLogonCount    = (Get-ItemProperty -Path $winlogon -Name 'AutoLogonCount' -ErrorAction SilentlyContinue).AutoLogonCount
+    }
+}
+
 
 function Test-Components {
     $facts = [ordered]@{}
@@ -109,6 +215,13 @@ function Test-Components {
         $vnc = Get-CimInstance Win32_Service -Filter "Name='uvnc_service'"
         if (-not $vnc) { throw 'uvnc_service is missing; the VNC fallback would not exist on clones' }
         $facts['ultravnc'] = [ordered]@{ state = $vnc.State; start = $vnc.StartMode }
+
+        # Idempotent: guarantees the captured image boots into the interactive
+        # session regardless of how many logons the answer file requested.
+        $facts['autologon'] = Set-PersistentAutoLogon -User 'automation'
+        if ($facts['autologon'].AutoAdminLogon -ne '1') {
+            throw 'AutoAdminLogon is not enabled; clones would stop at the login screen'
+        }
     } else {
         if ($cv.InstallationType -ne 'Server Core') {
             throw "Expected a Server Core installation, found '$($cv.InstallationType)'"
@@ -188,6 +301,10 @@ if ($Phase -eq 'verify') {
         }
 
         if (-not $report.deploy_answer_present) { throw "Deployment answer file $DeployAnswer is missing" }
+        if (-not $bitlockerAfter.determined) {
+            throw "Refusing to capture: encryption state of C: is unknown ($($bitlockerAfter.error))"
+        }
+
         if ($bitlockerAfter.encrypted) { throw 'C: is still encrypted; refusing to capture' }
     } catch {
         $status = 'failed'
