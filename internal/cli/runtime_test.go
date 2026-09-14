@@ -21,6 +21,11 @@ func TestRuntimeConfigurationRejectsInvalidDocuments(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "config"+tc.extension)
+			if tc.extension == ".toml" {
+				tc.body += "\n[screenshots]\nbase_url='http://127.0.0.1:8081'\n"
+			} else {
+				tc.body += "\nscreenshots:\n  base_url: http://127.0.0.1:8081\n"
+			}
 			require.NoError(t, os.WriteFile(path, []byte(tc.body), 0o600))
 			_, err := loadRuntimeConfig(path)
 			require.Error(t, err)
@@ -37,7 +42,7 @@ func TestRuntimeConfigurationResolvesPathsRelativeToFile(t *testing.T) {
 		os.WriteFile(
 			path,
 			[]byte(
-				"images_file='catalog.yaml'\n[incus]\nurl='https://example.invalid'\nclient_cert='client.crt'\nclient_key='client.key'\nhost='lab01'\npool='data'\n",
+				"images_file='catalog.yaml'\n[incus]\nurl='https://example.invalid'\nclient_cert='client.crt'\nclient_key='client.key'\nhost='lab01'\npool='data'\n[screenshots]\nbase_url='http://127.0.0.1:8081'\n",
 			),
 			0o600,
 		),

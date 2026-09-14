@@ -20,6 +20,6 @@ func testDependencies(t *testing.T) *mcpserver.Dependencies {
 	require.NoError(t, err)
 	service, err := compute.New(mocks.NewMockBackend(t), catalog, compute.Options{Host: "lab01"})
 	require.NoError(t, err)
-	deps := mcpserver.NewDependencies(service)
+	deps := mcpserver.NewDependencies(service, nil)
 	return &deps
 }

@@ -1,0 +1,296 @@
+{
+  "_note": "Prefer `elements` — `tree_markdown` will continue to work but new fields will only be added to the structured side. Use `max_elements` / `max_depth` to bound the AT-SPI walk on apps with very large trees.",
+  "app_name": "gnome-text-editor",
+  "element_count": 13,
+  "elements": [
+    {
+      "actions": [
+        "page.move-right",
+        "settings.show-right-margin",
+        "page.save-as",
+        "win.show-preferences",
+        "win.close-current-page",
+        "page.move-to-new-window",
+        "settings.spellcheck",
+        "win.close-other-pages",
+        "session.new-draft",
+        "win.focus-search",
+        "default.activate",
+        "page.zoom-one",
+        "settings.discover-settings",
+        "window.minimize",
+        "win.open",
+        "page.begin-search",
+        "page.confirm-discard-changes",
+        "win.close-page-or-window",
+        "page.copy-all",
+        "win.alternate-help-overlay",
+        "page.zoom-in",
+        "window.close",
+        "page.properties",
+        "page.print",
+        "page.move-left",
+        "settings.wrap-text",
+        "page.save",
+        "page.zoom-out",
+        "page.confirm-save",
+        "win.show-primary-menu",
+        "page.begin-replace",
+        "window.toggle-maximized",
+        "page.change-language",
+        "settings.auto-indent",
+        "settings.show-line-numbers"
+      ],
+      "depth": 0,
+      "element_index": 0,
+      "element_token": "s00000001:0",
+      "enabled": true,
+      "frame": {
+        "h": 520,
+        "w": 700,
+        "x": 322,
+        "y": 114
+      },
+      "label": "New Document (Draft) - Text Editor",
+      "role": "application"
+    },
+    {
+      "actions": [
+        "search.hide",
+        "page.goto-line",
+        "view.auto-indent",
+        "page.show-goto-line"
+      ],
+      "depth": 10,
+      "element_index": 1,
+      "element_token": "s00000001:1",
+      "enabled": true,
+      "frame": {
+        "h": 474,
+        "w": 700,
+        "x": 322,
+        "y": 160
+      },
+      "parent_index": 0,
+      "role": "generic"
+    },
+    {
+      "actions": [
+        "spelling.enabled",
+        "buffer.delete-line",
+        "buffer.select-line",
+        "misc.insert-emoji",
+        "page.zoom-in",
+        "selection.select-all",
+        "page.zoom-one",
+        "clipboard.paste",
+        "menu.popup",
+        "clipboard.copy",
+        "page.zoom-out",
+        "selection.delete",
+        "buffer.duplicate-line",
+        "clipboard.cut"
+      ],
+      "depth": 15,
+      "element_index": 2,
+      "element_token": "s00000001:2",
+      "enabled": true,
+      "frame": {
+        "h": 474,
+        "w": 700,
+        "x": 322,
+        "y": 160
+      },
+      "parent_index": 1,
+      "role": "text box"
+    },
+    {
+      "depth": 14,
+      "element_index": 3,
+      "element_token": "s00000001:3",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 80,
+        "x": 328,
+        "y": 120
+      },
+      "label": "Open",
+      "parent_index": 1,
+      "role": "button"
+    },
+    {
+      "actions": [
+        "click"
+      ],
+      "depth": 15,
+      "element_index": 4,
+      "element_token": "s00000001:4",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 80,
+        "x": 337,
+        "y": 125
+      },
+      "label": "Open",
+      "parent_index": 3,
+      "role": "toggle button"
+    },
+    {
+      "actions": [
+        "click"
+      ],
+      "depth": 14,
+      "element_index": 5,
+      "element_token": "s00000001:5",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 34,
+        "x": 419,
+        "y": 125
+      },
+      "label": "New tab",
+      "parent_index": 1,
+      "role": "button"
+    },
+    {
+      "depth": 14,
+      "element_index": 6,
+      "element_token": "s00000001:6",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 34,
+        "x": 828,
+        "y": 120
+      },
+      "label": "View",
+      "parent_index": 1,
+      "role": "button"
+    },
+    {
+      "actions": [
+        "click"
+      ],
+      "depth": 15,
+      "element_index": 7,
+      "element_token": "s00000001:7",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 34,
+        "x": 833,
+        "y": 125
+      },
+      "label": "View",
+      "parent_index": 6,
+      "role": "toggle button"
+    },
+    {
+      "depth": 14,
+      "element_index": 8,
+      "element_token": "s00000001:8",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 34,
+        "x": 868,
+        "y": 120
+      },
+      "label": "Main menu",
+      "parent_index": 1,
+      "role": "button"
+    },
+    {
+      "actions": [
+        "click"
+      ],
+      "depth": 15,
+      "element_index": 9,
+      "element_token": "s00000001:9",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 34,
+        "x": 873,
+        "y": 125
+      },
+      "label": "Main menu",
+      "parent_index": 8,
+      "role": "toggle button"
+    },
+    {
+      "actions": [
+        "click"
+      ],
+      "depth": 14,
+      "element_index": 10,
+      "element_token": "s00000001:10",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 34,
+        "x": 913,
+        "y": 125
+      },
+      "label": "Minimize",
+      "parent_index": 1,
+      "role": "button"
+    },
+    {
+      "actions": [
+        "click"
+      ],
+      "depth": 14,
+      "element_index": 11,
+      "element_token": "s00000001:11",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 34,
+        "x": 950,
+        "y": 125
+      },
+      "label": "Maximize",
+      "parent_index": 1,
+      "role": "button"
+    },
+    {
+      "actions": [
+        "click"
+      ],
+      "depth": 14,
+      "element_index": 12,
+      "element_token": "s00000001:12",
+      "enabled": true,
+      "frame": {
+        "h": 34,
+        "w": 34,
+        "x": 987,
+        "y": 125
+      },
+      "label": "Close",
+      "parent_index": 1,
+      "role": "button"
+    }
+  ],
+  "elements_complete": false,
+  "pid": 1220,
+  "returned_element_count": 13,
+  "screenshot_height": 642,
+  "screenshot_mime_type": "image/png",
+  "screenshot_width": 822,
+  "snapshot_id": "s00000001",
+  "total_element_count": 13,
+  "tree_markdown": "- [0] application \"New Document (Draft) - Text Editor\" [actions=[page.move-right,settings.show-right-margin,page.save-as,win.show-preferences,win.close-current-page,page.move-to-new-window,settings.spellcheck,win.close-other-pages,session.new-draft,win.focus-search,default.activate,page.zoom-one,settings.discover-settings,window.minimize,win.open,page.begin-search,page.confirm-discard-changes,win.close-page-or-window,page.copy-all,win.alternate-help-overlay,page.zoom-in,window.close,page.properties,page.print,page.move-left,settings.wrap-text,page.save,page.zoom-out,page.confirm-save,win.show-primary-menu,page.begin-replace,window.toggle-maximized,page.change-language,settings.auto-indent,settings.show-line-numbers]]\n                - tab panel = \"New Document\"\n                    - [1] generic \"\" [actions=[search.hide,page.goto-line,view.auto-indent,page.show-goto-line]]\n                              - [2] text box \"\" [actions=[spelling.enabled,buffer.delete-line,buffer.select-line,misc.insert-emoji,page.zoom-in,selection.select-all,page.zoom-one,clipboard.paste,menu.popup,clipboard.copy,page.zoom-out,selection.delete,buffer.duplicate-line,clipboard.cut]]\n                            - [3] button \"Open\" [actions=[]]\n                              - [4] toggle button \"Open\" [actions=[click]]\n                                  - label = \"Open\"\n                            - [5] button \"New tab\" [actions=[click]]\n                            - label = \"New Document\"\n                            - [6] button \"View\" [actions=[]]\n                              - [7] toggle button \"View\" [actions=[click]]\n                            - [8] button \"Main menu\" [actions=[]]\n                              - [9] toggle button \"Main menu\" [actions=[click]]\n                            - [10] button \"Minimize\" [actions=[click]]\n                            - [11] button \"Maximize\" [actions=[click]]\n                            - [12] button \"Close\" [actions=[click]]\n",
+  "window_bounds": {
+    "height": 642,
+    "width": 822,
+    "x": 261,
+    "y": 59
+  },
+  "window_id": 31457284,
+  "window_title": "New Document (Draft) - Text Editor"
+}

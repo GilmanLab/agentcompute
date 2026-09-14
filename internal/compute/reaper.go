@@ -11,6 +11,9 @@ const reaperInterval = 30 * time.Second
 // Reap deletes expired sandboxes. A failed delete leaves the project in place
 // for the next scan.
 func (s *Service) Reap(ctx context.Context) error {
+	if s.onReap != nil {
+		s.onReap()
+	}
 	boxes, err := s.backend.ListSandboxes(ctx)
 	if err != nil {
 		return s.backendError(ctx, "list sandboxes", err)
@@ -67,6 +70,9 @@ func (s *Service) reapSandbox(ctx context.Context, name string) error {
 	}
 	if box.ExpiresAt.After(time.Now()) {
 		return nil
+	}
+	if s.onSandboxExpired != nil {
+		s.onSandboxExpired(name)
 	}
 	if err := s.backend.DeleteSandbox(ctx, name); err != nil {
 		if errors.Is(err, ErrNotFound) {
