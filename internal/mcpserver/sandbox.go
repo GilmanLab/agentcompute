@@ -111,6 +111,10 @@ func (api sandboxAPI) create(
 	if err := validatePlatform(in.Platform); err != nil {
 		return sandboxCreateOut{}, err
 	}
+	platform := deref(in.Platform, platformIncus)
+	if platform == "" {
+		platform = platformIncus
+	}
 	var ttl time.Duration
 	if in.TTLMinutes != nil {
 		var err error
@@ -119,9 +123,17 @@ func (api sandboxAPI) create(
 			return sandboxCreateOut{}, err
 		}
 	}
-	sandbox, err := api.sandboxes.CreateSandbox(ctx, deref(in.Name, ""), ttl, string(subject.ID))
+	sandbox, err := api.sandboxes.CreateSandbox(ctx, deref(in.Name, ""), ttl, string(subject.ID), platform)
 	if err != nil {
 		return sandboxCreateOut{}, err
+	}
+	out := sandboxCreateOut{
+		Name:      sandbox.Name,
+		Platform:  sandbox.Platform,
+		ExpiresAt: formatTime(sandbox.ExpiresAt),
+	}
+	if sandbox.Platform == platformMac {
+		return out, nil
 	}
 	_, _, networks, err := api.sandboxes.GetSandbox(ctx, sandbox.Name)
 	if err != nil {
@@ -131,12 +143,8 @@ func (api sandboxAPI) create(
 	if !ok {
 		return sandboxCreateOut{}, fmt.Errorf("sandbox %q has no default network", sandbox.Name)
 	}
-	return sandboxCreateOut{
-		Name:      sandbox.Name,
-		Platform:  sandbox.Platform,
-		ExpiresAt: formatTime(sandbox.ExpiresAt),
-		Network:   networkDTO(network),
-	}, nil
+	out.Network = networkDTO(network)
+	return out, nil
 }
 
 func (api sandboxAPI) list(
@@ -211,10 +219,8 @@ func validatePlatform(platform *string) error {
 		value = platformIncus
 	}
 	switch value {
-	case platformIncus:
+	case platformIncus, platformMac:
 		return nil
-	case platformMac:
-		return agentErrorf("platform %q is not available yet", platformMac)
 	default:
 		return agentErrorf("unsupported platform %q", value)
 	}

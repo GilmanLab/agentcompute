@@ -80,3 +80,17 @@ images:
   memory_mb: 4096
   disk_gb: 100
   alias: windows/server-2025-26100.32230
+# macOS images are host-local Lume seeds, not registry digests. The seed name
+# is the stopped VM on the Mac host; clones inherit operator TCC consent.
+- name: macos/tahoe/desktop
+  os: macos
+  version: '26.6.2'
+  platform: mac
+  kinds:
+  - vm
+  kind: vm
+  desktop: true
+  cpus: 4
+  memory_mb: 8192
+  disk_gb: 100
+  seed: ac-seed-macos-tahoe-desktop

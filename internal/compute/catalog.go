@@ -13,6 +13,7 @@ import (
 const (
 	catalogSchemaVersion = 1
 	platformIncus        = "incus"
+	platformMac          = "mac"
 	sha256Prefix         = "@sha256:"
 	sha256HexLength      = 64
 )
@@ -39,6 +40,7 @@ type catalogFileImage struct {
 	Description string   `yaml:"description"`
 	Reference   string   `yaml:"reference"`
 	Alias       string   `yaml:"alias"`
+	Seed        string   `yaml:"seed"`
 	CPUs        int64    `yaml:"cpus"`
 	MemoryMB    int64    `yaml:"memory_mb"`
 	DiskGB      int64    `yaml:"disk_gb"`
@@ -131,6 +133,7 @@ func (entry catalogFileImage) toCatalogImage() (CatalogImage, error) {
 		Description: entry.Description,
 		Reference:   entry.Reference,
 		Alias:       entry.Alias,
+		Seed:        entry.Seed,
 		CPUs:        entry.CPUs,
 		MemoryMB:    entry.MemoryMB,
 		DiskGB:      entry.DiskGB,
@@ -156,18 +159,8 @@ func normalizeCatalogImage(image CatalogImage) (CatalogImage, error) {
 	if !slices.Contains(image.Kinds, image.Kind) {
 		return CatalogImage{}, fmt.Errorf("kind %q is not listed in kinds", image.Kind)
 	}
-	if (image.Reference == "") == (image.Alias == "") {
-		return CatalogImage{}, errors.New("exactly one of reference or alias is required")
-	}
-	if image.Alias != "" && (strings.TrimSpace(image.Alias) != image.Alias ||
-		strings.ContainsAny(image.Alias, ":\x00\r\n")) {
-		return CatalogImage{}, errors.New("alias must be a cluster-local image alias")
-	}
-	if strings.HasPrefix(strings.ToLower(image.OS), "windows") && image.Reference != "" {
-		return CatalogImage{}, errors.New("windows images must use a cluster-local alias")
-	}
-	if image.Reference != "" && !validReference(image.Reference) {
-		return CatalogImage{}, fmt.Errorf("reference %q is neither a digest nor a remote alias", image.Reference)
+	if err := validateCatalogSource(image); err != nil {
+		return CatalogImage{}, err
 	}
 	if image.CPUs <= 0 {
 		return CatalogImage{}, errors.New("cpus must be positive")
@@ -178,11 +171,68 @@ func normalizeCatalogImage(image CatalogImage) (CatalogImage, error) {
 	if image.DiskGB <= 0 {
 		return CatalogImage{}, errors.New("disk_gb must be positive")
 	}
-	if image.Platform == "" {
-		image.Platform = platformIncus
+	var err error
+	image.Platform, err = catalogPlatform(image)
+	if err != nil {
+		return CatalogImage{}, err
 	}
 	image.Kinds = slices.Clone(image.Kinds)
 	return image, nil
+}
+
+func validateCatalogSource(image CatalogImage) error {
+	sources := 0
+	if image.Reference != "" {
+		sources++
+	}
+	if image.Alias != "" {
+		sources++
+	}
+	if image.Seed != "" {
+		sources++
+	}
+	if sources != 1 {
+		return errors.New("exactly one of reference, alias, or seed is required")
+	}
+	if image.Alias != "" && (strings.TrimSpace(image.Alias) != image.Alias ||
+		strings.ContainsAny(image.Alias, ":\x00\r\n")) {
+		return errors.New("alias must be a cluster-local image alias")
+	}
+	if image.Seed != "" && (strings.TrimSpace(image.Seed) != image.Seed ||
+		strings.ContainsAny(image.Seed, ":\x00\r\n")) {
+		return errors.New("seed must be a host-local Lume VM name")
+	}
+	if strings.HasPrefix(strings.ToLower(image.OS), "windows") && image.Alias == "" {
+		return errors.New("windows images must use a cluster-local alias")
+	}
+	if image.Reference != "" && !validReference(image.Reference) {
+		return fmt.Errorf("reference %q is neither a digest nor a remote alias", image.Reference)
+	}
+	return nil
+}
+
+func catalogPlatform(image CatalogImage) (string, error) {
+	platform := image.Platform
+	switch platform {
+	case "":
+		platform = platformIncus
+		if image.Seed != "" {
+			platform = platformMac
+		}
+	case platformIncus, platformMac:
+	default:
+		return "", fmt.Errorf("unsupported platform %q", platform)
+	}
+	if platform == platformMac && image.Seed == "" {
+		return "", errors.New("mac images must use a host-local seed")
+	}
+	if platform != platformMac && image.Seed != "" {
+		return "", errors.New("seed is only valid for platform mac")
+	}
+	if platform == platformIncus && strings.EqualFold(image.OS, "macos") {
+		return "", errors.New("macos images must use platform mac")
+	}
+	return platform, nil
 }
 
 func validReference(reference string) bool {

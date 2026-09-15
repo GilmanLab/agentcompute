@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	// ErrNotFound is the adapter sentinel for a missing Incus resource.
+	// ErrNotFound is the adapter sentinel for a missing backend resource.
 	ErrNotFound = errors.New("not found")
 
 	// ErrUnavailable is the adapter sentinel for an unreachable backend.
@@ -21,6 +21,10 @@ func agentError(message string) error {
 
 func agentErrorf(format string, args ...any) error {
 	return &codemode.AgentError{Message: fmt.Sprintf(format, args...)}
+}
+
+func unsupportedOnMac() error {
+	return agentError("unsupported on platform mac")
 }
 
 func sandboxNotFound(name string) error {
