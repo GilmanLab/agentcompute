@@ -193,19 +193,10 @@ SCRIPT
   guest_run "$vm" "PNG=$guest_png" <<<'rm -f "$PNG"'
 }
 
-log "verifying $vm at $(guest_address "$vm")"
+log "verifying $vm at $(guest_address "$vm") (clone=$clone)"
 check "guest base matches the pinned IPSW" check_base
-# Measured: a clone re-runs macOS's first-login Setup Assistant even though the
-# seed completed it and keeps it suppressed across its own reboots, and killing
-# Setup Assistant logs the session out. The Driver works anyway -- grants,
-# accessibility tree and capture all pass -- but the visible desktop is the
-# wizard. --clone acknowledges that open defect instead of hiding it; the seed
-# itself is still gated on a clean session.
-if [ "$clone" -eq 0 ]; then
-  check "the desktop session is the agent's, not Setup Assistant's" check_desktop_session
-else
-  printf 'SKIP  desktop session check (clone: Setup Assistant re-runs, see README)\n'
-fi
+# A clone is agent-facing only when its console is a desktop, not a wizard.
+check "the desktop session is the agent's, not Setup Assistant's" check_desktop_session
 check "driver app identity matches the pin" check_driver_identity
 check "driver LaunchAgent is loaded" check_launch_agent
 check "TCC grants are held by the driver daemon" check_permissions
