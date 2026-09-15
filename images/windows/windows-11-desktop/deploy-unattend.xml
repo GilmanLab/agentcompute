@@ -60,7 +60,7 @@
         <HideLocalAccountScreen>true</HideLocalAccountScreen>
         <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
         <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
-        <HideWirelessSetupInHDS>true</HideWirelessSetupInHDS>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
         <NetworkLocation>Work</NetworkLocation>
         <ProtectYourPC>3</ProtectYourPC>
       </OOBE>

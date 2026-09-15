@@ -32,6 +32,8 @@ Set-StrictMode -Version Latest
 
 $stateDir = Join-Path $env:ProgramData 'agentcompute'
 $driver = Join-Path $stateDir 'cua-driver\cua-driver.exe'
+$proxy = Join-Path $stateDir 'cua-driver\cua-driver-proxy.exe'
+$pipe = '\\.\pipe\cua-driver'
 $checks = [System.Collections.Generic.List[object]]::new()
 
 function Add-Check {
@@ -55,6 +57,59 @@ function Get-Text {
     }
 }
 
+function Convert-CuaJson {
+    param([string] $Text)
+
+    $trim = $Text.Trim()
+    if (-not $trim) { return $null }
+    try { return $trim | ConvertFrom-Json } catch {}
+    $obj = $trim.IndexOf('{')
+    $arr = $trim.IndexOf('[')
+    $start = -1
+    if ($obj -ge 0 -and ($arr -lt 0 -or $obj -lt $arr)) { $start = $obj }
+    elseif ($arr -ge 0) { $start = $arr }
+    if ($start -lt 0) { return $null }
+    try { return $trim.Substring($start) | ConvertFrom-Json } catch { return $null }
+}
+
+function Get-CuaInteractiveDaemons {
+    param([Parameter(Mandatory)] [string] $DriverPath)
+
+    $expected = [System.IO.Path]::GetFullPath($DriverPath)
+    $found = @(Get-CimInstance Win32_Process -Filter "Name='cua-driver.exe'" |
+        Where-Object {
+            $_.SessionId -ge 1 -and $_.ExecutablePath -and
+            ([System.IO.Path]::GetFullPath($_.ExecutablePath) -eq $expected)
+        })
+    $serve = @($found | Where-Object { $_.CommandLine -match '\bserve\b' })
+    if ($serve.Count -gt 0) { return $serve }
+    $notClient = @($found | Where-Object {
+        $_.CommandLine -notmatch '\b(call|mcp|status|autostart)\b'
+    })
+    if ($notClient.Count -gt 0) { return $notClient }
+    return $found
+}
+
+function Get-CuaWindowRecords {
+    param($Parsed)
+
+    if ($null -eq $Parsed) { return @() }
+    if ($Parsed -is [System.Collections.IEnumerable] -and $Parsed -isnot [string]) {
+        $items = @($Parsed)
+        if ($items.Count -gt 0 -and $null -ne $items[0] -and
+            ($items[0].PSObject.Properties['window_id'] -or
+             $items[0].PSObject.Properties['hwnd'])) {
+            return $items
+        }
+    }
+    foreach ($name in 'windows', 'items', 'result') {
+        if ($Parsed.PSObject.Properties[$name] -and $null -ne $Parsed.$name) {
+            return @($Parsed.$name)
+        }
+    }
+    return @()
+}
+
 $cv = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
 $os = Get-CimInstance Win32_OperatingSystem
 
@@ -63,7 +118,7 @@ $os = Get-CimInstance Win32_OperatingSystem
 $machineSid = (Get-LocalUser -Name 'Administrator').SID.AccountDomainSid.Value
 
 $identity = [ordered]@{
-    computer_name = $env:COMPUTERNAME
+    computer_name = [Environment]::MachineName
     machine_sid   = $machineSid
     caption       = $os.Caption
     version       = $os.Version
@@ -75,7 +130,15 @@ $identity = [ordered]@{
 }
 
 Add-Check 'machine-sid-present' ([bool]$machineSid) $machineSid | Out-Null
-Add-Check 'computer-name-present' ([bool]$env:COMPUTERNAME) $env:COMPUTERNAME | Out-Null
+Add-Check 'computer-name-present' ([bool]$identity.computer_name) $identity.computer_name | Out-Null
+
+$sealContextPath = Join-Path $stateDir 'seal-context.json'
+$sealContext = if (Test-Path -LiteralPath $sealContextPath) {
+    Get-Content -LiteralPath $sealContextPath -Raw | ConvertFrom-Json
+} else { $null }
+$supportedSeal = $null -ne $sealContext -and $sealContext.sid -and
+    $sealContext.sid -ne 'S-1-5-18' -and $sealContext.elevated -and $sealContext.session -ge 1
+Add-Check 'source-sealed-as-interactive-administrator' ([bool]$supportedSeal) $sealContext | Out-Null
 
 $ver = Get-Text "$env:SystemRoot\System32\cmd.exe" @('/c', 'ver')
 Add-Check 'cmd-ver' ($ver -match 'Microsoft Windows') $ver | Out-Null
@@ -138,22 +201,55 @@ if ($Role -eq 'desktop') {
         Add-Check 'deploy-report-ok' ($deployReport.status -eq 'ok') $deployReport.status | Out-Null
     }
 
-    $status = Get-Text $driver @('status')
-    Add-Check 'driver-daemon-running' `
+    Add-Check 'driver-present' (Test-Path -LiteralPath $driver) $driver | Out-Null
+    Add-Check 'driver-proxy-present' (Test-Path -LiteralPath $proxy) $proxy | Out-Null
+
+    $daemons = @(Get-CuaInteractiveDaemons -DriverPath $driver)
+    $daemonDetail = @($daemons | ForEach-Object {
+        [ordered]@{
+            pid           = $_.ProcessId
+            session       = $_.SessionId
+            command_line  = $_.CommandLine
+            executable    = $_.ExecutablePath
+        }
+    })
+    $session = if ($daemons.Count -gt 0) { [int]$daemons[0].SessionId } else { -1 }
+    Add-Check 'driver-daemon-running' ($daemons.Count -gt 0) $daemonDetail | Out-Null
+    # Session 0 is the services session and has no attached desktop. Cua
+    # status text has no session field and SYSTEM cannot read the pid file.
+    Add-Check 'driver-session-interactive' ($session -ge 1) `
+        "session=$session pid=$(if ($daemons.Count -gt 0) { $daemons[0].ProcessId } else { 'none' })" | Out-Null
+
+    $status = Get-Text $proxy @('status', '--socket', $pipe)
+    Add-Check 'driver-status-via-proxy' `
         (($status -match 'running') -and ($status -notmatch 'not running')) $status | Out-Null
 
-    $session = -1
-    if ($status -match '(?m)session:\s*(\d+)') { $session = [int]$Matches[1] }
-    # Session 0 is the services session and has no attached desktop, so a
-    # daemon there cannot see windows at all.
-    Add-Check 'driver-session-interactive' ($session -ge 1) "session=$session" | Out-Null
+    $windowsText = Get-Text $proxy @('call', '--socket', $pipe, 'list_windows', '{}')
+    $windowsParsed = Convert-CuaJson $windowsText
+    $windowRecords = @(Get-CuaWindowRecords $windowsParsed)
+    $windowOk = $windowRecords.Count -gt 0 -and (
+        $windowRecords[0].PSObject.Properties['window_id'] -or
+        $windowRecords[0].PSObject.Properties['hwnd'] -or
+        $windowRecords[0].PSObject.Properties['title']
+    )
+    Add-Check 'driver-list-windows' $windowOk ([ordered]@{
+        count   = $windowRecords.Count
+        sample  = @($windowRecords | Select-Object -First 3)
+        raw     = $windowsText.Substring(0, [Math]::Min(400, $windowsText.Length))
+    }) | Out-Null
 
-    $windows = Get-Text $driver @('call', 'list_windows', '{}')
-    Add-Check 'driver-list-windows' ($windows -notmatch '^error:' -and $windows.Length -gt 0) $windows | Out-Null
-
-    $apps = Get-Text $driver @('call', 'list_apps', '{}')
-    Add-Check 'driver-list-apps' ($apps -notmatch '^error:' -and $apps.Length -gt 0) `
-        ($apps.Substring(0, [Math]::Min(400, $apps.Length))) | Out-Null
+    $appsText = Get-Text $proxy @('call', '--socket', $pipe, 'list_apps', '{}')
+    $appsParsed = Convert-CuaJson $appsText
+    $apps = @()
+    if ($null -ne $appsParsed -and $appsParsed.PSObject.Properties['apps']) {
+        $apps = @($appsParsed.apps)
+    } elseif ($null -ne $appsParsed -and $appsParsed -is [System.Collections.IEnumerable] -and $appsParsed -isnot [string]) {
+        $apps = @($appsParsed)
+    }
+    Add-Check 'driver-list-apps' ($apps.Count -gt 0) ([ordered]@{
+        count = $apps.Count
+        raw   = $appsText.Substring(0, [Math]::Min(400, $appsText.Length))
+    }) | Out-Null
 
     $vnc = Get-CimInstance Win32_Service -Filter "Name='uvnc_service'"
     $vncDetail = 'missing'
@@ -172,7 +268,7 @@ if ($Role -eq 'desktop') {
     # were visible. So the full-desktop capture is inspected for real content,
     # and the file is left in place for the host to pull as visual evidence.
     $shot = Join-Path $stateDir ('cua-' + [guid]::NewGuid().ToString('N').Substring(0, 12) + '.png')
-    $desktopState = Get-Text $driver @('call', 'get_desktop_state', '{}', '--screenshot-out-file', $shot)
+    $desktopState = Get-Text $proxy @('call', '--socket', $pipe, '--screenshot-out-file', $shot, 'get_desktop_state', '{}')
     $shotDetail = [ordered]@{ path = $shot; exists = Test-Path -LiteralPath $shot }
     $shotPass = $false
     if ($shotDetail.exists) {
@@ -216,6 +312,7 @@ if ($Role -eq 'desktop') {
     $explorer = Test-Path -LiteralPath "$env:SystemRoot\explorer.exe"
     Add-Check 'no-desktop-experience' (-not $explorer) "explorer.exe present=$explorer" | Out-Null
     Add-Check 'no-driver-installed' (-not (Test-Path -LiteralPath $driver)) $driver | Out-Null
+    Add-Check 'no-proxy-installed' (-not (Test-Path -LiteralPath $proxy)) $proxy | Out-Null
 }
 
 $failed = @($checks | Where-Object { -not $_.pass })

@@ -14,6 +14,11 @@ import (
 	"github.com/GilmanLab/agentcompute/internal/compute"
 )
 
+const (
+	bridgeMTUKey       = "bridge.mtu"
+	defaultEthernetMTU = 1500
+)
+
 var errBridgeCollision = errors.New("bridge name is already owned")
 
 // ListNetworks returns agent-facing networks owned by the sandbox.
@@ -138,12 +143,25 @@ func (c *Client) AttachNIC(ctx context.Context, ref compute.Ref, network, nic, i
 	if err != nil {
 		return compute.NIC{}, err
 	}
-	for _, attached := range observed.NICs {
-		if attached.Name == nicName {
-			return attached, nil
-		}
+	attached, ok := nicByName(observed.NICs, nicName)
+	if !ok {
+		return compute.NIC{}, fmt.Errorf("attached NIC %q was not observed", nicName)
 	}
-	return compute.NIC{}, fmt.Errorf("attached NIC %q was not observed", nicName)
+	if configureErr := c.configureWindowsNICs(ctx, observed); configureErr != nil {
+		return compute.NIC{}, configureErr
+	}
+	if !windowsGuest(observed.OS) || !instanceRunningStatus(observed.Status) {
+		return attached, nil
+	}
+	observed, err = c.GetInstance(ctx, ref)
+	if err != nil {
+		return compute.NIC{}, err
+	}
+	attached, ok = nicByName(observed.NICs, nicName)
+	if !ok {
+		return compute.NIC{}, fmt.Errorf("attached NIC %q was not observed", nicName)
+	}
+	return attached, nil
 }
 
 // GetNetwork returns one owned agent-facing network.
@@ -605,4 +623,64 @@ func nextNICName(devices map[string]map[string]string) string {
 			return candidate
 		}
 	}
+}
+
+func nicByName(nics []compute.NIC, name string) (compute.NIC, bool) {
+	for _, nic := range nics {
+		if nic.Name == name {
+			return nic, true
+		}
+	}
+	return compute.NIC{}, false
+}
+
+func (c *Client) ownedNetwork(ctx context.Context, sandbox, logical string) (*api.Network, error) {
+	if logical == "" {
+		return nil, compute.ErrNotFound
+	}
+	project, _, err := c.getProject(ctx, sandbox)
+	if err != nil {
+		return nil, err
+	}
+	if featuresNetworks(project) {
+		network, networkErr := c.projectNetwork(ctx, sandbox, logical)
+		if networkErr != nil {
+			return nil, networkErr
+		}
+		name := network.Config[metaName]
+		if name == "" {
+			name = network.Name
+		}
+		if network.Config[metaSandbox] != sandbox || network.Config[metaVersion] != versionValue || name != logical {
+			return nil, compute.ErrNotFound
+		}
+		return network, nil
+	}
+	networks, err := c.Scoped(ctx, api.ProjectDefaultName, "").GetNetworks()
+	if err != nil {
+		return nil, mapError(err)
+	}
+	for i := range networks {
+		network := &networks[i]
+		if network.Config[metaVersion] != versionValue {
+			continue
+		}
+		if network.Config[metaSandbox] == sandbox && network.Config[metaName] == logical {
+			return network, nil
+		}
+	}
+	return nil, compute.ErrNotFound
+}
+
+func parseNetworkMTU(config map[string]string) (int, error) {
+	value := strings.TrimSpace(config[bridgeMTUKey])
+	if value == "" {
+		// Incus bridgeMTUDefault when bridge.mtu is unset on an ordinary bridge.
+		return defaultEthernetMTU, nil
+	}
+	mtu, err := strconv.Atoi(value)
+	if err != nil || mtu <= 0 {
+		return 0, fmt.Errorf("invalid %s %q", bridgeMTUKey, value)
+	}
+	return mtu, nil
 }

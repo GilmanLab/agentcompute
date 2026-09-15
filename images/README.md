@@ -13,13 +13,16 @@ image-build wrapper.
 | `ubuntu-24.04-desktop/distrobuilder.yaml` | Split desktop VM recipe with Xorg, GDM automatic login, AT-SPI, Cua Driver, X0tigervnc, systemd-networkd, growroot, and signed shim/GRUB. |
 | `ubuntu-24.04-desktop/smoke.py` | Candidate qualification for X11, the Driver session socket and user unit, native `list_apps`, disabled nesting, and owned-resource cleanup. |
 | `build.py` | `validate` (schema and pin checks, no credentials) and `build` (download-verify, compile distrobuilder from vendored source, assemble). PEP 723 script with `build.py.lock`. |
-| `catalog.yaml` | Startup catalog: image name → digest-pinned GHCR reference or upstream Incus `remote:alias`, kind, OS, defaults. |
-| `smoke.sh` | Shared six-tool router boot smoke used by image CI. |
+| `catalog.yaml` | Startup catalog: name → digest-pinned GHCR reference, upstream Incus `remote:alias`, or cluster-local `alias` in `image-build`, plus kind, OS, and defaults. |
+| `smoke.sh` | Router boot qualification, including the four `/opt/router/{nat,route,dhcp,wg}` helpers. |
 | `runner/smoke.py` | Guest-contract qualification: disk growth, bogus payload, status transitions, serial lifecycle, poweroff, and owned-resource cleanup. |
 | `publish.py` | Protected-source gate, immutable-tag lookup, assembly, qualification, publication, and verified fetch-back. |
 | `catalog-pr.py` | Opens the public catalog digest PR from verified release evidence. |
 | `ci-incus.py` | Configures the pinned Incus CLI and restricted HTTPS identity. |
 | `../cmd/image-publish` | Immutable imgoci publication and verified fetch-back CLI. |
+
+Phase 7 router and Windows findings are maintained in the central
+[qualification report](https://docs.gilman.io/root/reference/agentcompute/phase7/).
 
 ## Build locally
 

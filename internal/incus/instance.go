@@ -31,15 +31,16 @@ func (p *pendingInstance) Wait(ctx context.Context) (compute.Instance, error) {
 	if err := waitOp(ctx, p.op); err != nil {
 		return compute.Instance{}, err
 	}
-	if p.start {
-		if err := p.client.startInstance(ctx, p.project, p.ref.Name); err != nil {
-			return compute.Instance{}, err
-		}
-		if err := p.client.waitRunning(ctx, p.project, p.ref.Name); err != nil {
-			return compute.Instance{}, err
-		}
+	if !p.start {
+		return p.client.GetInstance(ctx, p.ref)
 	}
-	return p.client.GetInstance(ctx, p.ref)
+	if err := p.client.startInstance(ctx, p.project, p.ref.Name); err != nil {
+		return compute.Instance{}, err
+	}
+	if err := p.client.waitRunning(ctx, p.project, p.ref.Name); err != nil {
+		return compute.Instance{}, err
+	}
+	return p.client.startedInstance(ctx, p.ref)
 }
 
 // BeginCreateInstance copies the image if needed and accepts the create request.

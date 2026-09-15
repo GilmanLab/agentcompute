@@ -15,7 +15,7 @@ media:
     product: Windows 11 Enterprise Evaluation
     edition_id: EnterpriseEval
     release: 25H2
-    build: 26200.6584
+    build: "26200.6584"
     wim_image_name: Windows 11 Enterprise Evaluation
     wim_image_index: 1
     installation_type: Client
@@ -36,7 +36,7 @@ media:
   windows-server-2025:
     product: Windows Server 2025 Standard Evaluation (Server Core)
     edition_id: ServerStandardEval
-    build: 26100.32230
+    build: "26100.32230"
     wim_image_name: Windows Server 2025 SERVERSTANDARDCORE
     wim_image_index: 1
     installation_type: Server Core

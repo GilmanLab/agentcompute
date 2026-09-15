@@ -8,6 +8,7 @@ import (
 	"github.com/meigma/codemode/authz"
 
 	"github.com/GilmanLab/agentcompute/internal/compute"
+	"github.com/GilmanLab/agentcompute/internal/windowsexec"
 )
 
 type instanceCreateIn struct {
@@ -243,7 +244,7 @@ func (api instanceAPI) exec(
 	}
 	argv := []string{"sh", "-c", in.Command}
 	if strings.HasPrefix(strings.ToLower(inst.OS), "windows") {
-		argv = []string{"cmd.exe", "/c", in.Command}
+		argv = windowsexec.Command(in.Command)
 	}
 	result, err := api.instances.Exec(ctx, compute.ExecRequest{
 		Ref:     compute.Ref{Sandbox: in.Sandbox, Name: in.Name},

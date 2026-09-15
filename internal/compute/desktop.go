@@ -62,7 +62,7 @@ func (s *Service) OpenExec(ctx context.Context, req ExecRequest) (io.ReadWriteCl
 }
 
 // DeleteFile removes a guest file for an internal consumer.
-// Missing files retain [os.ErrNotExist].
+// Missing files retain [os.ErrNotExist]. Live sandbox expiry is checked.
 func (s *Service) DeleteFile(ctx context.Context, ref Ref, path string) error {
 	if err := validateRef(ref); err != nil {
 		return err
@@ -82,21 +82,24 @@ func (s *Service) DeleteFile(ctx context.Context, ref Ref, path string) error {
 
 // ReadBinaryFile opens a guest file for bounded streaming by an internal consumer.
 // Missing files retain [os.ErrNotExist] so optional screenshots need no text parsing.
-func (s *Service) ReadBinaryFile(ctx context.Context, ref Ref, path string) (io.ReadCloser, error) {
+// The returned expiry is the live sandbox timestamp from the same check, so callers
+// can publish without a second control-plane round trip.
+func (s *Service) ReadBinaryFile(ctx context.Context, ref Ref, path string) (io.ReadCloser, time.Time, error) {
 	if err := validateRef(ref); err != nil {
-		return nil, err
+		return nil, time.Time{}, err
 	}
 	if err := validateFilePath(path); err != nil {
-		return nil, err
+		return nil, time.Time{}, err
 	}
-	if _, err := s.SandboxExpiry(ctx, ref.Sandbox); err != nil {
-		return nil, err
+	expiry, err := s.SandboxExpiry(ctx, ref.Sandbox)
+	if err != nil {
+		return nil, time.Time{}, err
 	}
 	body, err := s.backend.ReadBinaryFile(ctx, ref, path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, s.mapBackend(ctx, "read binary file", err)
+		return nil, time.Time{}, s.mapBackend(ctx, "read binary file", err)
 	}
-	return body, err
+	return body, expiry, err
 }
 
 // SandboxExpiry reads live metadata without taking the control-plane mutation gate.

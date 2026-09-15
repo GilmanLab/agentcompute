@@ -43,17 +43,26 @@ const (
 	emptyJSONObject       = "{}"
 	dataImagePrefix       = "data:image/"
 	guestCleanupTimeout   = 10 * time.Second
+	guestCleanupQueueSize = 8
 	minImagePayloadLen    = 512
 	imagePayloadSampleLen = 1024
 )
 
+type guestCleanup struct {
+	ctx  context.Context
+	ref  compute.Ref
+	path string
+}
+
 // Driver proxies native Cua Driver CLI calls inside Linux and Windows guests.
 type Driver struct {
-	compute  *compute.Service
-	store    *Store
-	mu       sync.Mutex
-	sessions map[string]*windowsSession
-	closed   bool
+	compute     *compute.Service
+	store       *Store
+	mu          sync.Mutex
+	sessions    map[string]*windowsSession
+	closed      bool
+	cleanup     chan guestCleanup
+	cleanupDone chan struct{}
 }
 
 // Info reports Driver catalog metadata, readiness, and a human VNC endpoint.
@@ -181,6 +190,9 @@ func (d *Driver) Call(ctx context.Context, ref compute.Ref, tool, args string) (
 	if err != nil {
 		return CallResult{}, err
 	}
+	if d.cachedWindows(ref) {
+		return d.callWindows(ctx, ref, tool, payload)
+	}
 	inst, err := d.compute.GetInstance(ctx, ref)
 	if err != nil {
 		return CallResult{}, err
@@ -252,6 +264,9 @@ func (d *Driver) Screenshot(
 			return Screenshot{}, err
 		}
 		payload = encoded
+	}
+	if d.cachedWindows(ref) {
+		return d.screenshotWindows(ctx, ref, tool, payload, pid, maxDimension)
 	}
 	inst, err := d.compute.GetInstance(ctx, ref)
 	if err != nil {
@@ -374,6 +389,39 @@ func (d *Driver) execDriver(
 	return d.compute.ExecJSON(ctx, req)
 }
 
+// queueGuestCleanup keeps file deletion off the completed screenshot's response path.
+// A full queue applies backpressure rather than leaking files or spawning workers.
+func (d *Driver) queueGuestCleanup(ctx context.Context, ref compute.Ref, path string) {
+	if path == "" {
+		return
+	}
+	d.mu.Lock()
+	if d.closed {
+		d.mu.Unlock()
+		d.removeGuestFile(ctx, ref, path)
+		return
+	}
+	if d.cleanup == nil {
+		d.cleanup = make(chan guestCleanup, guestCleanupQueueSize)
+		d.cleanupDone = make(chan struct{})
+		go d.cleanGuestFiles(d.cleanup, d.cleanupDone)
+	}
+	select {
+	case d.cleanup <- guestCleanup{ctx: ctx, ref: ref, path: path}:
+		d.mu.Unlock()
+	default:
+		d.mu.Unlock()
+		d.removeGuestFile(ctx, ref, path)
+	}
+}
+
+func (d *Driver) cleanGuestFiles(queue <-chan guestCleanup, done chan<- struct{}) {
+	defer close(done)
+	for file := range queue {
+		d.removeGuestFile(file.ctx, file.ref, file.path)
+	}
+}
+
 func (d *Driver) removeGuestFile(ctx context.Context, ref compute.Ref, path string) {
 	if path == "" {
 		return
@@ -389,7 +437,7 @@ func (d *Driver) pullScreenshot(
 	path string,
 	maxDimension int64,
 ) (Screenshot, error) {
-	body, err := d.compute.ReadBinaryFile(ctx, ref, path)
+	body, expiry, err := d.compute.ReadBinaryFile(ctx, ref, path)
 	if err != nil {
 		return Screenshot{}, err
 	}
@@ -400,10 +448,6 @@ func (d *Driver) pullScreenshot(
 	}
 	if int64(len(raw)) > MaxImageBytes {
 		return Screenshot{}, agentError("screenshot exceeds 16 MiB")
-	}
-	expiry, err := d.compute.SandboxExpiry(ctx, ref.Sandbox)
-	if err != nil {
-		return Screenshot{}, err
 	}
 	if maxDimension <= 0 {
 		return d.store.Publish(ref.Sandbox, expiry, bytes.NewReader(raw))

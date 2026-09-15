@@ -14,9 +14,9 @@ Usage:
     --evidence-dir /tmp/windows-bake-evidence
   uv run --locked --script images/windows/bake.py promote \\
     --image windows-11-desktop --remote nas01 --fingerprint <fp> \\
-    --gui-evidence /tmp/gui-gate.json
+    --qualification-evidence /tmp/gui-gate.json
   uv run --locked --script images/windows/bake.py teardown \\
-    --remote nas01 --project ac-win-bake-1
+    --remote nas01 --project ac-win-bake-1 --prefix w11
 
 This process only talks to the Incus API. Windows Setup runs on the cluster's
 first-level KVM; nothing here needs nested virtualization, so it is safe to
@@ -29,7 +29,8 @@ with the runtime device set, qualify it, delete it, and copy the image into the
 `image-build` project under a *candidate* alias.
 
 The stable catalog alias is deliberately not touched by `bake`: moving it is
-`promote`, which requires a GUI gate evidence file reporting a pass.
+`promote`, which requires fingerprint-bound qualification evidence. The desktop
+image also requires its runtime GUI gate to pass.
 """
 
 from __future__ import annotations
@@ -99,9 +100,10 @@ def incus(
     stdin: str | None = None,
     timeout: int | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    command = ["incus", *args]
+    command = ["incus"]
     if project:
         command += ["--project", project]
+    command.extend(args)
     try:
         # incus reads an instance definition from stdin when stdin is a pipe,
         # so a non-tty parent (a runner job, a supervised process) makes an
@@ -398,13 +400,15 @@ def finalize_and_seal(
           project=args.project)
 
     seal_started = time.monotonic()
-    # Sysprep powers the VM off, so the exec channel dies mid-call by design.
-    guest_exec(
+    # SYSTEM dispatches an elevated task in the logged-on administrator session.
+    dispatch = guest_exec(
         instance,
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
          "-File", f"{STATE_DIR}\\finalize.ps1", "-Phase", "seal"],
         args.remote, args.project, check=False, timeout=600,
     )
+    if dispatch.returncode != 0:
+        raise Error(f"dispatching administrator Sysprep failed: {dispatch.stderr.strip()}")
 
     _, stop_seconds = wait_until(
         "the generalized source to power off",
@@ -416,6 +420,7 @@ def finalize_and_seal(
         "sysprep_to_stopped_seconds": round(stop_seconds, 1),
         "total_seal_seconds": round(time.monotonic() - seal_started, 1),
         "media_detached": ["installer"],
+        "administrator_dispatch": dispatch.stdout.strip(),
         "warning": "the generalized source must never be booted again",
     })
 
@@ -423,8 +428,12 @@ def finalize_and_seal(
 def publish_candidate(
     instance: str, image: str, args: argparse.Namespace, evidence: Evidence
 ) -> dict[str, Any]:
-    alias = f"{args.volume_prefix}-candidate"
-    incus(["publish", f"{args.remote}:{instance}", "--alias", alias],
+    alias = f"{run_prefix(args)}-candidate"
+    settings = load_yaml(INSTANCE_PATH)["images"][image]
+    started = time.monotonic()
+    incus(["publish", f"{args.remote}:{instance}", f"{args.remote}:", "--alias", alias,
+           f"os={settings['os']}", f"release={settings['release']}",
+           f"description={settings['description']}"],
           project=args.project, timeout=7200)
     info = incus_json(["image", "list", f"{args.remote}:", alias], project=args.project)
     if not info:
@@ -432,6 +441,7 @@ def publish_candidate(
 
     return evidence.record("publish", {
         "alias": alias,
+        "capture_seconds": round(time.monotonic() - started, 3),
         "fingerprint": info[0]["fingerprint"],
         "size_bytes": info[0]["size"],
         "properties": info[0].get("properties"),
@@ -539,6 +549,19 @@ def qualify_clone(
         timeout=runtime["ready_timeout"], interval=10.0,
     )
 
+    if role == "desktop":
+        deploy, desktop_seconds = wait_until(
+            "the clone's interactive first-logon report",
+            lambda: guest_json_file(clone, f"{STATE_DIR}\\deploy-report.json",
+                                    args.remote, args.project),
+            timeout=runtime["ready_timeout"], interval=10.0,
+        )
+        evidence.record("clone-first-logon", {
+            "seconds_after_agent": round(desktop_seconds, 3), "report": deploy,
+        })
+        if deploy.get("status") != "ok":
+            raise Error(f"clone first-logon repair failed: {deploy.get('error')}")
+
     ver = guest_exec(clone, ["cmd.exe", "/c", "ver"], args.remote, args.project)
 
     # Qualification tooling comes from the working tree, not from the image, so
@@ -574,6 +597,11 @@ def qualify_clone(
 
     if parsed is None:
         raise Error(f"clone smoke produced no JSON: {smoke.stdout[:500]} {smoke.stderr[:500]}")
+    if smoke.returncode != 0 or parsed.get("status") != "ok":
+        evidence.record("clone-smoke-failure", {
+            "exit": smoke.returncode, "report": parsed, "stderr": smoke.stderr.strip(),
+        })
+        raise Error(f"clone smoke failed: {parsed.get('failed')}")
 
     identity = parsed["identity"]
     fresh_sid = identity["machine_sid"] != golden_identity.get("machine_sid")
@@ -581,9 +609,10 @@ def qualify_clone(
 
     # The binary file API is the transport the server uses for screenshots, so
     # prove it works on a Windows guest rather than assuming it.
-    pulled = Path(args.evidence_dir) / f"{clone}-deploy-report.json"
+    report_name = "deploy-report.json" if role == "desktop" else "bootstrap-report.json"
+    pulled = Path(args.evidence_dir) / f"{clone}-{report_name}"
     file_api = incus(
-        ["file", "pull", f"{args.remote}:{clone}/C:/ProgramData/agentcompute/deploy-report.json",
+        ["file", "pull", f"{args.remote}:{clone}/C:/ProgramData/agentcompute/{report_name}",
          str(pulled)],
         project=args.project, check=False, timeout=120,
     )
@@ -632,7 +661,7 @@ def qualify_clone(
         "fresh_computer_name": fresh_name,
         "golden_identity": golden_identity,
         "file_api": {
-            "command": "incus file pull <clone>/C:/ProgramData/agentcompute/deploy-report.json",
+            "command": f"incus file pull <clone>/C:/ProgramData/agentcompute/{report_name}",
             "exit": file_api.returncode,
             "stderr": file_api.stderr.strip(),
             "local_size": pulled.stat().st_size if pulled.is_file() else None,
@@ -656,13 +685,11 @@ def qualify_clone(
 def vnc_login_screen_gate(
     clone: str, runtime: dict[str, Any], args: argparse.Namespace, evidence: Evidence
 ) -> dict[str, Any]:
-    """Prove the fallback console answers with nobody logged on.
+    """Probe VNC after signing out the console, then verify reboot recovery.
 
-    Auto-logon normally consumes the login screen within seconds, so it is
-    switched off, the clone is rebooted, the absence of an interactive session
-    is confirmed, and only then is the banner read. Auto-logon is restored and
-    the Driver daemon re-checked afterwards, which also measures reboot
-    recovery.
+    Windows can sign the user back in after a restart even when AutoAdminLogon
+    is off. An explicit sign-out establishes the login-screen state without
+    changing the guest's restart sign-in policy.
     """
     port = runtime.get("vnc_port", 5900)
     probe = probe_container(args, evidence)
@@ -670,31 +697,38 @@ def vnc_login_screen_gate(
     logon_key = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon'
     guest_powershell(clone, f"Set-ItemProperty -Path '{logon_key}' -Name AutoAdminLogon -Value 0",
                      args.remote, args.project)
-    incus(["restart", f"{args.remote}:{clone}"], project=args.project, timeout=600)
-    wait_until("the clone's agent after the no-autologon reboot",
-               lambda: agent_ready(clone, args.remote, args.project),
-               timeout=runtime["ready_timeout"], interval=10.0)
-
-    sessions = guest_powershell(
+    guest_powershell(
         clone,
-        "$s = Get-CimInstance Win32_LogonSession -Filter 'LogonType=2';"
-        " if ($s) { ($s | ForEach-Object { $_.LogonId }) -join ',' } else { 'none' }",
+        r"""$user = (Get-CimInstance Win32_ComputerSystem).UserName
+if ($user) {
+    Add-Type 'using System.Runtime.InteropServices; public static class BakeConsole {
+        [DllImport("kernel32.dll")] public static extern uint WTSGetActiveConsoleSessionId();
+    }'
+    $session = [BakeConsole]::WTSGetActiveConsoleSessionId()
+    if ($session -eq [uint32]::MaxValue) { throw 'No attached console session' }
+    & "$env:SystemRoot\System32\logoff.exe" $session
+    if ($LASTEXITCODE -ne 0) { throw "Console sign-out failed: $LASTEXITCODE" }
+}""",
         args.remote, args.project,
-    ).strip()
-    if sessions != "none":
-        # Without this the probe could be reading a banner served to an
-        # already logged-on desktop, which proves nothing about the login
-        # screen.
-        raise Error(
-            f"expected no interactive logon before probing VNC, found sessions {sessions}"
-        )
+    )
+
+    def console_signed_out() -> str | None:
+        user = guest_powershell(
+            clone, "(Get-CimInstance Win32_ComputerSystem).UserName",
+            args.remote, args.project,
+        ).strip()
+        return None if user else "none"
+
+    console_user, _ = wait_until(
+        "the console user to sign out", console_signed_out, timeout=180, interval=5.0,
+    )
 
     addresses = guest_addresses(clone, args.remote, args.project)
     if not addresses:
         raise Error("clone has no global IPv4 address; cannot probe VNC")
 
     banner, banner_seconds = wait_until(
-        "the VNC banner with nobody logged on",
+        "the VNC banner with the console signed out",
         lambda: vnc_banner(probe, addresses[0], port, args) or None,
         timeout=180, interval=5.0,
     )
@@ -708,12 +742,15 @@ def vnc_login_screen_gate(
 
     def driver_running() -> str | None:
         text = guest_powershell(
-            clone, f"& '{STATE_DIR}\\cua-driver\\cua-driver.exe' status 2>&1 | Out-String",
+            clone,
+            "$d = Get-CimInstance Win32_Process -Filter \"Name='cua-driver.exe'\" |"
+            " Where-Object { $_.SessionId -ge 1 };"
+            " if ($d) { ($d | ForEach-Object {"
+            " 'pid=' + $_.ProcessId + ' session=' + $_.SessionId }) -join '; ' }"
+            " else { 'none' }",
             args.remote, args.project, check=False,
         )
-        # "is not running" contains "running": require the positive statement
-        # and the absence of the negative one.
-        if "running" in text and "not running" not in text:
+        if text.strip() and text.strip() != "none" and "session=" in text:
             return text
         return None
 
@@ -726,7 +763,7 @@ def vnc_login_screen_gate(
         "probe_instance": probe,
         "clone_address": addresses[0],
         "port": port,
-        "interactive_sessions_while_probing": sessions,
+        "console_user_while_probing": console_user,
         "banner": banner,
         "banner_wait_seconds": round(banner_seconds, 1),
         "driver_after_reboot": driver_status.strip(),
@@ -738,7 +775,7 @@ def copy_to_image_build(
     fingerprint: str, image: str, args: argparse.Namespace, evidence: Evidence
 ) -> dict[str, Any]:
     media = load_yaml(PINS_PATH)["media"][image]
-    alias = f"{STABLE_ALIASES[image]}-candidate-{media['build']}"
+    alias = f"{STABLE_ALIASES[image]}-candidate-{media['build']}-{fingerprint[:12]}"
     if args.project == args.promotion_project:
         # The bake already ran in the promotion project, which is the only
         # project a narrowly scoped publisher certificate may reach. Nothing to
@@ -755,11 +792,9 @@ def copy_to_image_build(
         raise Error(f"image copy to {args.promotion_project} produced no {alias}")
 
     for key, value in {
-        "os": media["product"],
-        "release": str(media.get("release", media["build"])),
         "agentcompute.build": media["build"],
         "agentcompute.media_provenance": media["provenance"],
-        "agentcompute.gate": "candidate-awaiting-gui-gate",
+        "agentcompute.gate": "candidate-awaiting-qualification",
     }.items():
         incus(["image", "set-property", f"{args.remote}:{alias}", key, value],
               project=args.promotion_project)
@@ -770,7 +805,7 @@ def copy_to_image_build(
         "fingerprint": info[0]["fingerprint"],
         "size_bytes": info[0]["size"],
         "stable_alias_moved": False,
-        "note": "the stable alias is moved by `promote` only, after the GUI gate passes",
+        "note": "the stable alias is moved by `promote` only, after qualification",
     })
 
 
@@ -811,7 +846,7 @@ def bake(args: argparse.Namespace) -> int:
     install = wait_for_install(golden, args, settings["build"]["install_timeout"], evidence)
     golden_identity = {
         "computer_name": install["bootstrap"]["facts"]["os"].get("computer_name")
-        or guest_powershell(golden, "$env:COMPUTERNAME", args.remote, args.project).strip(),
+        or guest_powershell(golden, "[Environment]::MachineName", args.remote, args.project).strip(),
         "machine_sid": guest_powershell(
             golden, "(Get-LocalUser -Name 'Administrator').SID.AccountDomainSid.Value",
             args.remote, args.project,
@@ -828,7 +863,7 @@ def bake(args: argparse.Namespace) -> int:
     finally:
         if not args.keep_clone:
             incus(["delete", f"{args.remote}:{clone}", "--force"],
-                  project=args.project, check=False)
+                  project=args.project)
             evidence.record("clone-deleted", {"instance": clone})
 
     # The golden source has served its purpose: the image is captured and a
@@ -837,7 +872,7 @@ def bake(args: argparse.Namespace) -> int:
     # included) and the next image's clone would otherwise exceed the quota.
     if not args.keep_golden:
         incus(["delete", f"{args.remote}:{golden}", "--force"],
-              project=args.project, check=False)
+              project=args.project)
         evidence.record("golden-deleted", {
             "instance": golden,
             "note": "captured image retained; generalized source never booted again",
@@ -846,7 +881,7 @@ def bake(args: argparse.Namespace) -> int:
     probe = f"{run_prefix(args)}-probe"
     if incus_json(["list", f"{args.remote}:", probe], project=args.project):
         incus(["delete", f"{args.remote}:{probe}", "--force"],
-              project=args.project, check=False)
+              project=args.project)
         evidence.record("probe-deleted", {"instance": probe})
 
     candidate = copy_to_image_build(published["fingerprint"], args.image, args, evidence)
@@ -854,9 +889,12 @@ def bake(args: argparse.Namespace) -> int:
     evidence.set("status", "ok")
     evidence.set("total_seconds", round(time.monotonic() - started, 1))
     evidence.set("promotion_gate", {
-        "stable_alias": STABLE_ALIASES[args.image],
+        "stable_alias": f"{STABLE_ALIASES[args.image]}-{media['build']}",
         "candidate_alias": candidate["alias"],
-        "remaining": "GUI gate through desktop.call on a fresh clone, then `promote`",
+        "remaining": (
+            "GUI gate through desktop.call on a fresh clone, then `promote`"
+            if settings["desktop"] else "Promote the qualified Server Core candidate"
+        ),
     })
     print(json.dumps(evidence.data["promotion_gate"], indent=2))
     return 0
@@ -899,10 +937,12 @@ def promote(args: argparse.Namespace) -> int:
             "copy the candidate there before promoting"
         )
 
-    alias = STABLE_ALIASES[args.image]
-    existing = incus_json(["image", "alias", "list", f"{args.remote}:", alias],
-                          project=args.promotion_project)
-    previous = existing[0]["target"] if existing else None
+    media = load_yaml(PINS_PATH)["media"][args.image]
+    alias = f"{STABLE_ALIASES[args.image]}-{media['build']}"
+    aliases = incus_json(["image", "alias", "list", f"{args.remote}:", alias],
+                         project=args.promotion_project)
+    existing = next((entry for entry in aliases if entry["name"] == alias), None)
+    previous = existing["target"] if existing else None
     if previous == args.fingerprint:
         print(json.dumps({"alias": alias, "fingerprint": args.fingerprint, "changed": False}))
         return 0
@@ -912,7 +952,7 @@ def promote(args: argparse.Namespace) -> int:
         incus(["query", "-X", "PUT",
                f"{args.remote}:/1.0/images/aliases/{alias}?project={args.promotion_project}",
                "-d", json.dumps({"target": args.fingerprint,
-                                 "description": existing[0].get("description", "")})])
+                                 "description": existing.get("description", "")})])
     else:
         incus(["image", "alias", "create", f"{args.remote}:{alias}", args.fingerprint],
               project=args.promotion_project)
@@ -1026,7 +1066,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     project_cmd.add_argument("--network", default="incusbr0")
     project_cmd.add_argument("--evidence-dir", required=True)
 
-    promote_cmd = sub.add_parser("promote", help="move the stable alias after the GUI gate")
+    promote_cmd = sub.add_parser("promote", help="move the stable alias after qualification")
     promote_cmd.add_argument("--image", choices=IMAGE_NAMES, required=True)
     promote_cmd.add_argument("--remote", default="local")
     promote_cmd.add_argument("--promotion-project", default="image-build")

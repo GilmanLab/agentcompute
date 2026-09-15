@@ -44,15 +44,33 @@ function Get-DriverText {
     }
 }
 
+function Get-CuaInteractiveDaemons {
+    $expected = [System.IO.Path]::GetFullPath($driver)
+    if (-not (Test-Path -LiteralPath $driver)) { return @() }
+    return @(Get-CimInstance Win32_Process -Filter "Name='cua-driver.exe'" |
+        Where-Object {
+            $_.SessionId -ge 1 -and $_.ExecutablePath -and
+            ([System.IO.Path]::GetFullPath($_.ExecutablePath) -eq $expected)
+        })
+}
+
 $status = 'ok'
 $failure = $null
 $started = (Get-Date).ToUniversalTime()
 
 try {
+    $beforeDaemons = @(Get-CuaInteractiveDaemons | ForEach-Object {
+        [ordered]@{
+            pid          = $_.ProcessId
+            session      = $_.SessionId
+            command_line = $_.CommandLine
+        }
+    })
     $before = [ordered]@{
         driver_present   = Test-Path -LiteralPath $driver
         autostart_status = Get-DriverText @('autostart', 'status')
         daemon_status    = Get-DriverText @('status')
+        daemon_processes = $beforeDaemons
         task             = (& "$env:SystemRoot\System32\schtasks.exe" /query /fo LIST 2>&1 |
                              Select-String -SimpleMatch 'cua-driver' | ForEach-Object { $_.Line.Trim() }) -join '; '
     }
@@ -74,7 +92,7 @@ try {
     $winlogon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
     Set-ItemProperty -Path $winlogon -Name 'AutoAdminLogon' -Value '1' -Type String
     Set-ItemProperty -Path $winlogon -Name 'DefaultUserName' -Value $env:USERNAME -Type String
-    Set-ItemProperty -Path $winlogon -Name 'DefaultDomainName' -Value $env:COMPUTERNAME -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultDomainName' -Value ([Environment]::MachineName) -Type String
     Set-ItemProperty -Path $winlogon -Name 'DefaultPassword' -Value '' -Type String
     Remove-ItemProperty -Path $winlogon -Name 'AutoLogonCount' -ErrorAction SilentlyContinue
 
@@ -94,7 +112,7 @@ try {
         schema_version   = 1
         status           = $status
         error            = $failure
-        computer_name    = $env:COMPUTERNAME
+        computer_name    = [Environment]::MachineName
         user             = "$env:USERDOMAIN\$env:USERNAME"
         session          = (Get-Process -Id $PID).SessionId
         # The finding: true means the generalized image's scheduled task came
@@ -103,6 +121,13 @@ try {
         repaired         = $repaired
         before           = $before
         after_status     = $after
+        after_processes  = @(Get-CuaInteractiveDaemons | ForEach-Object {
+            [ordered]@{
+                pid          = $_.ProcessId
+                session      = $_.SessionId
+                command_line = $_.CommandLine
+            }
+        })
         finished         = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
         seconds          = [math]::Round(((Get-Date).ToUniversalTime() - $started).TotalSeconds, 3)
     }
@@ -113,7 +138,7 @@ try {
         schema_version = 1
         status         = $status
         error          = $failure
-        computer_name  = $env:COMPUTERNAME
+        computer_name  = [Environment]::MachineName
         finished       = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     }
 }

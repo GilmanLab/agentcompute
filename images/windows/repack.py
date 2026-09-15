@@ -16,6 +16,8 @@ Usage:
   uv run --locked --script images/windows/repack.py import \\
     --image windows-11-desktop --output-dir <dir> \\
     --remote nas01 --project <project> --pool data --target lab01
+  uv run --locked --script images/windows/repack.py compile-proxy \\
+    --work-dir <new-dir> --output-dir <dir> --cache-dir <dir>
 
 `stage` needs root and loop devices, not KVM: distrobuilder's repack-windows
 mounts the source ISO and the virtio ISO, injects the pinned driver set into
@@ -49,8 +51,13 @@ PINS_PATH = WINDOWS_DIR / "pins.lock.yaml"
 COMMON_DIR = WINDOWS_DIR / "common"
 INSTANCE_PATH = COMMON_DIR / "instance.yaml"
 IMAGE_NAMES = ("windows-11-desktop", "windows-server-2025")
-GUEST_SCRIPTS = ("bootstrap.ps1", "finalize.ps1", "smoke.ps1", "deploy-firstlogon.ps1")
+GUEST_SCRIPTS = (
+    "bootstrap.ps1", "finalize.ps1", "smoke.ps1",
+    "deploy-firstlogon.ps1", "apply-driver-proxy.ps1",
+)
 PASSWORD_TOKEN = "AUTOMATION_PASSWORD"
+DRIVER_PROXY_DIR = WINDOWS_DIR / "driver-proxy"
+PROXY_EXE_NAME = "cua-driver-proxy.exe"
 
 
 def load_build_module() -> Any:
@@ -159,6 +166,12 @@ def validate() -> dict[str, Any]:
     for script in GUEST_SCRIPTS:
         if not (COMMON_DIR / script).is_file():
             raise Error(f"missing guest script {COMMON_DIR / script}")
+    if not (DRIVER_PROXY_DIR / "main_windows.go").is_file():
+        raise Error(f"missing {DRIVER_PROXY_DIR / 'main_windows.go'}")
+    if not (DRIVER_PROXY_DIR / "go.mod").is_file():
+        raise Error(f"missing {DRIVER_PROXY_DIR / 'go.mod'}")
+    if (DRIVER_PROXY_DIR / PROXY_EXE_NAME).is_file():
+        raise Error(f"built {PROXY_EXE_NAME} must not be committed under {DRIVER_PROXY_DIR}")
 
     for image in IMAGE_NAMES:
         directory = image_dir(image)
@@ -222,6 +235,77 @@ def fetch(build: Any, url: str, dest: Path, digest: str) -> dict[str, Any]:
         "reused": reused,
         "seconds": round(time.monotonic() - started, 3),
     }
+
+def resolve_go_binary(
+    build: Any, image_pins: dict[str, Any], cache: Path, work: Path
+) -> tuple[Path, str]:
+    """Pinned Go from images/pins.yaml, never an unpinned download."""
+    extracted = work / "go" / "bin" / "go"
+    if extracted.is_file():
+        return extracted, "extracted"
+
+    entry = image_pins["go"]
+    archive = cache / entry["url"].rsplit("/", 1)[-1]
+    fetch(build, entry["url"], archive, entry["sha256"])
+    build.extract_tar(archive, work)
+    if not extracted.is_file():
+        raise Error("go toolchain extract did not produce go/bin/go")
+    return extracted, "extracted"
+
+
+def compile_driver_proxy(
+    build: Any,
+    image_pins: dict[str, Any],
+    cache: Path,
+    work: Path,
+    dest: Path,
+) -> dict[str, Any]:
+    source = DRIVER_PROXY_DIR / "main_windows.go"
+    module = DRIVER_PROXY_DIR / "go.mod"
+    if not source.is_file() or not module.is_file():
+        raise Error(f"driver-proxy source missing under {DRIVER_PROXY_DIR}")
+
+    go_bin, go_origin = resolve_go_binary(build, image_pins, cache, work)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    gocache = work / "proxy-gocache"
+    gomod = work / "proxy-gomod"
+    gocache.mkdir(mode=0o700, exist_ok=True)
+    gomod.mkdir(mode=0o700, exist_ok=True)
+    env = os.environ.copy()
+    env["PATH"] = f"{go_bin.parent}{os.pathsep}{env.get('PATH', '')}"
+    env["GOTOOLCHAIN"] = "local"
+    env["GOCACHE"] = str(gocache)
+    env["GOMODCACHE"] = str(gomod)
+    env["GOOS"] = "windows"
+    env["GOARCH"] = "amd64"
+    env["CGO_ENABLED"] = "0"
+    env["GOPROXY"] = "off"
+    env["GOSUMDB"] = "off"
+    started = time.monotonic()
+    run(
+        [str(go_bin), "build", "-trimpath", "-buildvcs=false", "-o", str(dest), "."],
+        cwd=DRIVER_PROXY_DIR,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if not dest.is_file():
+        raise Error("proxy compile did not produce an executable")
+    return {
+        "file": dest.name,
+        "path": str(dest),
+        "sha256": build.sha256_file(dest),
+        "size": dest.stat().st_size,
+        "go": str(image_pins["go"]["version"]),
+        "go_origin": go_origin,
+        "goos": "windows",
+        "goarch": "amd64",
+        "source": "images/windows/driver-proxy/main_windows.go",
+        "source_sha256": build.sha256_file(source),
+        "seconds": round(time.monotonic() - started, 3),
+    }
+
+
 
 
 def stage_virtio(build: Any, pins: dict[str, Any], cache: Path, work: Path) -> dict[str, Any]:
@@ -288,6 +372,7 @@ def build_payload_tree(
     output: Path,
     password: str,
     build_id: str,
+    proxy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     started = time.monotonic()
     directory = image_dir(image)
@@ -333,6 +418,26 @@ def build_payload_tree(
             "version": driver["version"],
             "archive_root": driver["archive_root"],
         }
+        if not proxy:
+            raise Error("desktop payload requires a compiled cua-driver-proxy")
+        proxy_src = Path(proxy["path"])
+        if not proxy_src.is_file():
+            raise Error(f"compiled proxy missing: {proxy_src}")
+        shutil.copy2(proxy_src, payload_dir / PROXY_EXE_NAME)
+        config["payload"]["cua_driver_proxy"] = {
+            "file": PROXY_EXE_NAME,
+            "sha256": proxy["sha256"],
+        }
+        files.append({
+            "file": PROXY_EXE_NAME,
+            "sha256": proxy["sha256"],
+            "size": proxy["size"],
+            "reused": False,
+            "seconds": proxy["seconds"],
+            "compiled": True,
+            "go": proxy["go"],
+            "source_sha256": proxy["source_sha256"],
+        })
 
         vnc = guest_payload["ultravnc"]
         setup = cache / vnc["file"]
@@ -495,6 +600,7 @@ def stage(args: argparse.Namespace) -> int:
     output = build.require_new_dir(Path(args.output_dir), "--output-dir")
     started = time.monotonic()
 
+    image_pins = build.load_pins()
     distrobuilder: Path
     compile_seconds = 0.0
     if args.distrobuilder:
@@ -502,7 +608,6 @@ def stage(args: argparse.Namespace) -> int:
         if not distrobuilder.is_file():
             raise Error(f"--distrobuilder {distrobuilder} is not a file")
     else:
-        image_pins = build.load_pins()
         downloads = work / "downloads"
         downloads.mkdir(mode=0o700)
         for key in ("go", "distrobuilder"):
@@ -516,9 +621,15 @@ def stage(args: argparse.Namespace) -> int:
         raise Error(f"distrobuilder reports {version!r}, expected {expected}")
 
     virtio = stage_virtio(build, pins, cache, work)
+    proxy_record = None
+    if loaded["instance"]["images"][args.image]["desktop"]:
+        proxy_record = compile_driver_proxy(
+            build, image_pins, cache, work, work / "proxy" / PROXY_EXE_NAME,
+        )
     payload = build_payload_tree(
         build, pins, args.image, cache, work, output,
         args.automation_password, args.build_id or f"{args.image}-local",
+        proxy_record,
     )
     installer = repack_installer(
         build, pins, args.image, cache, work, output, Path(virtio["path"]), distrobuilder,
@@ -530,6 +641,7 @@ def stage(args: argparse.Namespace) -> int:
         "image": args.image,
         "build_id": payload["config"]["build_id"],
         "distrobuilder": {"version": version, "compile_seconds": compile_seconds},
+        "driver_proxy": proxy_record,
         "virtio": virtio,
         "installer": installer,
         "payload": {key: value for key, value in payload.items() if key != "config"},
@@ -585,6 +697,25 @@ def import_volumes(args: argparse.Namespace) -> int:
     print(json.dumps({"volumes": results, "project": args.project, "pool": args.pool}, indent=2))
     return 0
 
+def compile_proxy_command(args: argparse.Namespace) -> int:
+    """Cross-compile the SYSTEM proxy with the pinned Go toolchain."""
+    validate()
+    build = load_build_module()
+    image_pins = build.load_pins()
+    cache = Path(args.cache_dir).expanduser().resolve()
+    cache.mkdir(parents=True, exist_ok=True)
+    work = build.require_new_dir(Path(args.work_dir), "--work-dir")
+    output = Path(args.output_dir).expanduser().resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    dest = output / PROXY_EXE_NAME
+    record = compile_driver_proxy(build, image_pins, cache, work, dest)
+    (output / "cua-driver-proxy.json").write_text(
+        json.dumps(record, indent=2) + "\n", encoding="utf-8"
+    )
+    print(json.dumps(record, indent=2))
+    return 0
+
+
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -614,6 +745,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     import_cmd.add_argument("--volume-prefix", required=True)
     import_cmd.add_argument("--replace", action="store_true")
 
+    proxy_cmd = sub.add_parser(
+        "compile-proxy",
+        help="cross-compile cua-driver-proxy.exe with the pinned Go toolchain",
+    )
+    proxy_cmd.add_argument("--work-dir", required=True, help="must not exist yet")
+    proxy_cmd.add_argument("--output-dir", required=True)
+    proxy_cmd.add_argument("--cache-dir", required=True, help="verified download cache")
+
     return parser.parse_args(argv)
 
 
@@ -626,6 +765,8 @@ def main(argv: list[str]) -> int:
             return 0
         if args.command == "stage":
             return stage(args)
+        if args.command == "compile-proxy":
+            return compile_proxy_command(args)
         return import_volumes(args)
     except Error as exc:
         print(f"error: {exc}", file=sys.stderr)

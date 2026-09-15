@@ -44,15 +44,28 @@ func sessionKey(ref compute.Ref) string {
 	return ref.Sandbox + "/" + ref.Name
 }
 
-// Close drops every cached Windows MCP session.
-func (d *Driver) Close() error {
+func (d *Driver) cachedWindows(ref compute.Ref) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	return !d.closed && d.sessions[sessionKey(ref)] != nil
+}
+
+// Close drains screenshot cleanup and closes cached Windows MCP sessions.
+func (d *Driver) Close() error {
+	d.mu.Lock()
+	if !d.closed && d.cleanup != nil {
+		close(d.cleanup)
+	}
 	d.closed = true
+	done := d.cleanupDone
 	var err error
 	for key, sess := range d.sessions {
 		err = errors.Join(err, sess.Close())
 		delete(d.sessions, key)
+	}
+	d.mu.Unlock()
+	if done != nil {
+		<-done
 	}
 	return err
 }
@@ -162,7 +175,7 @@ func (d *Driver) screenshotWindows(
 	if err != nil {
 		return Screenshot{}, err
 	}
-	defer d.removeGuestFile(ctx, ref, path)
+	defer d.queueGuestCleanup(ctx, ref, path)
 	args, err := callArguments(payload, path)
 	if err != nil {
 		return Screenshot{}, err

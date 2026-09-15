@@ -37,12 +37,18 @@
                language="neutral" versionScope="nonSxS"
                xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
       <TimeZone>UTC</TimeZone>
+      <UserAccounts>
+        <AdministratorPassword>
+          <Value>AUTOMATION_PASSWORD</Value>
+          <PlainText>true</PlainText>
+        </AdministratorPassword>
+      </UserAccounts>
       <OOBE>
         <HideEULAPage>true</HideEULAPage>
         <HideLocalAccountScreen>true</HideLocalAccountScreen>
         <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
         <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
-        <HideWirelessSetupInHDS>true</HideWirelessSetupInHDS>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
         <NetworkLocation>Work</NetworkLocation>
         <ProtectYourPC>3</ProtectYourPC>
       </OOBE>

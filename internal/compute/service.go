@@ -12,16 +12,17 @@ import (
 )
 
 const (
-	defaultTTL            = 240 * time.Minute
-	maxTTL                = 1440 * time.Minute
-	kindBridge            = "bridge"
-	kindOVN               = "ovn"
-	kindContainer         = "container"
-	kindVM                = "vm"
-	statusRunning         = "Running"
-	numericUIDBase        = 10
-	numericUIDBitSize     = 32
-	instanceCreateTimeout = 5 * time.Minute
+	defaultTTL        = 240 * time.Minute
+	maxTTL            = 1440 * time.Minute
+	kindBridge        = "bridge"
+	kindOVN           = "ovn"
+	kindContainer     = "container"
+	kindVM            = "vm"
+	statusRunning     = "Running"
+	numericUIDBase    = 10
+	numericUIDBitSize = 32
+	// Image import and cold first-logon provisioning share this budget.
+	instanceCreateTimeout = 10 * time.Minute
 )
 
 // Options configures a compute Service.

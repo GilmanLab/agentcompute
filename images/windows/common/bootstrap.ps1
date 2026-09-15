@@ -198,7 +198,9 @@ function Disable-OnlineServicing {
     # would silently change the captured image, so they are switched off with
     # the documented policy keys before anything else is installed.
     $au = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
-    New-Item -Path $au -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $au)) {
+        New-Item -Path $au -Force | Out-Null
+    }
     Set-ItemProperty -Path $au -Name 'NoAutoUpdate' -Type DWord -Value 1
     Set-ItemProperty -Path $au -Name 'AUOptions' -Type DWord -Value 1
 
@@ -206,7 +208,9 @@ function Disable-OnlineServicing {
     # sealed to the build VM's vTPM would be useless as an image, so refuse it
     # up front and verify with manage-bde in finalize.ps1.
     $bitlocker = 'HKLM:\SYSTEM\CurrentControlSet\Control\BitLocker'
-    New-Item -Path $bitlocker -Force | Out-Null
+    if (-not (Test-Path -LiteralPath $bitlocker)) {
+        New-Item -Path $bitlocker -Force | Out-Null
+    }
     Set-ItemProperty -Path $bitlocker -Name 'PreventDeviceEncryption' -Type DWord -Value 1
 
     return [ordered]@{
@@ -218,7 +222,7 @@ function Disable-OnlineServicing {
 function Install-PinnedServicing {
     param(
         [Parameter(Mandatory)] [string] $Root,
-        [Parameter(Mandatory)] [object[]] $Packages
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [object[]] $Packages
     )
 
     $applied = @()
@@ -241,6 +245,7 @@ function Install-CuaDriver {
     param(
         [Parameter(Mandatory)] [string] $Root,
         [Parameter(Mandatory)] [object] $Pin,
+        [Parameter(Mandatory)] [object] $ProxyPin,
         [Parameter(Mandatory)] [string] $InstallDir
     )
 
@@ -266,6 +271,11 @@ function Install-CuaDriver {
     if (-not (Test-Path -LiteralPath $exe)) {
         throw "cua-driver.exe missing from $InstallDir after extraction"
     }
+    $proxySrc = Join-Path $Root $ProxyPin.file
+    Assert-FileHash -Path $proxySrc -Expected $ProxyPin.sha256 | Out-Null
+    $proxy = Join-Path $InstallDir 'cua-driver-proxy.exe'
+    Copy-Item -LiteralPath $proxySrc -Destination $proxy -Force
+    $proxyHash = Assert-FileHash -Path $proxy -Expected $ProxyPin.sha256
 
     # Machine PATH so both the interactive daemon and the Session 0 agent can
     # invoke the same binary without a per-user profile.
@@ -305,12 +315,29 @@ function Install-CuaDriver {
     }
 
     $autostart = (Invoke-Native -FilePath $exe -Arguments @('autostart', 'status') -PassThruOutput).Trim()
-    $session = if ($status -match '(?m)session:\s*(\S+)') { $Matches[1] } else { $null }
+    $daemons = @(Get-CimInstance Win32_Process -Filter "Name='cua-driver.exe'" |
+        Where-Object {
+            $_.SessionId -ge 1 -and $_.ExecutablePath -and
+            ([System.IO.Path]::GetFullPath($_.ExecutablePath) -eq
+                [System.IO.Path]::GetFullPath($exe))
+        })
+    $daemonPid = $null
+    $session = $null
+    if ($daemons.Count -gt 0) {
+        $daemonPid = [int]$daemons[0].ProcessId
+        $session = [int]$daemons[0].SessionId
+    }
+    if ($null -eq $session -or $session -lt 1) {
+        throw "Cua Driver daemon did not come up in an interactive session: $status"
+    }
 
     return [ordered]@{
         version          = $version
         executable       = $exe
+        proxy            = $proxy
+        proxy_sha256     = $proxyHash
         status           = $status
+        daemon_pid       = $daemonPid
         session          = $session
         autostart_status = $autostart
     }
@@ -408,18 +435,19 @@ function Set-PersistentAutoLogon {
     $winlogon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
     Set-ItemProperty -Path $winlogon -Name 'AutoAdminLogon' -Value '1' -Type String
     Set-ItemProperty -Path $winlogon -Name 'DefaultUserName' -Value $User -Type String
-    Set-ItemProperty -Path $winlogon -Name 'DefaultDomainName' -Value $env:COMPUTERNAME -Type String
+    Set-ItemProperty -Path $winlogon -Name 'DefaultDomainName' -Value ([Environment]::MachineName) -Type String
     Set-ItemProperty -Path $winlogon -Name 'DefaultPassword' -Value '' -Type String
     foreach ($stale in 'AutoLogonCount', 'AutoLogonSID') {
         Remove-ItemProperty -Path $winlogon -Name $stale -ErrorAction SilentlyContinue
     }
 
     $values = Get-ItemProperty -Path $winlogon
+    $count = $values.PSObject.Properties['AutoLogonCount']
     return [ordered]@{
         AutoAdminLogon    = $values.AutoAdminLogon
         DefaultUserName   = $values.DefaultUserName
         DefaultDomainName = $values.DefaultDomainName
-        AutoLogonCount    = (Get-ItemProperty -Path $winlogon -Name 'AutoLogonCount' -ErrorAction SilentlyContinue).AutoLogonCount
+        AutoLogonCount    = if ($null -ne $count) { $count.Value } else { $null }
     }
 }
 
@@ -433,10 +461,14 @@ function Copy-CaptureAssets {
     $imageDir = 'C:\image'
     New-Item -ItemType Directory -Force -Path $imageDir | Out-Null
     $source = Join-Path $Root 'agentcompute'
-    Copy-Item -LiteralPath (Join-Path $source 'finalize.ps1') -Destination $script:StateDir -Force
-    Copy-Item -LiteralPath (Join-Path $source 'smoke.ps1') -Destination $script:StateDir -Force
-    Copy-Item -LiteralPath (Join-Path $source 'deploy-firstlogon.ps1') -Destination $script:StateDir -Force
-    Copy-Item -LiteralPath (Join-Path $source 'deploy-unattend.xml') -Destination $imageDir -Force
+    # ISO files are read-only; copied scripts must remain replaceable by the
+    # controller's file API before capture and qualification.
+    foreach ($name in 'finalize.ps1', 'smoke.ps1', 'deploy-firstlogon.ps1') {
+        $file = Copy-Item -LiteralPath (Join-Path $source $name) -Destination $script:StateDir -Force -PassThru
+        $file.IsReadOnly = $false
+    }
+    $deploy = Copy-Item -LiteralPath (Join-Path $source 'deploy-unattend.xml') -Destination $imageDir -Force -PassThru
+    $deploy.IsReadOnly = $false
 
     return [ordered]@{
         state_dir   = $script:StateDir
@@ -494,6 +526,7 @@ try {
         }
         $script:Facts['cua_driver'] = Invoke-Step 'cua-driver' {
             Install-CuaDriver -Root $payloadRoot -Pin $config.payload.cua_driver `
+                -ProxyPin $config.payload.cua_driver_proxy `
                 -InstallDir $config.driver_dir
         }
         $script:Facts['autologon'] = Invoke-Step 'persistent-autologon' {

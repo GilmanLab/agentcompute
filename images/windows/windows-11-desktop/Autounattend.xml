@@ -101,12 +101,6 @@
         <AcceptEula>true</AcceptEula>
         <FullName>agentcompute</FullName>
         <Organization>GilmanLab</Organization>
-        <ProductKey>
-          <!-- Evaluation media carries its own edition; an empty key with
-               WillShowUI=OnError skips the product key page. -->
-          <Key></Key>
-          <WillShowUI>OnError</WillShowUI>
-        </ProductKey>
       </UserData>
     </component>
   </settings>
@@ -187,7 +181,7 @@
         <HideLocalAccountScreen>true</HideLocalAccountScreen>
         <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
         <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
-        <HideWirelessSetupInHDS>true</HideWirelessSetupInHDS>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
         <NetworkLocation>Work</NetworkLocation>
         <ProtectYourPC>3</ProtectYourPC>
       </OOBE>
