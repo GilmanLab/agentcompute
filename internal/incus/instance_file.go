@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -18,33 +19,16 @@ const defaultFileReadLimit = 64 * 1024
 
 // ReadFile pulls a bounded guest file through the Incus agent.
 func (c *Client) ReadFile(ctx context.Context, req compute.FileReadRequest) (compute.FileReadResult, error) {
-	if err := c.requireInstance(ctx, req.Ref); err != nil {
-		return compute.FileReadResult{}, err
-	}
-	srv := c.Scoped(ctx, projectName(req.Ref.Sandbox), "")
-	body, info, err := srv.GetInstanceFile(req.Ref.Name, req.Path)
+	body, err := c.ReadBinaryFile(ctx, req.Ref, req.Path)
 	if err != nil {
-		if errors.Is(mapError(err), compute.ErrNotFound) {
+		if errors.Is(err, os.ErrNotExist) {
 			return compute.FileReadResult{}, fileErrorf(
 				"file not found on instance %q in sandbox %q",
 				req.Ref.Name,
 				req.Ref.Sandbox,
 			)
 		}
-		return compute.FileReadResult{}, mapError(err)
-	}
-	if info != nil && info.Type == "directory" {
-		if body != nil {
-			_ = body.Close()
-		}
-		return compute.FileReadResult{}, fileErrorf(
-			"path is a directory on instance %q in sandbox %q",
-			req.Ref.Name,
-			req.Ref.Sandbox,
-		)
-	}
-	if body == nil {
-		return compute.FileReadResult{}, errors.New("file read returned no content")
+		return compute.FileReadResult{}, err
 	}
 	defer body.Close()
 
@@ -61,6 +45,32 @@ func (c *Client) ReadFile(ctx context.Context, req compute.FileReadRequest) (com
 		buf = buf[:limit]
 	}
 	return compute.FileReadResult{Content: string(buf), Truncated: truncated}, nil
+}
+
+// ReadBinaryFile opens a guest file without passing bytes through exec or text conversion.
+// The caller must close the stream and enforce its own byte bound.
+func (c *Client) ReadBinaryFile(ctx context.Context, ref compute.Ref, path string) (io.ReadCloser, error) {
+	if err := c.requireInstance(ctx, ref); err != nil {
+		return nil, err
+	}
+	srv := c.Scoped(ctx, projectName(ref.Sandbox), "")
+	body, info, err := srv.GetInstanceFile(ref.Name, path)
+	if err != nil {
+		if errors.Is(mapError(err), compute.ErrNotFound) {
+			return nil, fmt.Errorf("guest file missing: %w", os.ErrNotExist)
+		}
+		return nil, mapError(err)
+	}
+	if info != nil && info.Type != "file" {
+		if body != nil {
+			_ = body.Close()
+		}
+		return nil, fileErrorf("path is not a regular file on instance %q in sandbox %q", ref.Name, ref.Sandbox)
+	}
+	if body == nil {
+		return nil, errors.New("file read returned no content")
+	}
+	return body, nil
 }
 
 // WriteFile pushes a bounded guest file through the Incus agent.
@@ -96,6 +106,21 @@ func (c *Client) WriteFile(ctx context.Context, req compute.FileWriteRequest) (c
 		return compute.FileWriteResult{}, mapError(err)
 	}
 	return compute.FileWriteResult{Bytes: int64(len(req.Content))}, nil
+}
+
+// DeleteFile removes a guest file through the Incus agent.
+func (c *Client) DeleteFile(ctx context.Context, ref compute.Ref, path string) error {
+	if err := c.requireInstance(ctx, ref); err != nil {
+		return err
+	}
+	err := c.Scoped(ctx, projectName(ref.Sandbox), "").DeleteInstanceFile(ref.Name, path)
+	if err != nil {
+		if errors.Is(mapError(err), compute.ErrNotFound) {
+			return fmt.Errorf("guest file missing: %w", os.ErrNotExist)
+		}
+		return mapError(err)
+	}
+	return nil
 }
 
 func parseOctalMode(mode string) (int, error) {

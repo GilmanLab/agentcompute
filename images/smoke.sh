@@ -5,7 +5,8 @@
 # reconciler imports, boots, and promotes the shared `router` alias.
 # This script covers the gap those tools leave open — proving a
 # freshly built router.tar.xz actually boots, carries its router tooling,
-# and ships /opt/router/nat before anything is pushed to a registry.
+# and ships /opt/router/{nat,route,dhcp,wg} before anything is pushed to a
+# registry.
 # Consequently it:
 #
 #   * never promotes (or touches) the shared `router` alias, and asserts that
@@ -249,7 +250,7 @@ check_rejects() {
 	printf '=== reject %s\n' "$*" >>"$log"
 	if incus_q exec "$remote:$name" -- "$@" 2>&1 | tee -a "$log" >&2; then
 		printf '=== FAILED (expected rejection): %s\n' "$*" >>"$log"
-		die "router nat helper did not reject: $* (log: $log)"
+		die "router helper did not reject: $* (log: $log)"
 	fi
 }
 
@@ -260,10 +261,21 @@ check dnsmasq --version
 check wg --version
 check tcpdump --version
 check test -x /opt/router/nat
+check test -x /opt/router/route
+check test -x /opt/router/dhcp
+check test -x /opt/router/wg
+check /opt/router/nat --help
+check /opt/router/route --help
+check /opt/router/dhcp --help
+check /opt/router/wg --help
 check_rejects /opt/router/nat --mode full-cone --inside eth0 --outside eth1
 check_rejects /opt/router/nat --mode port-restricted --inside eth0 --outside eth0
-note "six router tool checks and nat helper contract passed"
+check_rejects /opt/router/nat --mode masquerade --inside eth0 --outside eth0
+check_rejects /opt/router/route --to not-a-prefix --via 192.168.50.1
+check_rejects /opt/router/dhcp --interface eth0 --range 192.168.50.100
+check_rejects /opt/router/wg --interface wg0 --address 10.8.0.1/24
+note "six router tool checks and helper contract passed"
 
-printf '{"fingerprint":"%s","file":"%s","remote":"%s","project":"%s","instance":"%s","image_imported":%s,"checks":9,"log":"%s"}\n' \
+printf '{"fingerprint":"%s","file":"%s","remote":"%s","project":"%s","instance":"%s","image_imported":%s,"checks":20,"log":"%s"}\n' \
 	"$fingerprint" "$file" "$remote" "$project" "$name" \
 	"$([ "$image_imported" -eq 1 ] && printf true || printf false)" "$log"

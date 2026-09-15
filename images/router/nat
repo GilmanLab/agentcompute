@@ -1,13 +1,17 @@
 #!/bin/bash
-# Port-restricted IPv4 NAT for the router image.
+# IPv4 NAT for the router image.
 #
 # Representative invocation:
 #   /opt/router/nat --mode port-restricted --inside eth0 --outside eth1
 #
-# Applies IPv4 forwarding, masquerade on the outside interface, and stateful
-# return filtering. Mapping and timeouts are whatever Linux conntrack
-# provides; this helper does not claim full-cone, hairpin, or stable port
-# assignments.
+# --mode masquerade: SNAT via nft masquerade on the outside interface.
+# --mode port-restricted: persistent masquerade with inbound filtering that
+# accepts replies only from the original remote endpoint. Conntrack tracks
+# both the remote address and port; persistent does not guarantee stable ports.
+#
+# Mapping and timeouts are whatever Linux conntrack provides; this helper does
+# not claim full-cone, hairpin, or stable port assignments. Only the
+# helper-owned nft table is replaced; other tables are left untouched.
 #
 # Clients on an OVN network still receive the logical router (.1) as their
 # DHCP default gateway. Traffic only transits this instance when a route
@@ -15,7 +19,7 @@
 set -euo pipefail
 
 usage() {
-	printf 'usage: %s --mode port-restricted --inside <if> --outside <if>\n' "${0##*/}"
+	printf 'usage: %s --mode masquerade|port-restricted --inside <if> --outside <if>\n' "${0##*/}"
 }
 
 err() {
@@ -79,7 +83,12 @@ done
 	err "required flags: --mode, --inside, --outside"
 }
 
-[ "$mode" = "port-restricted" ] || err "unsupported mode: $mode (only port-restricted)"
+case "$mode" in
+masquerade | port-restricted) ;;
+*)
+	err "unsupported mode: $mode (masquerade|port-restricted)"
+	;;
+esac
 
 valid_ifname "$inside" || err "invalid inside interface name: $inside"
 valid_ifname "$outside" || err "invalid outside interface name: $outside"
@@ -110,6 +119,21 @@ printf '1\n' >/proc/sys/net/ipv4/ip_forward || err "cannot enable IPv4 forwardin
 read -r forwarding </proc/sys/net/ipv4/ip_forward
 [ "$forwarding" = 1 ] || err "IPv4 forwarding did not enable"
 
+# RELATED ICMP errors are required for PMTU; conntrack helpers that punch
+# extra pinholes are not. Ignore if the sysctl is not present in this netns.
+if [ -w /proc/sys/net/netfilter/nf_conntrack_helper ]; then
+	printf '0\n' >/proc/sys/net/netfilter/nf_conntrack_helper || true
+fi
+
+masq_stmt="oifname \"${outside}\" masquerade"
+input_stmt=""
+if [ "$mode" = "port-restricted" ]; then
+	masq_stmt="oifname \"${outside}\" masquerade persistent"
+	# Unsolicited packets addressed to the router hit INPUT, not FORWARD.
+	# Drop before conntrack confirmation so they cannot occupy a reply tuple.
+	input_stmt="iifname \"${outside}\" ct state new drop"
+fi
+
 # Replace only the helper-owned table. Other nft tables are left untouched.
 nft -f - <<EOF
 destroy table ip router_nat
@@ -119,12 +143,18 @@ table ip router_nat {
 		ct state invalid drop
 		ct state established,related accept
 		iifname "${inside}" oifname "${outside}" accept
+		iifname "${outside}" ct state new drop
+	}
+	chain input {
+		type filter hook input priority filter; policy accept;
+		iifname "${outside}" udp sport 67 udp dport 68 accept
+		${input_stmt}
 	}
 	chain postrouting {
 		type nat hook postrouting priority srcnat; policy accept;
-		oifname "${outside}" masquerade persistent
+		${masq_stmt}
 	}
 }
 EOF
 
-printf 'nat: port-restricted masquerade inside=%s outside=%s\n' "$inside" "$outside" >&2
+printf 'nat: %s inside=%s outside=%s\n' "$mode" "$inside" "$outside" >&2

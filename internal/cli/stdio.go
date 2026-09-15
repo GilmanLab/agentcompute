@@ -48,7 +48,7 @@ func newStdioCommand(options Options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			runErr := runStdio(cmd.Context(), logger, options.Build, cmd.InOrStdin(), cmd.OutOrStdout(), rt.deps)
+			runErr := rt.runStdio(cmd.Context(), logger, options.Build, cmd.InOrStdin(), cmd.OutOrStdout())
 			return errors.Join(runErr, rt.close())
 		},
 	}

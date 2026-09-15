@@ -19,6 +19,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/GilmanLab/agentcompute/internal/compute"
+	"github.com/GilmanLab/agentcompute/internal/desktop"
 	"github.com/GilmanLab/agentcompute/internal/incus"
 	"github.com/GilmanLab/agentcompute/internal/mcpserver"
 )
@@ -28,12 +29,15 @@ const (
 	defaultTTLMinutes = 240
 	maxTTLMinutes     = 1440
 	yamlExtension     = ".yaml"
+	tomlExtension     = ".toml"
 )
 
 // runtime owns backend connections and the reaper, not individual MCP sessions.
 type runtime struct {
-	deps  mcpserver.Dependencies
-	close func() error
+	deps             mcpserver.Dependencies
+	close            func() error
+	screenshots      *desktop.Store
+	screenshotListen string
 }
 
 type runtimeConfig struct {
@@ -64,6 +68,7 @@ type sandboxConfig struct {
 type screenshotConfig struct {
 	Dir     string `yaml:"dir"      toml:"dir"`
 	BaseURL string `yaml:"base_url" toml:"base_url"`
+	Listen  string `yaml:"listen"   toml:"listen"`
 }
 
 func loadRuntimeConfig(path string) (runtimeConfig, error) {
@@ -73,7 +78,8 @@ func loadRuntimeConfig(path string) (runtimeConfig, error) {
 			MaxTTLMinutes:      maxTTLMinutes,
 			DefaultNetworkKind: "ovn",
 		},
-		ImagesFile: "images/catalog.yaml",
+		Screenshots: screenshotConfig{Dir: "screenshots", Listen: "127.0.0.1:8081"},
+		ImagesFile:  "images/catalog.yaml",
 	}
 	if path == "" {
 		return cfg, errors.New("configuration is required: use --config or AGENTCOMPUTE_CONFIG")
@@ -95,7 +101,7 @@ func decodeRuntimeConfig(path string, cfg *runtimeConfig) error {
 	}
 	defer file.Close()
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".toml":
+	case tomlExtension:
 		err = toml.NewDecoder(file).DisallowUnknownFields().Decode(cfg)
 	case yamlExtension, ".yml":
 		err = decodeYAMLConfig(file, cfg)
@@ -142,6 +148,9 @@ func validateRuntimeConfig(cfg runtimeConfig) error {
 	if cfg.ImagesFile == "" {
 		return errors.New("images_file must not be empty")
 	}
+	if cfg.Screenshots.BaseURL == "" {
+		return errors.New("screenshots.base_url is required")
+	}
 	return nil
 }
 
@@ -182,16 +191,32 @@ func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime
 	if err != nil {
 		return nil, errors.Join(err, client.Close())
 	}
+	screenshots, err := desktop.NewStore(cfg.Screenshots.Dir, cfg.Screenshots.BaseURL)
+	if err != nil {
+		return nil, errors.Join(err, client.Close())
+	}
+	var driver *desktop.Driver
 	service, err := compute.New(client, catalog, compute.Options{
 		Host:               cfg.Incus.Host,
 		DefaultNetworkKind: cfg.Sandbox.DefaultNetworkKind,
 		DefaultTTL:         time.Duration(cfg.Sandbox.DefaultTTLMinutes) * time.Minute,
 		MaxTTL:             time.Duration(cfg.Sandbox.MaxTTLMinutes) * time.Minute,
 		Logger:             logger,
+		OnSandboxExpired: func(name string) {
+			screenshots.PurgeSandbox(name)
+			if driver != nil {
+				driver.CloseSandbox(name)
+			}
+		},
+		OnReap: screenshots.Sweep,
+		DesktopReady: func(ctx context.Context, ref compute.Ref) (bool, error) {
+			return driver.Ready(ctx, ref)
+		},
 	})
 	if err != nil {
-		return nil, errors.Join(err, client.Close())
+		return nil, errors.Join(err, screenshots.Close(), client.Close())
 	}
+	driver = desktop.NewDriver(service, screenshots)
 	lifecycle, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	go func() {
@@ -200,11 +225,16 @@ func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime
 			logger.ErrorContext(lifecycle, "reaper stopped", "err", reapErr)
 		}
 	}()
-	return &runtime{deps: mcpserver.NewDependencies(service), close: func() error {
-		cancel()
-		<-done
-		return client.Close()
-	}}, nil
+	return &runtime{
+		deps:             mcpserver.NewDependencies(service, driver),
+		screenshots:      screenshots,
+		screenshotListen: cfg.Screenshots.Listen,
+		close: func() error {
+			cancel()
+			<-done
+			return errors.Join(driver.Close(), screenshots.Close(), client.Close())
+		},
+	}, nil
 }
 
 func (o Options) openRuntime(ctx context.Context, logger *slog.Logger) (*runtime, error) {

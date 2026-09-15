@@ -1,0 +1,225 @@
+{
+  "date": "2026-09-14",
+  "source_commit": "fb74056",
+  "initial_build": {
+    "download_wall_seconds": 7.503,
+    "compile_wall_seconds": 34.399,
+    "assemble_wall_seconds": 1.274,
+    "download_includes": "https fetch and sha256 of go, vendored distrobuilder source, alpine miniroot, and every pinned apk",
+    "compile_includes": "extract go+distrobuilder and go build -mod=vendor -tags=containers_image_storage_stub,containers_image_docker_daemon_stub,containers_image_openpgp; excludes download and assemble",
+    "assemble_includes": "seed tar plus distrobuilder build-incus --type=unified --compression=xz-1 --disable-overlay; excludes download and compile",
+    "peak_rss_kib": 512060,
+    "compile_peak_rss_kib": 512060,
+    "scratch_high_water_bytes": 954597376,
+    "scratch_sampling_seconds": 0.1,
+    "artifact_bytes": 11683040,
+    "artifact_sha256": "84a4f3f16a18f77da6d1f6338ca2b6e251b9468fcbda80ef2cb3d09a0330c987",
+    "decoded_bytes": 44479609,
+    "tools": {
+      "tar": "tar (GNU tar) 1.35",
+      "xz": "xz (XZ Utils) 5.8.3",
+      "gcc": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+    }
+  },
+  "final_build": {
+    "download_wall_seconds": 7.972,
+    "compile_wall_seconds": 31.766,
+    "assemble_wall_seconds": 1.17,
+    "download_includes": "https fetch and sha256 of go, vendored distrobuilder source, alpine miniroot, and every pinned apk",
+    "compile_includes": "extract go+distrobuilder and go build -mod=vendor -tags=containers_image_storage_stub,containers_image_docker_daemon_stub,containers_image_openpgp; excludes download and assemble",
+    "assemble_includes": "seed tar plus distrobuilder build-incus --type=unified --compression=xz-1 --disable-overlay; excludes download and compile",
+    "peak_rss_kib": 512088,
+    "compile_peak_rss_kib": 512088,
+    "scratch_high_water_bytes": 954626048,
+    "scratch_sampling_seconds": 0.1,
+    "artifact_bytes": 11683284,
+    "artifact_sha256": "d10fff199809da10f04565f1a6a932ef77e0252efec48fb6fe68ae6e5f26d111",
+    "decoded_bytes": 44479971,
+    "tools": {
+      "tar": "tar (GNU tar) 1.35",
+      "xz": "xz (XZ Utils) 5.8.3",
+      "gcc": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+    }
+  },
+  "exact_program": {
+    "source": "def main():\n    sb = sandbox.create(name=\"nat-repro\", ttl_minutes=120)\n    lan = net.create(sandbox=\"nat-repro\", name=\"lan\", cidr=\"192.168.50.0/24\", nat=False)\n    # The isolated LAN reaches outside only through the router's WAN NIC.\n    wan = net.create(sandbox=\"nat-repro\", name=\"wan\", cidr=\"10.99.0.0/24\", nat=True)\n\n    # Port-restricted NAT is beyond OVN's SNAT, so a router instance does it.\n    instance.create(sandbox=\"nat-repro\", name=\"rtr\", image=\"router\", network=\"lan\")\n    net.attach(sandbox=\"nat-repro\", instance=\"rtr\", network=\"wan\")\n    instance.exec(sandbox=\"nat-repro\", name=\"rtr\", command=\"/opt/router/nat --mode port-restricted --inside eth0 --outside eth1\")\n\n    instance.create(sandbox=\"nat-repro\", name=\"client\", image=\"ubuntu/24.04/desktop\", network=\"lan\")\n    instance.wait(sandbox=\"nat-repro\", name=\"client\", until=\"desktop\", timeout_seconds=300)\n\n    shot = desktop.screenshot(sandbox=\"nat-repro\", instance=\"client\")\n    apps = json.decode(desktop.call(sandbox=\"nat-repro\", instance=\"client\", tool=\"list_apps\")[\"result\"])\n    return {\"router\": instance.get(sandbox=\"nat-repro\", name=\"rtr\")[\"nics\"], \"screenshot\": shot[\"url\"], \"apps\": apps}\n",
+    "seconds": 37.78198025,
+    "router": [
+      {
+        "addresses": [
+          "192.168.50.2"
+        ],
+        "mac": "10:66:6a:79:88:9c",
+        "name": "eth0",
+        "network": "lan"
+      },
+      {
+        "addresses": [
+          "10.99.0.2"
+        ],
+        "mac": "10:66:6a:e7:4a:12",
+        "name": "eth1",
+        "network": "wan"
+      }
+    ],
+    "apps_count": 190,
+    "desktop_png": "1280x800, all black; transport-only success"
+  },
+  "measurement": {
+    "baseline": {
+      "seconds": 11.164292583,
+      "exit_code": 0,
+      "stderr": "",
+      "stderr_truncated": false,
+      "stdout": "PING 10.99.0.3 (10.99.0.3) 56(84) bytes of data.\n\n--- 10.99.0.3 ping statistics ---\n100 packets transmitted, 100 received, 0% packet loss, time 10293ms\nrtt min/avg/max/mdev = 0.196/0.444/1.485/0.153 ms\n",
+      "stdout_truncated": false,
+      "timed_out": false
+    },
+    "impaired": {
+      "seconds": 21.095815084,
+      "exit_code": 0,
+      "stderr": "",
+      "stderr_truncated": false,
+      "stdout": "PING 10.99.0.3 (10.99.0.3) 56(84) bytes of data.\n\n--- 10.99.0.3 ping statistics ---\n200 packets transmitted, 192 received, 4% packet loss, time 20073ms\nrtt min/avg/max/mdev = 100.404/100.725/102.171/0.156 ms, pipe 2\n",
+      "stdout_truncated": false,
+      "timed_out": false
+    },
+    "qdisc": {
+      "seconds": 0.767660459,
+      "exit_code": 0,
+      "stderr": "",
+      "stderr_truncated": false,
+      "stdout": "qdisc netem 1: root refcnt 25 limit 1000 delay 100ms loss 5% seed 6971113283496791079\n Sent 18900 bytes 194 pkt (dropped 8, overlimits 0 requeues 0) \n backlog 0b 0p requeues 0\n",
+      "stdout_truncated": false,
+      "timed_out": false
+    },
+    "cleared": {
+      "seconds": 11.144574208,
+      "exit_code": 0,
+      "stderr": "",
+      "stderr_truncated": false,
+      "stdout": "PING 10.99.0.3 (10.99.0.3) 56(84) bytes of data.\n\n--- 10.99.0.3 ping statistics ---\n100 packets transmitted, 100 received, 0% packet loss, time 10292ms\nrtt min/avg/max/mdev = 0.345/0.626/1.349/0.105 ms\n",
+      "stdout_truncated": false,
+      "timed_out": false
+    },
+    "cleared_qdisc": {
+      "seconds": 1.22111775,
+      "exit_code": 0,
+      "stderr": "",
+      "stderr_truncated": false,
+      "stdout": "qdisc noqueue 0: root refcnt 2 \n",
+      "stdout_truncated": false,
+      "timed_out": false
+    }
+  },
+  "wan_capture": "tcpdump: verbose output suppressed, use -v[v]... for full protocol decode\nlistening on eth1, link-type EN10MB (Ethernet), snapshot length 262144 bytes\n19:35:57.599256 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 1, length 64\n19:35:57.599939 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 1, length 64\n19:35:57.699814 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 2, length 64\n19:35:57.700138 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 2, length 64\n19:35:57.803957 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 3, length 64\n19:35:57.804195 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 3, length 64\n19:35:57.907950 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 4, length 64\n19:35:57.908075 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 4, length 64\n19:35:58.011927 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 5, length 64\n19:35:58.012133 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 5, length 64\n19:35:58.115925 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 6, length 64\n19:35:58.116139 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 6, length 64\n19:35:58.219949 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 7, length 64\n19:35:58.220111 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 7, length 64\n19:35:58.323945 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 8, length 64\n19:35:58.324124 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 8, length 64\n19:35:58.427924 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 9, length 64\n19:35:58.428144 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 9, length 64\n20 packets captured\n20 packets received by filter\n0 packets dropped by kernel\n19:35:58.531958 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 1557, seq 10, length 64\n19:35:58.532134 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 1557, seq 10, length 64\n[phase7-wan-capture: exited; cursor=1951]",
+  "endpoint_filtering": {
+    "before_input_fix": {
+      "mappings": [
+        [
+          "10.99.0.2",
+          40000
+        ],
+        [
+          "10.99.0.2",
+          61583
+        ],
+        [
+          "10.99.0.2",
+          61583
+        ]
+      ],
+      "same_mapping": false
+    },
+    "after_prototype": {
+      "mappings": [
+        [
+          "10.99.0.2",
+          40010
+        ],
+        [
+          "10.99.0.2",
+          40010
+        ],
+        [
+          "10.99.0.2",
+          40010
+        ]
+      ],
+      "same_mapping": true
+    },
+    "final_image_log": "UDP_PROBE_READY\n{\"first\": [\"10.99.0.2\", 40020]}\nTraceback (most recent call last):\n  File \"/tmp/phase7-udp-observer-final.py\", line 10, in <module>\n    data,second=b.recvfrom(1024); b.sendto(b'now-allowed-port',second)\n                ^^^^^^^^^^^^^^^^\nTimeoutError: timed out\nUDP_PROBE_READY\n{\"first\": [\"10.99.0.2\", 40020]}\n{\"mappings\": [[\"10.99.0.2\", 40020], [\"10.99.0.2\", 40020], [\"10.99.0.2\", 40020]], \"same_mapping\": true}\n[phase7-udp-final: exited; cursor=427]",
+    "observations": {
+      "original_reply": true,
+      "unsolicited_other_port_dropped": true,
+      "unsolicited_other_address_dropped": true,
+      "contacted_other_port_allowed": true,
+      "contacted_other_address_allowed": true
+    },
+    "first_fresh_router_attempt": "Original reply timed out; observer neighbor 10.99.0.2 was FAILED. Retest passed after a router-to-observer ping."
+  },
+  "namespace": {
+    "uid_map": "0 1000000 1000000000",
+    "restricted": true,
+    "containers_lowlevel": "block",
+    "containers_nesting": "block",
+    "containers_privilege": "unprivileged"
+  },
+  "desktop": {
+    "full_screen": "all black before and after launching the text editor",
+    "window": {
+      "seconds": 6.127587083,
+      "width": 822,
+      "height": 642,
+      "visual": "Text Editor New Document window visible",
+      "file": "/tmp/agentcompute-phase7-window-vm-evidence/03-0.png"
+    }
+  },
+  "vm_nic_mapping": {
+    "request": {
+      "name": "execute",
+      "arguments": {
+        "source": "def main():\n    net.impair(sandbox=\"nat-repro\",instance=\"client\",nic=\"eth0\",latency_ms=10)\n    applied=instance.exec(sandbox=\"nat-repro\",name=\"client\",command=\"tc qdisc show dev enp5s0\")\n    net.impair(sandbox=\"nat-repro\",instance=\"client\",nic=\"eth0\",clear=True)\n    cleared=instance.exec(sandbox=\"nat-repro\",name=\"client\",command=\"tc qdisc show dev enp5s0\")\n    return {\"applied\":applied,\"cleared\":cleared}\n"
+      },
+      "expect_error": false
+    },
+    "response": {
+      "_meta": {
+        "io.modelcontextprotocol/serverInfo": {
+          "name": "agentcompute",
+          "title": "agentcompute CodeMode MCP server",
+          "version": "dev"
+        }
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"result\":{\"applied\":{\"exit_code\":0,\"stderr\":\"\",\"stderr_truncated\":false,\"stdout\":\"qdisc netem 1: root refcnt 3 limit 1000 delay 10ms\\n\",\"stdout_truncated\":false,\"timed_out\":false},\"cleared\":{\"exit_code\":0,\"stderr\":\"\",\"stderr_truncated\":false,\"stdout\":\"qdisc mq 0: root \\nqdisc fq_codel 0: parent :2 limit 10240p flows 1024 quantum 1456 target 5ms interval 100ms memory_limit 32Mb ecn drop_batch 64 \\nqdisc fq_codel 0: parent :1 limit 10240p flows 1024 quantum 1456 target 5ms interval 100ms memory_limit 32Mb ecn drop_batch 64 \\n\",\"stdout_truncated\":false,\"timed_out\":false}}}"
+        }
+      ],
+      "structuredContent": {
+        "result": {
+          "applied": {
+            "exit_code": 0,
+            "stderr": "",
+            "stderr_truncated": false,
+            "stdout": "qdisc netem 1: root refcnt 3 limit 1000 delay 10ms\n",
+            "stdout_truncated": false,
+            "timed_out": false
+          },
+          "cleared": {
+            "exit_code": 0,
+            "stderr": "",
+            "stderr_truncated": false,
+            "stdout": "qdisc mq 0: root \nqdisc fq_codel 0: parent :2 limit 10240p flows 1024 quantum 1456 target 5ms interval 100ms memory_limit 32Mb ecn drop_batch 64 \nqdisc fq_codel 0: parent :1 limit 10240p flows 1024 quantum 1456 target 5ms interval 100ms memory_limit 32Mb ecn drop_batch 64 \n",
+            "stdout_truncated": false,
+            "timed_out": false
+          }
+        }
+      },
+      "resultType": "complete"
+    },
+    "seconds": 11.726831917,
+    "step": 4
+  }
+}

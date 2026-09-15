@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/netip"
 	"strconv"
@@ -309,6 +310,25 @@ func (s *Service) CreateForward(
 	return created, nil
 }
 
+// InstanceForward finds an existing scalar port forward to a guest.
+// An empty Address means no matching forward; this method never exposes a port.
+func (s *Service) InstanceForward(ctx context.Context, ref Ref, targetPort int64, protocol string) (Forward, error) {
+	if err := validateRef(ref); err != nil {
+		return Forward{}, err
+	}
+	if targetPort < 1 || targetPort > 65535 || (protocol != "tcp" && protocol != "udp") {
+		return Forward{}, agentError("forward lookup requires a valid port and tcp or udp protocol")
+	}
+	if _, err := s.SandboxExpiry(ctx, ref.Sandbox); err != nil {
+		return Forward{}, err
+	}
+	forward, err := s.backend.InstanceForward(ctx, ref, targetPort, protocol)
+	if err != nil {
+		return Forward{}, s.mapBackend(ctx, "find instance forward", err)
+	}
+	return forward, nil
+}
+
 // ImpairNIC applies Linux-only tc netem settings inside a guest. It is not gated.
 func (s *Service) ImpairNIC(ctx context.Context, ref Ref, nic string, impairment Impairment) error {
 	if err := validateRef(ref); err != nil {
@@ -333,7 +353,17 @@ func (s *Service) ImpairNIC(ctx context.Context, ref Ref, nic string, impairment
 	if err := s.requireLinuxGuest(ctx, inst); err != nil {
 		return err
 	}
-	script := impairCommand(nic, impairment)
+	guestNIC := nic
+	for _, attached := range inst.NICs {
+		if attached.Name == nic && attached.GuestName != "" {
+			guestNIC = attached.GuestName
+			break
+		}
+	}
+	if err := validateName(guestNIC); err != nil {
+		return agentErrorf("unsupported guest NIC name %q", guestNIC)
+	}
+	script := impairCommand(guestNIC, impairment)
 	stdout := newDrainingWriter(execOutputLimit)
 	stderr := newDrainingWriter(execOutputLimit)
 	code, execErr := s.backend.Exec(ctx, ExecRequest{
@@ -347,7 +377,11 @@ func (s *Service) ImpairNIC(ctx context.Context, ref Ref, nic string, impairment
 		return s.backendError(ctx, "impair", execErr)
 	}
 	if code != 0 {
-		return agentErrorf("impair failed on nic %q of instance %q", nic, ref.Name)
+		detail := strings.TrimSpace(stderr.String())
+		if detail == "" {
+			return agentErrorf("impair failed on nic %q of instance %q", nic, ref.Name)
+		}
+		return agentErrorf("impair failed on nic %q of instance %q: %s", nic, ref.Name, detail)
 	}
 	return nil
 }
@@ -508,7 +542,7 @@ func validateImpairment(impairment Impairment) error {
 	if impairment.LatencyMS < 0 || impairment.JitterMS < 0 || impairment.RateMbit < 0 || impairment.LossPercent < 0 {
 		return agentError("impairment values must be non-negative")
 	}
-	if impairment.LossPercent > maxLossPercent {
+	if math.IsNaN(impairment.LossPercent) || impairment.LossPercent > maxLossPercent {
 		return agentError("loss_percent must be between 0 and 100")
 	}
 	if impairment.JitterMS > 0 && impairment.LatencyMS == 0 {
@@ -540,11 +574,15 @@ func nicExists(instance Instance, nic string) bool {
 }
 
 func (s *Service) requireLinuxGuest(ctx context.Context, inst Instance) error {
-	if image, ok := s.catalog.Lookup(inst.Image); ok {
-		osName := strings.ToLower(image.OS)
-		if strings.Contains(osName, "windows") || osName == "darwin" || osName == "macos" {
-			return agentErrorf("net.impair is not supported on %s guests", image.OS)
+	osName := inst.OS
+	if osName == "" {
+		if image, ok := s.catalog.Lookup(inst.Image); ok {
+			osName = image.OS
 		}
+	}
+	lowerOS := strings.ToLower(osName)
+	if strings.HasPrefix(lowerOS, "windows") || lowerOS == "darwin" || lowerOS == "macos" {
+		return agentErrorf("net.impair is not supported on %s guests", osName)
 	}
 	stdout := newDrainingWriter(execOutputLimit)
 	stderr := newDrainingWriter(execOutputLimit)

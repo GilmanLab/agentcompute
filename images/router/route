@@ -1,0 +1,154 @@
+#!/bin/bash
+# Static IPv4 routes for the router image.
+#
+# Representative invocation:
+#   /opt/router/route --to 10.99.0.0/24 --via 192.168.50.2
+#   /opt/router/route --to default --via 10.99.0.1 --dev eth1
+#
+# Uses `ip route replace` so reruns are idempotent. Does not flush the
+# routing table or touch nftables.
+set -euo pipefail
+
+usage() {
+	printf 'usage: %s --to <prefix|default> --via <gateway> [--dev <if>]\n' "${0##*/}"
+}
+
+err() {
+	printf 'route: %s\n' "$*" >&2
+	exit 1
+}
+
+valid_ifname() {
+	case "$1" in
+	"" | -* | *[!A-Za-z0-9._-]*)
+		return 1
+		;;
+	esac
+	[ "${#1}" -le 15 ]
+}
+
+valid_ipv4() {
+	local octet dots
+	case "$1" in
+	"" | *[!0-9.]* | .* | *. | *..*)
+		return 1
+		;;
+	esac
+	dots=${1//[^.]/}
+	[ "${#dots}" -eq 3 ] || return 1
+	IFS=.
+	set -- $1
+	unset IFS
+	[ "$#" -eq 4 ] || return 1
+	for octet in "$1" "$2" "$3" "$4"; do
+		case "$octet" in
+		"" | *[!0-9]*)
+			return 1
+			;;
+		esac
+		[ "$octet" -ge 0 ] && [ "$octet" -le 255 ] || return 1
+		[ "$octet" = "0" ] || [ "${octet#0}" = "$octet" ] || return 1
+	done
+}
+
+valid_prefix() {
+	local addr len
+	if [ "$1" = "default" ] || [ "$1" = "0.0.0.0/0" ]; then
+		return 0
+	fi
+	case "$1" in
+	*/*) ;;
+	*)
+		return 1
+		;;
+	esac
+	addr=${1%/*}
+	len=${1##*/}
+	valid_ipv4 "$addr" || return 1
+	case "$len" in
+	"" | *[!0-9]*)
+		return 1
+		;;
+	esac
+	[ "$len" -ge 0 ] && [ "$len" -le 32 ]
+}
+
+to=""
+via=""
+dev=""
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--to)
+		[ "$#" -ge 2 ] || err "--to requires a prefix"
+		[ -z "$to" ] || err "--to specified more than once"
+		to=$2
+		shift 2
+		;;
+	--via)
+		[ "$#" -ge 2 ] || err "--via requires a gateway address"
+		[ -z "$via" ] || err "--via specified more than once"
+		via=$2
+		shift 2
+		;;
+	--dev)
+		[ "$#" -ge 2 ] || err "--dev requires an interface name"
+		[ -z "$dev" ] || err "--dev specified more than once"
+		dev=$2
+		shift 2
+		;;
+	--)
+		shift
+		[ "$#" -eq 0 ] || err "unexpected argument: $1"
+		break
+		;;
+	-*)
+		err "unknown option: $1"
+		;;
+	*)
+		err "unexpected argument: $1"
+		;;
+	esac
+done
+
+[ -n "$to" ] && [ -n "$via" ] || {
+	usage >&2
+	err "required flags: --to, --via"
+}
+
+valid_prefix "$to" || err "invalid destination prefix: $to"
+valid_ipv4 "$via" || err "invalid gateway address: $via"
+if [ -n "$dev" ]; then
+	valid_ifname "$dev" || err "invalid interface name: $dev"
+	[ -e "/sys/class/net/$dev" ] || err "interface not found: $dev"
+fi
+
+command -v ip >/dev/null 2>&1 || err "missing required command: ip"
+[ "$(id -u)" -eq 0 ] || err "must run as root"
+
+if [ "$to" = "0.0.0.0/0" ]; then
+	to=default
+fi
+
+if [ -n "$dev" ]; then
+	existing=$(ip route show "$to" dev "$dev" 2>/dev/null || true)
+else
+	existing=$(ip route show "$to" 2>/dev/null || true)
+fi
+case "$existing" in
+*" proto kernel "*)
+	err "refusing to replace kernel connected route $to"
+	;;
+esac
+
+if [ -n "$dev" ]; then
+	ip route replace "$to" via "$via" dev "$dev" || err "failed to replace route $to via $via dev $dev"
+	printf 'route: %s via %s dev %s\n' "$to" "$via" "$dev" >&2
+else
+	ip route replace "$to" via "$via" || err "failed to replace route $to via $via"
+	printf 'route: %s via %s\n' "$to" "$via" >&2
+fi

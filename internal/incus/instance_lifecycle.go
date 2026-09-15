@@ -22,7 +22,7 @@ func (c *Client) StartInstance(ctx context.Context, ref compute.Ref, force bool)
 	if err := c.waitRunning(ctx, projectName(ref.Sandbox), ref.Name); err != nil {
 		return compute.Instance{}, err
 	}
-	return c.GetInstance(ctx, ref)
+	return c.startedInstance(ctx, ref)
 }
 
 // StopInstance stops a guest and waits until it is stopped.
@@ -58,7 +58,7 @@ func (c *Client) RestartInstance(ctx context.Context, ref compute.Ref, force boo
 	if err := c.waitRunning(ctx, projectName(ref.Sandbox), ref.Name); err != nil {
 		return compute.Instance{}, err
 	}
-	return c.GetInstance(ctx, ref)
+	return c.startedInstance(ctx, ref)
 }
 
 // WaitInstance polls guest state until the requested stage is reached.
@@ -145,7 +145,9 @@ func (c *Client) waitSatisfied(ctx context.Context, req compute.WaitRequest) (bo
 		return false, "", mapError(err)
 	}
 	status := full.Status
-	if full.StatusCode == api.Error {
+	// A VM can report Error while QMP reconnects during a guest reboot.
+	// Keep waiting for readiness; operation errors and the deadline still fail.
+	if full.StatusCode == api.Error && full.Type != string(api.InstanceTypeVM) {
 		return false, status, errors.New("instance entered error state")
 	}
 	switch req.Until {

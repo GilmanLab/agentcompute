@@ -39,6 +39,8 @@ type Instance struct {
 	Ref Ref
 	// Image is the catalog name used to create the guest.
 	Image string
+	// OS is the guest operating system recorded by Incus image metadata.
+	OS string
 	// Kind is container or vm.
 	Kind string
 	// Host is the actual member.
@@ -61,8 +63,10 @@ type Instance struct {
 
 // NIC describes an attached interface using agent-facing network names.
 type NIC struct {
-	// Name is the guest device name.
+	// Name is the configured device name used by network operations.
 	Name string
+	// GuestName is the observed OS interface name, which may differ on VMs.
+	GuestName string
 	// Network is the metadata-resolved agent-facing network name.
 	Network string
 	// MAC is the observed hardware address.
@@ -115,6 +119,8 @@ type CatalogImage struct {
 	Description string
 	// Reference is the immutable imgoci release or upstream remote alias.
 	Reference string
+	// Alias names a qualified cluster-local image in the image-build project.
+	Alias string
 	// Fingerprint is derived during reconciliation, not an image build identity.
 	Fingerprint string
 	// CPUs is the default CPU count.
@@ -151,9 +157,9 @@ type CreateInstance struct {
 type ExecRequest struct {
 	// Ref identifies the guest.
 	Ref Ref
-	// Argv contains sh, -c, and the agent's command.
+	// Argv is a native argument vector; shell callers use sh -c or cmd.exe /c.
 	Argv []string
-	// User is a numeric UID; empty selects root.
+	// User is a Linux numeric UID; Windows exec uses the agent service identity.
 	User string
 	// Cwd is the optional absolute guest working directory.
 	Cwd string
@@ -199,6 +205,7 @@ type Backend interface {
 	GetInstance(context.Context, Ref) (Instance, error)
 	DeleteInstance(context.Context, Ref) error
 	Exec(context.Context, ExecRequest, io.Writer, io.Writer) (int64, error)
+	OpenExec(context.Context, ExecRequest) (io.ReadWriteCloser, error)
 	ListNetworks(context.Context, string) ([]Network, error)
 	CreateNetwork(context.Context, string, Network) (Network, error)
 	AttachNIC(context.Context, Ref, string, string, string, string) (NIC, error)
@@ -209,11 +216,14 @@ type Backend interface {
 	AddACLRule(context.Context, string, string, ACLRule) (ACLRule, error)
 	RemoveACLRule(context.Context, string, string, string) error
 	CreateForward(context.Context, string, string, Ref, int64, int64, string) (Forward, error)
+	InstanceForward(context.Context, Ref, int64, string) (Forward, error)
 	StartInstance(context.Context, Ref, bool) (Instance, error)
 	StopInstance(context.Context, Ref, bool) (Instance, error)
 	RestartInstance(context.Context, Ref, bool) (Instance, error)
 	WaitInstance(context.Context, WaitRequest) (WaitResult, error)
 	ReadFile(context.Context, FileReadRequest) (FileReadResult, error)
+	ReadBinaryFile(context.Context, Ref, string) (io.ReadCloser, error)
+	DeleteFile(context.Context, Ref, string) error
 	WriteFile(context.Context, FileWriteRequest) (FileWriteResult, error)
 	CreateSnapshot(context.Context, Ref, string) error
 	RestoreSnapshot(context.Context, Ref, string) error

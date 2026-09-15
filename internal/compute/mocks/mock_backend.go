@@ -565,6 +565,69 @@ func (_c *MockBackend_CreateSnapshot_Call) RunAndReturn(run func(context1 contex
 	return _c
 }
 
+// DeleteFile provides a mock function for the type MockBackend
+func (_mock *MockBackend) DeleteFile(context1 context.Context, ref compute.Ref, s string) error {
+	ret := _mock.Called(context1, ref, s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteFile")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) error); ok {
+		r0 = returnFunc(context1, ref, s)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockBackend_DeleteFile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteFile'
+type MockBackend_DeleteFile_Call struct {
+	*mock.Call
+}
+
+// DeleteFile is a helper method to define mock.On call
+//   - context1 context.Context
+//   - ref compute.Ref
+//   - s string
+func (_e *MockBackend_Expecter) DeleteFile(context1 interface{}, ref interface{}, s interface{}) *MockBackend_DeleteFile_Call {
+	return &MockBackend_DeleteFile_Call{Call: _e.mock.On("DeleteFile", context1, ref, s)}
+}
+
+func (_c *MockBackend_DeleteFile_Call) Run(run func(context1 context.Context, ref compute.Ref, s string)) *MockBackend_DeleteFile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBackend_DeleteFile_Call) Return(err error) *MockBackend_DeleteFile_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockBackend_DeleteFile_Call) RunAndReturn(run func(context1 context.Context, ref compute.Ref, s string) error) *MockBackend_DeleteFile_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteInstance provides a mock function for the type MockBackend
 func (_mock *MockBackend) DeleteInstance(context1 context.Context, ref compute.Ref) error {
 	ret := _mock.Called(context1, ref)
@@ -1294,6 +1357,84 @@ func (_c *MockBackend_GetSandboxImage_Call) RunAndReturn(run func(context1 conte
 	return _c
 }
 
+// InstanceForward provides a mock function for the type MockBackend
+func (_mock *MockBackend) InstanceForward(context1 context.Context, ref compute.Ref, n int64, s string) (compute.Forward, error) {
+	ret := _mock.Called(context1, ref, n, s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InstanceForward")
+	}
+
+	var r0 compute.Forward
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, int64, string) (compute.Forward, error)); ok {
+		return returnFunc(context1, ref, n, s)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, int64, string) compute.Forward); ok {
+		r0 = returnFunc(context1, ref, n, s)
+	} else {
+		r0 = ret.Get(0).(compute.Forward)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref, int64, string) error); ok {
+		r1 = returnFunc(context1, ref, n, s)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBackend_InstanceForward_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InstanceForward'
+type MockBackend_InstanceForward_Call struct {
+	*mock.Call
+}
+
+// InstanceForward is a helper method to define mock.On call
+//   - context1 context.Context
+//   - ref compute.Ref
+//   - n int64
+//   - s string
+func (_e *MockBackend_Expecter) InstanceForward(context1 interface{}, ref interface{}, n interface{}, s interface{}) *MockBackend_InstanceForward_Call {
+	return &MockBackend_InstanceForward_Call{Call: _e.mock.On("InstanceForward", context1, ref, n, s)}
+}
+
+func (_c *MockBackend_InstanceForward_Call) Run(run func(context1 context.Context, ref compute.Ref, n int64, s string)) *MockBackend_InstanceForward_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBackend_InstanceForward_Call) Return(forward compute.Forward, err error) *MockBackend_InstanceForward_Call {
+	_c.Call.Return(forward, err)
+	return _c
+}
+
+func (_c *MockBackend_InstanceForward_Call) RunAndReturn(run func(context1 context.Context, ref compute.Ref, n int64, s string) (compute.Forward, error)) *MockBackend_InstanceForward_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListInstances provides a mock function for the type MockBackend
 func (_mock *MockBackend) ListInstances(context1 context.Context, s string) ([]compute.Instance, error) {
 	ret := _mock.Called(context1, s)
@@ -1560,6 +1701,74 @@ func (_c *MockBackend_ListSnapshots_Call) RunAndReturn(run func(context1 context
 	return _c
 }
 
+// OpenExec provides a mock function for the type MockBackend
+func (_mock *MockBackend) OpenExec(context1 context.Context, execRequest compute.ExecRequest) (io.ReadWriteCloser, error) {
+	ret := _mock.Called(context1, execRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OpenExec")
+	}
+
+	var r0 io.ReadWriteCloser
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.ExecRequest) (io.ReadWriteCloser, error)); ok {
+		return returnFunc(context1, execRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.ExecRequest) io.ReadWriteCloser); ok {
+		r0 = returnFunc(context1, execRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadWriteCloser)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.ExecRequest) error); ok {
+		r1 = returnFunc(context1, execRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBackend_OpenExec_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OpenExec'
+type MockBackend_OpenExec_Call struct {
+	*mock.Call
+}
+
+// OpenExec is a helper method to define mock.On call
+//   - context1 context.Context
+//   - execRequest compute.ExecRequest
+func (_e *MockBackend_Expecter) OpenExec(context1 interface{}, execRequest interface{}) *MockBackend_OpenExec_Call {
+	return &MockBackend_OpenExec_Call{Call: _e.mock.On("OpenExec", context1, execRequest)}
+}
+
+func (_c *MockBackend_OpenExec_Call) Run(run func(context1 context.Context, execRequest compute.ExecRequest)) *MockBackend_OpenExec_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.ExecRequest
+		if args[1] != nil {
+			arg1 = args[1].(compute.ExecRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBackend_OpenExec_Call) Return(readWriteCloser io.ReadWriteCloser, err error) *MockBackend_OpenExec_Call {
+	_c.Call.Return(readWriteCloser, err)
+	return _c
+}
+
+func (_c *MockBackend_OpenExec_Call) RunAndReturn(run func(context1 context.Context, execRequest compute.ExecRequest) (io.ReadWriteCloser, error)) *MockBackend_OpenExec_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PeerNetworks provides a mock function for the type MockBackend
 func (_mock *MockBackend) PeerNetworks(context1 context.Context, s string, s1 string, s2 string) error {
 	ret := _mock.Called(context1, s, s1, s2)
@@ -1697,6 +1906,80 @@ func (_c *MockBackend_PublishInstance_Call) Return(s1 string, err error) *MockBa
 }
 
 func (_c *MockBackend_PublishInstance_Call) RunAndReturn(run func(context1 context.Context, ref compute.Ref, s string) (string, error)) *MockBackend_PublishInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadBinaryFile provides a mock function for the type MockBackend
+func (_mock *MockBackend) ReadBinaryFile(context1 context.Context, ref compute.Ref, s string) (io.ReadCloser, error) {
+	ret := _mock.Called(context1, ref, s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadBinaryFile")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) (io.ReadCloser, error)); ok {
+		return returnFunc(context1, ref, s)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, compute.Ref, string) io.ReadCloser); ok {
+		r0 = returnFunc(context1, ref, s)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, compute.Ref, string) error); ok {
+		r1 = returnFunc(context1, ref, s)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBackend_ReadBinaryFile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadBinaryFile'
+type MockBackend_ReadBinaryFile_Call struct {
+	*mock.Call
+}
+
+// ReadBinaryFile is a helper method to define mock.On call
+//   - context1 context.Context
+//   - ref compute.Ref
+//   - s string
+func (_e *MockBackend_Expecter) ReadBinaryFile(context1 interface{}, ref interface{}, s interface{}) *MockBackend_ReadBinaryFile_Call {
+	return &MockBackend_ReadBinaryFile_Call{Call: _e.mock.On("ReadBinaryFile", context1, ref, s)}
+}
+
+func (_c *MockBackend_ReadBinaryFile_Call) Run(run func(context1 context.Context, ref compute.Ref, s string)) *MockBackend_ReadBinaryFile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 compute.Ref
+		if args[1] != nil {
+			arg1 = args[1].(compute.Ref)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBackend_ReadBinaryFile_Call) Return(readCloser io.ReadCloser, err error) *MockBackend_ReadBinaryFile_Call {
+	_c.Call.Return(readCloser, err)
+	return _c
+}
+
+func (_c *MockBackend_ReadBinaryFile_Call) RunAndReturn(run func(context1 context.Context, ref compute.Ref, s string) (io.ReadCloser, error)) *MockBackend_ReadBinaryFile_Call {
 	_c.Call.Return(run)
 	return _c
 }

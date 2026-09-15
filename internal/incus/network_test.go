@@ -17,6 +17,46 @@ import (
 	"github.com/GilmanLab/agentcompute/internal/compute"
 )
 
+func TestGetInstanceMatchesRenamedGuestNICByMAC(t *testing.T) {
+	t.Parallel()
+	const mac = "10:66:6a:18:d8:f7"
+	full := forwardClaimInstance()
+	full.Config = map[string]string{"volatile.eth0.hwaddr": mac}
+	full.State.Network = map[string]api.InstanceStateNetwork{
+		"Ethernet 2": {
+			Hwaddr: mac,
+			Addresses: []api.InstanceStateNetworkAddress{
+				{Address: "192.168.82.2", Scope: "global"},
+			},
+		},
+		"eth0": {
+			Hwaddr: "10:66:6a:00:00:01",
+			Addresses: []api.InstanceStateNetworkAddress{
+				{Address: "203.0.113.2", Scope: "global"},
+			},
+		},
+	}
+	state := &forwardClaimState{network: api.Network{Name: "lan", Type: networkKindOVN}}
+	base := state.handler(t)
+	fixture := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/1.0/instances/web" {
+			writeIncusSync(w, full)
+			return
+		}
+		base.ServeHTTP(w, r)
+	}))
+	t.Cleanup(fixture.Close)
+	sdk := connectFixture(t, fixture.URL)
+	t.Cleanup(sdk.Disconnect)
+	client := &Client{server: sdk}
+
+	instance, err := client.GetInstance(t.Context(), compute.Ref{Sandbox: "demo", Name: "web"})
+	require.NoError(t, err)
+	require.Len(t, instance.NICs, 1)
+	assert.Equal(t, "eth0", instance.NICs[0].Name)
+	assert.Equal(t, []string{"192.168.82.2"}, instance.NICs[0].Addresses)
+}
+
 func TestBridgeCollisionRetriesWithoutAdoptingAnotherSandboxNetwork(t *testing.T) {
 	t.Parallel()
 	const occupied = "ac12345678"

@@ -1,0 +1,160 @@
+schema_version: 1
+recipe_revision: 1
+architecture: amd64
+
+# Every entry records where the bytes come from and how their identity was
+# established. `provenance: published` means the publisher documents the exact
+# digest recorded here. `provenance: derived` means the publisher documents a
+# different digest over a container of these bytes (recorded in `chain`), and
+# the value here was computed from that verified container. `provenance:
+# measured` means the publisher documents no digest at all; such an entry is
+# never allowed to gate a promotion on its own (see `gate`).
+
+media:
+  windows-11-desktop:
+    product: Windows 11 Enterprise Evaluation
+    edition_id: EnterpriseEval
+    release: 25H2
+    build: "26200.6584"
+    wim_image_name: Windows 11 Enterprise Evaluation
+    wim_image_index: 1
+    installation_type: Client
+    language: en-US
+    architecture: amd64
+    # Official Microsoft Evaluation Center link. Resolving it requires no form,
+    # no account and no click-through.
+    url: https://go.microsoft.com/fwlink/?linkid=2334167&clcid=0x409&culture=en-us&country=us
+    resolved_url: https://software-static.download.prss.microsoft.com/dbazure/888969d5-f34g-4e03-ac9d-1f9786c66749/26200.6584.250915-1905.25h2_ge_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso
+    size: 7092807680
+    sha256: a61adeab895ef5a4db436e0a7011c92a2ff17bb0357f58b13bbc4062e535e7b9
+    provenance: published
+    published_by: https://go.microsoft.com/fwlink/?linkid=2334901
+    published_as: Enterprise Eval x64 Eval EN-US DVD9
+    license: Microsoft evaluation software, 90-day term. Test rights only; no
+      redistribution. Cluster-local Incus alias only, never a registry.
+    gate: cleared
+  windows-server-2025:
+    product: Windows Server 2025 Standard Evaluation (Server Core)
+    edition_id: ServerStandardEval
+    build: "26100.32230"
+    wim_image_name: Windows Server 2025 SERVERSTANDARDCORE
+    wim_image_index: 1
+    installation_type: Server Core
+    language: en-US
+    architecture: amd64
+    url: https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us
+    resolved_url: https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.32230.260111-0550.lt_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso
+    size: 8152356864
+    sha256: 7b052573ba7894c9924e3e87ba732ccd354d18cb75a883efa9b900ea125bfd51
+    provenance: measured
+    published_by: null
+    license: Microsoft evaluation software, 180-day term. Test rights only; no
+      redistribution. Cluster-local Incus alias only, never a registry.
+    # Microsoft publishes a Verify Download document for Windows 11 Enterprise
+    # evaluation media but none for Server evaluation media: not on the
+    # download page, not on the product page, and not in the CDN document space
+    # that carries the Windows 11 one. MS Q&A confirms Microsoft stopped
+    # publishing ISO checksums outside VLSC and Visual Studio subscriptions.
+    gate: cleared
+    gate_reason: the owner explicitly approved this measured digest for exactly
+      this build (26100.32230) fetched over HTTPS from the official evaluation
+      URL above. It is not a Microsoft-published value and must never be
+      described as one; a different build requires a fresh approval.
+
+drivers:
+  virtio_win:
+    version: 0.1.302-1
+    iso_file: virtio-win-0.1.302.iso
+    iso_sha256: 303f7ae40dad495d6ae474fdc571df58958a4dbc5c37a522d80f9a203867949d
+    iso_size: 877373440
+    provenance: derived
+    # Fedora publishes only an MD5 over the RPM, and the RPM carries no PGP
+    # signature at all (rpm -qp reports no SIGPGP/SIGGPG/RSA header), so no
+    # upstream signature verification is possible. The MD5 match is a
+    # corruption check, not integrity authentication; the SHA-256 values below
+    # are measured from the verified RPM and from the ISO extracted out of it.
+    upstream_signature: none (unsigned RPM)
+    chain:
+      url: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.302-1/virtio-win-0.1.302-1.noarch.rpm
+      size: 297008245
+      md5: 66f65c16ab3e8dfe12c2855a0d1ac303
+      md5_published_by: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.302-1/CHECKSUM
+      sha256: 2f58eea024e0221a873032761dc3ed3262409cd80860b7b27d3d5a0f206616c9
+      member: ./usr/share/virtio-win/virtio-win-0.1.302.iso
+    # distrobuilder injects exactly these driver packages from the ISO
+    # (windows/drivers.go). Recorded so a driver-set change is visible in review.
+    injected:
+      - Balloon
+      - NetKVM
+      - vioinput
+      - viorng
+      - vioscsi
+      - vioserial
+      - viofs
+      - viogpudo
+      - viostor
+      - viosock
+
+guest_payload:
+  cua_driver:
+    version: 0.28.1
+    archive: cua-driver-rs-0.28.1-windows-x86_64.zip
+    archive_root: cua-driver-rs-0.28.1-windows-x86_64
+    url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.28.1/cua-driver-rs-0.28.1-windows-x86_64.zip
+    size: 28931191
+    sha256: 0f864381d3bcf29e7caf20d4b93bdf8476faf4e1ba986ce03890162beba5c3ee
+    provenance: published
+    published_by: https://api.github.com/repos/trycua/cua/releases (asset digest)
+    # 0.28.1 is a GitHub prerelease, accepted under the same project-specific
+    # pin exception as the Linux desktop image, and is the same version that
+    # image runs. The full archive is pinned, not the curl-pipe installer.
+    prerelease: true
+    install_dir: C:\ProgramData\agentcompute\cua-driver
+    executable: C:\ProgramData\agentcompute\cua-driver\cua-driver.exe
+    pipe: \\.\pipe\cua-driver
+  ultravnc:
+    version: 1.8.3.0
+    file: UltraVNC_1830_x64_Setup.exe
+    url: https://uvnc.eu/download/1800/UltraVNC_1830_x64_Setup.exe
+    size: 6239336
+    sha256: e9c22419ef3128a707b0d004a2c58e25459528c5c12d104dea56e5e662bd131e
+    provenance: published
+    published_by: https://uvnc.com/downloads/ultravnc/172-ultravnc-1-8-3-0.html
+    license: GPL-2.0-or-later (UltraVNC)
+    # TigerVNC's Windows winvnc server is declared unmaintained upstream, so it
+    # is rejected for this image.
+    port: 5900
+    service: uvnc_service
+  servicing:
+    # Deliberately empty, and empty is a decision rather than a gap: both
+    # evaluation images are already Microsoft's current servicing refresh
+    # (Win11 26200.6584, Server 26100.32230), and pulling updates online during
+    # a bake would make the image unreproducible and unpinnable. bootstrap.ps1
+    # applies every package listed here with DISM and fails the bake if one
+    # fails, so adding a pinned KB is a lock-file change only.
+    packages: []
+
+tools:
+  distrobuilder:
+    version: 3.3.1
+    url: https://github.com/lxc/distrobuilder/releases/download/v3.3.1/distrobuilder-3.3.1.tar.gz
+    sha256: 6c411af7178bb55ef649c708f4f38fc3c30e6ecce901c08d8a389448a900a73a
+    # Must agree with images/pins.yaml; repack.py compiles it from that source.
+    subcommand: repack-windows
+    windows_version_token:
+      windows-11-desktop: w11
+      windows-server-2025: 2k25
+    windows_arch_token: amd64
+  # Host packages the repack step requires. distrobuilder checks for
+  # hivexregedit, rsync, wimlib-imagex and genisoimage or mkisofs.
+  repack_host:
+    platform: Ubuntu 26.04 LTS (sandbox01)
+    packages:
+      - name: wimtools
+        version: 1.14.5-1
+      - name: libwin-hivex-perl
+        version: 1.3.24-2.1build2
+      - name: genisoimage
+        version: 9:1.1.11-5
+      - name: rsync
+        version: 3.4.1+ds1-7ubuntu0.3

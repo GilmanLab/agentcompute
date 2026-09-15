@@ -2,11 +2,13 @@ package mcpserver
 
 import (
 	"context"
+	"strings"
 
 	"github.com/meigma/codemode"
 	"github.com/meigma/codemode/authz"
 
 	"github.com/GilmanLab/agentcompute/internal/compute"
+	"github.com/GilmanLab/agentcompute/internal/windowsexec"
 )
 
 type instanceCreateIn struct {
@@ -236,9 +238,17 @@ func (api instanceAPI) exec(
 			return instanceExecOut{}, err
 		}
 	}
+	inst, err := api.instances.GetInstance(ctx, compute.Ref{Sandbox: in.Sandbox, Name: in.Name})
+	if err != nil {
+		return instanceExecOut{}, err
+	}
+	argv := []string{"sh", "-c", in.Command}
+	if strings.HasPrefix(strings.ToLower(inst.OS), "windows") {
+		argv = windowsexec.Command(in.Command)
+	}
 	result, err := api.instances.Exec(ctx, compute.ExecRequest{
 		Ref:     compute.Ref{Sandbox: in.Sandbox, Name: in.Name},
-		Argv:    []string{"sh", "-c", in.Command},
+		Argv:    argv,
 		User:    deref(in.User, ""),
 		Cwd:     deref(in.Cwd, ""),
 		Env:     env,

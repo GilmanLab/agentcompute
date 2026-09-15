@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Deployment answer file for clones of the generalized Windows 11 image.
+
+  Sysprep is run with /unattend pointing at this file, so Windows copies it to
+  \Windows\Panther and processes it on the clone's first boot. It must not
+  recreate the automation account: generalization keeps local accounts, and
+  re-adding one fails. What it must do is restore console auto-logon, which
+  generalization clears, and run the idempotent first-logon repair that
+  guarantees the Driver daemon ends up in the clone's interactive session.
+-->
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+  <settings pass="specialize">
+    <component name="Microsoft-Windows-Shell-Setup"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <!-- A random name per clone; the qualification gate checks that two
+           clones of the same image differ in both name and machine SID. -->
+      <ComputerName>*</ComputerName>
+      <TimeZone>UTC</TimeZone>
+    </component>
+  </settings>
+
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <InputLocale>en-US</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+
+    <component name="Microsoft-Windows-Shell-Setup"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <TimeZone>UTC</TimeZone>
+
+      <AutoLogon>
+        <!-- LogonCount is required by Microsoft's AutoLogon reference. One
+             logon is enough: it runs deploy-firstlogon.ps1, which restores the
+             persistent Winlogon values on the clone. -->
+        <Username>automation</Username>
+        <Enabled>true</Enabled>
+        <LogonCount>1</LogonCount>
+        <Password>
+          <Value>AUTOMATION_PASSWORD</Value>
+          <PlainText>true</PlainText>
+        </Password>
+      </AutoLogon>
+
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideLocalAccountScreen>true</HideLocalAccountScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <NetworkLocation>Work</NetworkLocation>
+        <ProtectYourPC>3</ProtectYourPC>
+      </OOBE>
+
+      <FirstLogonCommands>
+        <!-- One entry again, from disk this time: the payload volume is gone
+             on a clone. The script records whether the Driver's scheduled task
+             survived generalization before repairing it, which is how the
+             Sysprep-survival question gets an answer on every clone rather
+             than once. -->
+        <SynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Description>agentcompute deploy first logon</Description>
+          <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\agentcompute\deploy-firstlogon.ps1</CommandLine>
+        </SynchronousCommand>
+      </FirstLogonCommands>
+    </component>
+  </settings>
+</unattend>

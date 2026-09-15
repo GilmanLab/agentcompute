@@ -118,6 +118,9 @@ type Dependencies struct {
 
 	// Image is the catalog service consumed by image.list and instance.create.
 	Image imageService
+
+	// Desktop proxies the guest Driver and publishes screenshot URLs.
+	Desktop desktopService
 }
 
 // Options configures the agentcompute MCP server.
@@ -152,12 +155,13 @@ type Options struct {
 }
 
 // NewDependencies adapts a compute service to the handler consumer interfaces.
-func NewDependencies(svc *compute.Service) Dependencies {
+func NewDependencies(svc *compute.Service, driver desktopService) Dependencies {
 	return Dependencies{
 		Sandbox:  svc,
 		Instance: svc,
 		Network:  svc,
 		Image:    svc,
+		Desktop:  driver,
 	}
 }
 
@@ -180,6 +184,7 @@ func New(options Options) (*mcp.Server, error) {
 	registerImage(builder, options.Deps)
 	registerInstance(builder, options.Deps)
 	registerNet(builder, options.Deps)
+	registerDesktop(builder, options.Deps)
 	service, err := builder.Build()
 	if err != nil {
 		return nil, fmt.Errorf("build CodeMode runtime: %w", err)

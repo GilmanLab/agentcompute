@@ -1,0 +1,176 @@
+{
+  "project": "ac-p7-rtr-impair",
+  "status": "ok",
+  "project_created": true,
+  "networks": {
+    "lan": {
+      "config": {
+        "bridge.mtu": "1442",
+        "ipv4.address": "192.168.50.1/24",
+        "ipv4.dhcp": "true",
+        "ipv4.nat": "false",
+        "ipv6.address": "none",
+        "network": "none"
+      },
+      "description": "",
+      "locations": [
+        "lab01",
+        "lab02",
+        "lab03",
+        "nas01"
+      ],
+      "managed": true,
+      "name": "lan",
+      "project": "ac-p7-rtr-impair",
+      "status": "Created",
+      "type": "ovn",
+      "used_by": []
+    },
+    "wan": {
+      "config": {
+        "bridge.mtu": "1442",
+        "dns.nameservers": "10.10.40.1",
+        "ipv4.address": "10.99.0.1/24",
+        "ipv4.dhcp": "true",
+        "ipv4.nat": "true",
+        "ipv6.address": "none",
+        "network": "fast40-uplink",
+        "volatile.network.ipv4.address": "10.10.40.65"
+      },
+      "description": "",
+      "locations": [
+        "nas01",
+        "lab01",
+        "lab02",
+        "lab03"
+      ],
+      "managed": true,
+      "name": "wan",
+      "project": "ac-p7-rtr-impair",
+      "status": "Created",
+      "type": "ovn",
+      "used_by": []
+    }
+  },
+  "eth1_before_nat": {
+    "addresses": [
+      {
+        "address": "fe80::1266:6aff:fe0c:ecf9",
+        "family": "inet6",
+        "netmask": "64",
+        "scope": "link"
+      }
+    ],
+    "counters": {
+      "bytes_received": 0,
+      "bytes_sent": 516,
+      "errors_received": 0,
+      "errors_sent": 0,
+      "packets_dropped_inbound": 0,
+      "packets_dropped_outbound": 0,
+      "packets_received": 0,
+      "packets_sent": 6
+    },
+    "host_name": "veth83e9371d",
+    "hwaddr": "10:66:6a:0c:ec:f9",
+    "mtu": 1442,
+    "state": "up",
+    "type": "broadcast"
+  },
+  "rtr_privileged": "false",
+  "help": {
+    "nat": "usage: nat --mode masquerade|port-restricted --inside <if> --outside <if>",
+    "route": "usage: route --to <prefix|default> --via <gateway> [--dev <if>]",
+    "dhcp": "usage: dhcp --interface <if> --range <start,end> [--gateway <ip>] [--lease <time>]",
+    "wg": "usage: wg --interface <if> --address <cidr> --private-key-file <path> --peer <pubkey> --endpoint <host:port> --allowed-ips <prefix>"
+  },
+  "rtr_caps": "CapPrm:\t000001ffffffffff\nCapEff:\t000001ffffffffff\n0",
+  "nft_before": "",
+  "addresses": {
+    "rtr_lan": "192.168.50.2",
+    "rtr_wan": "10.99.0.2",
+    "client": "192.168.50.3",
+    "wanprobe": "10.99.0.3"
+  },
+  "nat": {
+    "first": {
+      "code": 0,
+      "stderr": "udhcpc: started, v1.37.0\nudhcpc: broadcasting discover\nudhcpc: broadcasting select for 10.99.0.2, server 10.99.0.1\nudhcpc: lease of 10.99.0.2 obtained from 10.99.0.1, lease time 3600\nnat: port-restricted inside=eth0 outside=eth1"
+    },
+    "second": {
+      "code": 0,
+      "stderr": "nat: port-restricted inside=eth0 outside=eth1"
+    },
+    "nft": "table ip router_nat\ntable ip router_nat {\n\tchain forward {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tct state invalid drop\n\t\tct state established,related accept\n\t\tiifname \"eth0\" oifname \"eth1\" accept\n\t\tiifname \"eth1\" ct state new drop\n\t}\n\n\tchain postrouting {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\toifname \"eth1\" masquerade persistent\n\t}\n}",
+    "idempotent": true
+  },
+  "client_routes_before": "default via 192.168.50.1 dev eth0 metric 399 \n192.168.50.0/24 dev eth0 proto kernel scope link src 192.168.50.3",
+  "client_route_command": "ip route replace default via 192.168.50.2",
+  "wan_route_command": "ip route replace 10.99.0.0/24 via 192.168.50.2",
+  "client_routes_after": "default via 192.168.50.2 dev eth0 \ndefault via 192.168.50.1 dev eth0 metric 399 \n192.168.50.0/24 dev eth0 proto kernel scope link src 192.168.50.3",
+  "rtr_routes": "default via 192.168.50.1 dev eth0 metric 395 \ndefault via 10.99.0.1 dev eth1 metric 397 \n10.99.0.0/24 dev eth1 proto kernel scope link src 10.99.0.2 \n192.168.50.0/24 dev eth0 proto kernel scope link src 192.168.50.2 \n198.51.100.0/24 via 10.99.0.1 dev eth1",
+  "ping_baseline": {
+    "code": 0,
+    "stdout": "PING 10.99.0.3 (10.99.0.3): 56 data bytes\n64 bytes from 10.99.0.3: seq=0 ttl=63 time=0.896 ms\n64 bytes from 10.99.0.3: seq=1 ttl=63 time=0.090 ms\n64 bytes from 10.99.0.3: seq=2 ttl=63 time=0.090 ms\n64 bytes from 10.99.0.3: seq=3 ttl=63 time=0.086 ms\n64 bytes from 10.99.0.3: seq=4 ttl=63 time=0.088 ms\n\n--- 10.99.0.3 ping statistics ---\n5 packets transmitted, 5 packets received, 0% packet loss\nround-trip min/avg/max = 0.086/0.250/0.896 ms",
+    "avg_ms": 0.25
+  },
+  "translated_source": {
+    "tcpdump": "19:15:18.065493 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 391, seq 0, length 64\n19:15:18.065504 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 391, seq 0, length 64\n19:15:19.065579 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 391, seq 1, length 64\n19:15:19.065592 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 391, seq 1, length 64\n19:15:20.065769 IP 10.99.0.2 > 10.99.0.3: ICMP echo request, id 391, seq 2, length 64\n19:15:20.065780 IP 10.99.0.3 > 10.99.0.2: ICMP echo reply, id 391, seq 2, length 64",
+    "tcpdump_err": "tcpdump: verbose output suppressed, use -v[v]... for full protocol decode\nlistening on eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes\n6 packets captured\n6 packets received by filter\n0 packets dropped by kernel",
+    "tcpdump_code": 0,
+    "ping": "PING 10.99.0.3 (10.99.0.3): 56 data bytes\n64 bytes from 10.99.0.3: seq=0 ttl=63 time=0.064 ms\n64 bytes from 10.99.0.3: seq=1 ttl=63 time=0.076 ms\n64 bytes from 10.99.0.3: seq=2 ttl=63 time=0.078 ms\n\n--- 10.99.0.3 ping statistics ---\n3 packets transmitted, 3 packets received, 0% packet loss\nround-trip min/avg/max = 0.064/0.072/0.078 ms",
+    "expected_src": "10.99.0.2",
+    "saw_rtr_wan": true,
+    "saw_client": false
+  },
+  "port_restricted": {
+    "udp_capture": "19:15:21.390389 IP 10.99.0.2.44353 > 10.99.0.3.9999: UDP, length 6",
+    "udp_err": "tcpdump: verbose output suppressed, use -v[v]... for full protocol decode\nlistening on eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes",
+    "udp_code": null,
+    "conntrack": "",
+    "capture_src_is_rtr": true,
+    "capture_src_is_client": false
+  },
+  "unsolicited_inbound": {
+    "tcpdump": "",
+    "err": "tcpdump: verbose output suppressed, use -v[v]... for full protocol decode\nlistening on eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes",
+    "code": null,
+    "forwarded": false
+  },
+  "netem": {
+    "apply_code": 0,
+    "qdisc": "qdisc netem 1: root refcnt 25 limit 1000 delay 100ms loss 5% seed 8430927376031788928",
+    "delayed": "PING 10.99.0.3 (10.99.0.3): 56 data bytes\n64 bytes from 10.99.0.3: seq=0 ttl=63 time=100.929 ms\n64 bytes from 10.99.0.3: seq=1 ttl=63 time=100.233 ms\n64 bytes from 10.99.0.3: seq=2 ttl=63 time=100.177 ms\n64 bytes from 10.99.0.3: seq=3 ttl=63 time=100.197 ms\n64 bytes from 10.99.0.3: seq=4 ttl=63 time=100.206 ms\n\n--- 10.99.0.3 ping statistics ---\n5 packets transmitted, 5 packets received, 0% packet loss\nround-trip min/avg/max = 100.177/100.348/100.929 ms",
+    "delayed_avg_ms": 100.348,
+    "cleared_qdisc": "qdisc noqueue 0: root refcnt 2",
+    "cleared": "PING 10.99.0.3 (10.99.0.3): 56 data bytes\n64 bytes from 10.99.0.3: seq=0 ttl=63 time=0.077 ms\n64 bytes from 10.99.0.3: seq=1 ttl=63 time=0.075 ms\n64 bytes from 10.99.0.3: seq=2 ttl=63 time=0.078 ms\n64 bytes from 10.99.0.3: seq=3 ttl=63 time=0.076 ms\n64 bytes from 10.99.0.3: seq=4 ttl=63 time=0.073 ms\n\n--- 10.99.0.3 ping statistics ---\n5 packets transmitted, 5 packets received, 0% packet loss\nround-trip min/avg/max = 0.073/0.075/0.078 ms",
+    "cleared_avg_ms": 0.075,
+    "impair_apply": "net.impair(sandbox=..., instance='rtr', nic='eth1', latency_ms=100, loss_percent=5)",
+    "impair_clear": "net.impair(sandbox=..., instance='rtr', nic='eth1', clear=True)"
+  },
+  "dhcp": {
+    "first": {
+      "code": 0,
+      "stderr": "dhcp: interface=eth0 range=192.168.50.150-192.168.50.160 lease=12h",
+      "stdout": ""
+    },
+    "second": {
+      "code": 0,
+      "stderr": "dhcp: interface=eth0 range=192.168.50.150-192.168.50.160 lease=12h"
+    },
+    "ps": "451\n  450 root      0:00 [dnsmasq]\n  451 dnsmasq   0:00 dnsmasq --pid-file=/run/router-dhcp.eth0.pid --dhcp-leasefile=/run/router-dhcp.eth0.leases --interface=eth0 --bind-interfaces --except-interface=lo --port=0 --no-resolv --dhcp-range=192.168.50.150,192.168.50.160,12h --dhcp-option=3,192.168.50.2"
+  },
+  "wg": {
+    "code": 0,
+    "stderr": "wg: interface=wg0 address=10.8.0.1/24 endpoint=10.99.0.3:51820",
+    "stdout": "",
+    "iface": "2: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000\n    link/none"
+  },
+  "masquerade": {
+    "code": 0,
+    "stderr": "nat: masquerade inside=eth0 outside=eth1",
+    "nft": "table ip router_nat {\n\tchain forward {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tct state invalid drop\n\t\tct state established,related accept\n\t\tiifname \"eth0\" oifname \"eth1\" accept\n\t\tiifname \"eth1\" ct state new drop\n\t}\n\n\tchain postrouting {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\toifname \"eth1\" masquerade\n\t}\n}"
+  },
+  "cleaned": true,
+  "project_gone": true
+}

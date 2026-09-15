@@ -1,0 +1,85 @@
+schema_version: 1
+
+# Incus settings for the Windows images. `build` is what bake.py creates the
+# golden source with; `runtime` is the contract a launched clone needs and is
+# the input for the server-side runtime profile. The two differ only in the
+# installer media and the extra scratch the unattended install needs.
+#
+# No entry here enables nested virtualization: Windows Setup runs on the
+# cluster's first-level KVM, and the CI runner only calls the Incus API.
+
+defaults:
+  # Windows Setup writes to the disk from a UEFI boot; Secure Boot with the
+  # default Microsoft keys stays on for both the build VM and every clone.
+  config:
+    security.secureboot: "true"
+    security.nesting: "false"
+  # The agent CD-ROM is not a convenience: Incus re-reads it on every boot to
+  # refresh the agent and its credentials, so it stays attached at runtime too.
+  agent_device:
+    name: agent
+    type: disk
+    source: agent:config
+
+images:
+  windows-11-desktop:
+    desktop: true
+    os: Windows 11
+    release: 25H2
+    description: Windows 11 Enterprise Evaluation 25H2 with Cua Driver in the
+      interactive session and UltraVNC as a fallback console
+    build:
+      cpu: 4
+      memory: 8GiB
+      root_size: 100GiB
+      # Windows 11 requires a TPM 2.0; Incus provides a software TPM, and each
+      # instance gets its own state, so a clone never inherits the build VM's.
+      tpm: true
+      install_timeout: 3600
+    runtime:
+      cpu: 4
+      memory: 8GiB
+      tpm: true
+      # Measured on the clone qualification, not a guess: see the bake report.
+      ready_timeout: 600
+      vnc_port: 5900
+
+  windows-server-2025:
+    desktop: false
+    os: Windows Server 2025
+    release: "2025"
+    description: Windows Server 2025 Standard Evaluation, Server Core, Incus
+      agent and pinned servicing only
+    build:
+      cpu: 4
+      memory: 8GiB
+      root_size: 80GiB
+      # Server 2025 has no TPM requirement of its own. The vTPM is attached
+      # anyway because Sysprep /mode:vm is only supported when the clone sees
+      # the same virtual hardware as the golden source, and the server-side
+      # runtime attaches a TPM to every Windows instance.
+      tpm: true
+      install_timeout: 3600
+    runtime:
+      cpu: 2
+      memory: 4GiB
+      tpm: true
+      ready_timeout: 600
+
+# The only device bake.py attaches to the build VM and not to a clone. It is a
+# custom ISO storage volume rather than a host path, which is what the
+# restricted project allows (restricted.devices.disk=managed requires pool=).
+#
+# One boot volume carries the installer, the answer file and the provisioning
+# payload. A separate answer-file CD was tried first and Windows 11 25H2 Setup
+# treated it as an interrupted upgrade, stopping on "It looks like you started
+# an upgrade and booted from installation media".
+# The root disk outranks the installer CD (root 10, installer 1). The empty
+# disk cannot boot, so the firmware falls through to the CD once; afterwards
+# the installed disk boots first and Setup continues instead of re-entering
+# Setup from the CD and reporting an interrupted upgrade.
+build_media:
+  - name: installer
+    type: disk
+    boot_priority: 1
+    volume_suffix: installer

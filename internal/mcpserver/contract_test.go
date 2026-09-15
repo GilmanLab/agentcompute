@@ -485,6 +485,63 @@ func capabilityContracts() []capabilityContract {
 			},
 			output: []fieldShape{},
 		},
+		{
+			name:      capabilityDesktopInfo,
+			signature: "desktop.info(*, sandbox: str, instance: str)",
+			input: []fieldShape{
+				{Name: "sandbox", Type: "str", Required: true},
+				{Name: "instance", Type: "str", Required: true},
+			},
+			output: []fieldShape{
+				{Name: "ready", Type: "bool", Required: true},
+				{Name: "os", Type: "str", Required: true},
+				{Name: "driver_version", Type: "str", Required: true},
+				{Name: "tools", Type: "list[str]", Required: true},
+				{Name: "vnc", Type: "str"},
+			},
+		},
+		{
+			name:      capabilityDesktopEnable,
+			signature: "desktop.enable(*, sandbox: str, instance: str)",
+			input: []fieldShape{
+				{Name: "sandbox", Type: "str", Required: true},
+				{Name: "instance", Type: "str", Required: true},
+			},
+			output: []fieldShape{{Name: "ready", Type: "bool", Required: true}},
+		},
+		{
+			name:      capabilityDesktopCall,
+			signature: "desktop.call(*, sandbox: str, instance: str, tool: str, args: str | None)",
+			input: []fieldShape{
+				{Name: "sandbox", Type: "str", Required: true},
+				{Name: "instance", Type: "str", Required: true},
+				{Name: "tool", Type: "str", Required: true},
+				{Name: "args", Type: "str | None"},
+			},
+			output: []fieldShape{
+				{Name: "ok", Type: "bool", Required: true},
+				{Name: "summary", Type: "str", Required: true},
+				{Name: "result", Type: "str", Required: true},
+				{Name: "screenshot_url", Type: "str"},
+			},
+		},
+		{
+			name:      capabilityDesktopScreenshot,
+			signature: "desktop.screenshot(*, sandbox: str, instance: str, pid: int | None, window_id: int | None, max_dimension: int | None)",
+			input: []fieldShape{
+				{Name: "sandbox", Type: "str", Required: true},
+				{Name: "instance", Type: "str", Required: true},
+				{Name: "pid", Type: "int | None"},
+				{Name: "window_id", Type: "int | None"},
+				{Name: "max_dimension", Type: "int | None"},
+			},
+			output: []fieldShape{
+				{Name: "url", Type: "str", Required: true},
+				{Name: "width", Type: "int", Required: true},
+				{Name: "height", Type: "int", Required: true},
+				{Name: "scale", Type: "float", Required: true},
+			},
+		},
 	}
 }
 

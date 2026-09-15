@@ -10,7 +10,7 @@ images:
   kinds:
   - container
   kind: container
-  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:47cc9f058575d398736f45cd696f5613a24af73188df0a154c6284cc3e091960
+  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:9f4f95b75280be6890e9143432d8db398a0138acd960f4fbe499ad7b6507072c
   cpus: 1
   memory_mb: 512
   disk_gb: 2
@@ -33,7 +33,7 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:f65fc5afbe5a6b5f0cc6954bfbe5c9761a75f382beaa331aa2179bb1f322be7e
+  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:6218bfaec1c0cbb97a196f882b42002e00e3297d4da4a9650d18d48ec0d27596
 - name: runner-publisher
   os: ubuntu
   version: '24.04'
@@ -43,4 +43,40 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:8ff94bdb69d62be5be6bda4682b15e1a34cfdf2a8c826b9e5f0e1b47104f4770
+  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:21e6f8c6743db11262634ae6c48e60d3d4bb9de4753038a11cb5a2a4ea8b28e0
+- name: ubuntu/24.04/desktop
+  os: ubuntu
+  version: '24.04'
+  kinds:
+  - vm
+  kind: vm
+  desktop: true
+  cpus: 4
+  memory_mb: 8192
+  disk_gb: 40
+  reference: ghcr.io/gilmanlab/agentcompute/ubuntu-24.04-desktop@sha256:5dc4e120a79dd06ad6784e69474f0617387f74cb98685af8844170b7165ea8e2
+# Windows images are cluster-local: evaluation media grants test rights, not
+# redistribution, so these rows carry an Incus alias in the shared image-build
+# namespace instead of a registry digest. `images/windows/bake.py promote`
+# moves the alias after fingerprint-bound qualification.
+- name: windows/11/desktop
+  os: windows
+  version: 25H2
+  kinds:
+  - vm
+  kind: vm
+  desktop: true
+  cpus: 4
+  memory_mb: 8192
+  disk_gb: 100
+  alias: windows/11/desktop-26200.6584
+- name: windows/server-2025
+  os: windows
+  version: '2025'
+  kinds:
+  - vm
+  kind: vm
+  cpus: 2
+  memory_mb: 4096
+  disk_gb: 100
+  alias: windows/server-2025-26100.32230

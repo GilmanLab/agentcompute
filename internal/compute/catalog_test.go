@@ -145,3 +145,38 @@ func TestCatalogImagesEmptyCopy(t *testing.T) {
 	_, ok := catalog.Lookup("missing")
 	assert.False(t, ok)
 }
+
+func TestWindowsCatalogRequiresLocalAlias(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, alias, reference string
+		valid                  bool
+	}{
+		{name: "local candidate", alias: "windows/11/desktop-26100", valid: true},
+		{name: "missing source"},
+		{name: "ambiguous source", alias: "windows/11/desktop-26100", reference: "images:windows"},
+		{name: "remote alias", alias: "images:windows"},
+		{name: "remote reference", reference: "images:windows"},
+		{name: "registry", reference: "ghcr.io/example/windows@sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			image := CatalogImage{
+				Name: "windows/11/desktop", OS: "Windows", Version: "11",
+				Kind: "vm", Kinds: []string{"vm"}, Desktop: true,
+				Alias: tt.alias, Reference: tt.reference,
+				CPUs: 2, MemoryMB: 4096, DiskGB: 64,
+			}
+			catalog, err := NewCatalog([]CatalogImage{image})
+			if !tt.valid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			got, ok := catalog.Lookup(image.Name)
+			require.True(t, ok)
+			assert.Equal(t, tt.alias, got.Alias)
+			assert.Empty(t, got.Reference)
+		})
+	}
+}
