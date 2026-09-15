@@ -29,6 +29,8 @@ The MCP SDK establishes the receiving handler context, so setting an arbitrary v
 
 HTTP defaults to `localhost:8080` and enables standard-library cross-origin protection. A non-loopback address without a credential file is refused unless `--insecure` explicitly permits unauthenticated exposure. A configured credential file requires a valid token on loopback too, including requests proxied by Tailscale Serve.
 
+With bearer authentication configured, a reverse proxy may preserve its public `Host` header when forwarding to loopback. The server disables only the SDK's localhost-host restriction in that mode; bearer verification still runs before MCP dispatch, and cross-origin protection stays enabled. Without bearer authentication, loopback requests with a non-localhost `Host` remain forbidden.
+
 Cross-origin protection does not authenticate direct clients. Named static tokens are loaded once from `--auth-tokens-file` and compared using constant-time SHA-256 digest comparisons on every request. The verified name becomes the sandbox subject. Rotate or revoke a token by replacing the credential file and restarting the process. Tokens have no inherent expiry or per-client scopes; this is not an OAuth resource server and does not advertise a nonexistent authorization server.
 
 Keep the listener on loopback, terminate public-root HTTPS with Tailscale Serve, and deliver secret files with systemd credentials. Do not use `--insecure` in deployment. Screenshot URLs remain short-lived bearer capabilities mounted beside MCP, so protect their transport and avoid recording them in shared logs.

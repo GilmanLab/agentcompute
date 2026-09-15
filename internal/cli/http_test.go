@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -208,44 +210,73 @@ func TestServeHTTPExposesCodeModeTools(t *testing.T) {
 	assertCodeModeExecute(t, session)
 }
 
-func TestServeHTTPRejectsMissingBearerThenServes(t *testing.T) {
+func TestServeHTTPReverseProxy(t *testing.T) {
 	t.Parallel()
 
-	const token = "s3cret-token"
-	tokens := testBearerTokens(t, `{"operator":"s3cret-token"}`)
-	ln := startHTTPListener(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	for _, authenticated := range []bool{false, true} {
+		name := "unauthenticated"
+		if authenticated {
+			name = "authenticated"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			const token = "s3cret-token"
+			cfg := httpConfig{
+				build:  BuildInfo{Version: "test"},
+				logger: slog.New(slog.DiscardHandler),
+				deps:   *testDependencies(t),
+			}
+			if authenticated {
+				cfg.authTokens = testBearerTokens(t, `{"operator":"s3cret-token"}`)
+			}
+			ln := startHTTPListener(t)
+			cfg.addr = ln.Addr().String()
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			serveErr := make(chan error, 1)
+			go func() { serveErr <- serveHTTP(ctx, ln, cfg) }()
+			t.Cleanup(func() {
+				cancel()
+				select {
+				case err := <-serveErr:
+					require.NoError(t, err)
+				case <-time.After(serverExitTimeout):
+					t.Fatal("serveHTTP did not return after context cancellation")
+				}
+			})
+			endpoint := "http://" + ln.Addr().String()
+			waitForHTTP(t, endpoint)
+			target, err := url.Parse(endpoint)
+			require.NoError(t, err)
+			proxy := httputil.NewSingleHostReverseProxy(target)
+			front := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				r.Host = "compute.example"
+				proxy.ServeHTTP(w, r)
+			}))
+			t.Cleanup(front.Close)
 
-	serveErr := make(chan error, 1)
-	deps := *testDependencies(t)
-	go func() {
-		serveErr <- serveHTTP(ctx, ln, httpConfig{
-			build:      BuildInfo{Version: "test"},
-			addr:       ln.Addr().String(),
-			authTokens: tokens,
-			logger:     slog.New(slog.DiscardHandler),
-			deps:       deps,
+			resp, err := http.Get(front.URL)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+			if !authenticated {
+				assert.Equal(t, http.StatusForbidden, resp.StatusCode,
+					"unauthenticated loopback must retain DNS rebinding protection")
+				return
+			}
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+			session := connectHTTPSession(t, front.URL, token)
+			assertCodeModeExecute(t, session)
+
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, front.URL, nil)
+			require.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Origin", "https://attacker.example")
+			resp, err = http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+			assert.Equal(t, http.StatusForbidden, resp.StatusCode,
+				"authenticated proxy must retain cross-origin protection")
 		})
-	}()
-
-	endpoint := "http://" + ln.Addr().String()
-	waitForHTTP(t, endpoint)
-
-	resp, err := http.Get(endpoint + "/")
-	require.NoError(t, err, "unauthenticated request")
-	require.NoError(t, resp.Body.Close())
-	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-
-	session := connectHTTPSession(t, endpoint, token)
-	assertCodeModeExecute(t, session)
-
-	cancel()
-	select {
-	case err := <-serveErr:
-		require.NoError(t, err, "context cancellation is a clean shutdown")
-	case <-time.After(serverExitTimeout):
-		t.Fatal("serveHTTP did not return after context cancellation")
 	}
 }
 

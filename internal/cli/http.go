@@ -178,7 +178,12 @@ func serveHTTP(ctx context.Context, ln net.Listener, cfg httpConfig) error {
 		func(*http.Request) *mcp.Server {
 			return mcpServer
 		},
-		nil,
+		&mcp.StreamableHTTPOptions{
+			// Authenticated reverse proxies preserve the public Host header.
+			// Bearer verification below remains mandatory before SDK dispatch.
+			// Unauthenticated loopback servers retain DNS rebinding protection.
+			DisableLocalhostProtection: len(cfg.authTokens) > 0,
+		},
 	)
 
 	// MUST: the SDK does NOT enable Origin verification by default. Wrapping the
