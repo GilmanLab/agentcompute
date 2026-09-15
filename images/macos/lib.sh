@@ -56,6 +56,12 @@ pin() {
 # quoting never reaches the guest, and it runs under `bash -euo pipefail`.
 # Each NAME=value pair becomes a readonly variable at the top of the script.
 # Guest stdout and stderr pass through; the guest exit status is the result.
+#
+# `lume ssh` is NOT argv-safe: it joins its command arguments with spaces and
+# the guest re-parses the result as shell code, so `lume ssh vm /bin/bash -c
+# '<script>'` arrives as `bash -c <first-word> <rest...>`. The command is
+# therefore composed here as one already-valid shell line, and the base64
+# payload is the only thing that carries user content.
 guest_run() {
   local vm=$1
   shift
@@ -67,17 +73,22 @@ guest_run() {
   done
   payload=$({ printf '%s' "$prelude"; cat; } | base64 | tr -d '\n')
   lume ssh "$vm" -u "$LUME_GUEST_USER" -p "$LUME_GUEST_PASSWORD" -t "$LUME_SSH_TIMEOUT" -- \
-    /bin/bash -c "printf %s $payload | base64 -D | /bin/bash -euo pipefail -s"
+    "printf %s $payload | base64 -D | /bin/bash -euo pipefail -s"
 }
 
 # guest_state <vm> — `stopped`, `running`, or a Lume provisioning state.
+#
+# Lume 0.5.3 names this field `status`, not `state`, in both `lume ls
+# --format json` and the HTTP API. `lume get --format json` wraps its single
+# VM in an array while the API returns a bare object, so both shapes are
+# accepted here.
 guest_state() {
-  lume ls --format json | jq -r --arg name "$1" '.[] | select(.name == $name) | .state' | head -n 1
+  lume ls --format json | jq -r --arg name "$1" '.[] | select(.name == $name) | .status' | head -n 1
 }
 
 # guest_address <vm> — the NAT address Lume assigned, empty while not running.
 guest_address() {
-  lume get "$1" --format json | jq -r '.[0].ipAddress // empty'
+  lume get "$1" --format json | jq -r '(if type == "array" then .[0] else . end).ipAddress // empty'
 }
 
 require_running() {

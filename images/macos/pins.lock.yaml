@@ -10,9 +10,10 @@ architecture: arm64
 # a digest that Apple itself does not document. An `aggregated` entry never
 # gates a build on its own — see `gate` on the IPSW entry.
 #
-# Nothing here has run yet. The Mac host that Phase 8 requires (design
-# prerequisite 5) does not exist, so every value below is verified by
-# publisher metadata only, never by a local build.
+# Every digest below was measured on the Mac host (studio-1, macOS 26.6.2) and
+# matched its published or aggregated value. `macos/tahoe/desktop` is the
+# qualified train; the Sequoia rows are kept because the design names that
+# train and because its measurements are evidence for the choice.
 
 host:
   # Lume's documented host floor, not a purchasing recommendation.
@@ -107,11 +108,11 @@ sequoia_ipsw:
   # so no Apple-published SHA-256 exists for this file. The URL and size were
   # confirmed live (HTTP 200, Content-Length 16814137790, Last-Modified
   # 2025-08-18) on 2026-09-14.
-  gate: blocked
+  gate: cleared
   gate_reason: the SHA-256 above is republished by AppleDB, not documented by
-    Apple, and has not been measured locally. Closing this gate requires
-    downloading the IPSW on the Mac host, measuring it, and recording the match
-    here. A mismatch is a stop, not a pin update.
+    Apple. It was measured on the Mac host on 2026-09-15 and matched, which is
+    what clears this gate. A future build that disagrees is a stop, not a pin
+    update.
   # 15.6.1 is the LAST Sequoia release Apple published as a full restore image.
   # 15.7.x and 15.8 (24H23) ship only as InstallAssistant packages and OTA
   # assets, so a Sequoia seed built from an IPSW is pinned roughly a year behind
@@ -125,16 +126,43 @@ sequoia_ipsw:
     virtual instances per Apple-branded host, development and testing use, no
     redistribution. Host-local seed only, never a registry.
 
+tahoe_ipsw:
+  train: tahoe
+  product_version: "26.6.2"
+  build: 25G83
+  released: 2026-08-17
+  device_class: VirtualMac2,1
+  url: https://updates.cdn-apple.com/2026SummerFCS/fullrestores/140-75212/A2A24B94-1FC1-45A3-93F7-C51B02AF1F4D/UniversalMac_26.6.2_25G83_Restore.ipsw
+  size: 19772231540
+  sha256: 885503b7f4b06609e9a512f2befd40f59730640a3f1233e3892d60affdd51c95
+  provenance: aggregated
+  published_by: null
+  aggregated_by: https://api.appledb.dev/ios/macOS/main.json
+  gate: cleared
+  gate_reason: measured on the Mac host on 2026-09-15 and matched the
+    aggregated value; downloaded in 212 s.
+  # This is the qualified train. It is the current Tahoe release, it matches the
+  # host's own build (26.6.2 / 25G83), and unlike Sequoia it is not a year
+  # behind on security updates. Neither train avoids the first-login Setup
+  # Assistant; see README.md.
+  license: Apple macOS Software License Agreement. At most two additional
+    virtual instances per Apple-branded host, development and testing use, no
+    redistribution. Host-local seed only, never a registry.
+
 unattended:
   # `lume create --unattended` accepts a built-in preset name or a YAML path.
   # This recipe passes the path so the health-check budget is explicit and
   # reviewable; the file is otherwise the upstream sequoia preset.
   preset_source: https://github.com/trycua/cua/blob/lume-v0.5.3/libs/lume/src/Resources/unattended-presets/sequoia.yml
   recipe_file: images/macos/sequoia/desktop/unattended.yaml
-  # Upstream still reports that the Sequoia preset can stop on Setup Assistant's
-  # Accessibility step at first display boot (trycua/cua#2155 closed, docs not).
-  # First GUI boot is therefore a blocking qualification, not an assumption.
-  first_display_boot_gate: required
+  # Measured on both trains: the offline patcher does NOT complete Setup
+  # Assistant. 15.6.1 boots to its Accessibility screen, 26.6.2 to the
+  # automatic-updates screen, both full-screen over a working autologin
+  # session. The seed therefore needs one console pass (README.md step 4), and
+  # the two built-in presets are byte-identical in 0.5.3 -- the preset name
+  # only selects which YAML Lume reads, so it cannot be the difference.
+  first_display_boot_gate: console_pass_required
+  presets_identical: true
   default_account:
     user: lume
     password: lume

@@ -6,25 +6,25 @@ schema_version: 1
 # Apple's license does not grant redistribution and Cua's own guidance is to
 # keep a consented seed private, so there is no registry reference here.
 
-name: macos/sequoia/desktop
+name: macos/tahoe/desktop
 platform: mac
 os: macos
-version: "15.6.1"
+version: "26.6.2"
 kind: vm
 kinds:
   - vm
 desktop: true
-description: macOS Sequoia desktop with Cua Driver and operator-granted TCC
+description: macOS Tahoe desktop with Cua Driver and operator-granted TCC
 
 # The catalog row this recipe backs. `seed` is the Lume VM name on the Mac
 # host, which replaces the digest or alias the Incus families carry.
-seed: ac-seed-macos-sequoia-desktop
+seed: ac-seed-macos-tahoe-desktop
 
 expect:
   # `sw_vers` must report exactly this. A different build means a different
   # IPSW than images/macos/pins.lock.yaml pins.
-  product_version: "15.6.1"
-  build_version: 24G90
+  product_version: "26.6.2"
+  build_version: 25G83
   architecture: arm64
 
 # `lume create` geometry. The disk is sparse: the configured size is the
@@ -36,7 +36,7 @@ create:
   memory: 8GB
   disk_size: 100GB
   display: 1920x1200
-  unattended: images/macos/sequoia/desktop/unattended.yaml
+  unattended: images/macos/tahoe/desktop/unattended.yaml
 
 # Defaults the catalog reports to agents. Two running guests is Apple's
 # ceiling for the whole host, so an 8GB guest is the largest size that leaves

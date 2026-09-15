@@ -21,9 +21,12 @@ image-build wrapper.
 | `publish.py` | Protected-source gate, immutable-tag lookup, assembly, qualification, publication, and verified fetch-back. |
 | `catalog-pr.py` | Opens the public catalog digest PR from verified release evidence. |
 | `ci-incus.py` | Configures the pinned Incus CLI and restricted HTTPS identity. |
-| `macos/pins.lock.yaml` | Lume, Cua Driver, and Sequoia IPSW pins for the host-local macOS seed, with provenance labels and one open digest gate. |
-| `macos/lib.sh` | Host helpers shared by the seed scripts: the pin reader and the `lume ssh` command transport. |
-| `macos/sequoia/desktop/` | Seed recipe and operator runbook: `image.yaml`, `unattended.yaml`, `provision.sh`, `verify.sh`, `README.md`. Produces no publishable artifact. |
+| `macos/pins.lock.yaml` | Lume, Cua Driver, and Tahoe/Sequoia IPSW pins for the host-local macOS seed, with provenance labels and locally measured digests. |
+| `macos/lib.sh` | Host helpers shared by the seed scripts: the pin reader and the quoting-safe `lume ssh` transport. |
+| `macos/provision.sh` | Idempotent seed provisioning: base assertions, automation public key, pinned Driver, first-login suppression, Driver LaunchAgent. |
+| `macos/verify.sh` | The qualification gate: guest build, Driver identity, TCC grants held by the daemon, accessibility tree, capture plus scp pull. `--clone` for workers. |
+| `macos/{tahoe,sequoia}/desktop/` | Per-train `image.yaml` and `unattended.yaml`. `tahoe` is the qualified train. |
+| `macos/README.md` | Operator runbook, measurements, and findings. Produces no publishable artifact. |
 | `../cmd/image-publish` | Immutable imgoci publication and verified fetch-back CLI. |
 
 Phase 7 router and Windows findings are maintained in the central
@@ -96,26 +99,31 @@ guest-file API and return as URLs rather than embedded image data.
 See the [Phase 6 desktop spike report](../spikes/desktop/README.md) for direct
 Driver results, timing, screenshot scaling, VNC, and reboot evidence.
 
-### macOS seed (not built)
+### macOS seed on Lume
 
-`macos/sequoia/desktop/` is the one family that produces no artifact. The
-deliverable is a stopped Lume VM on a dedicated Apple Silicon host, holding an
-operator's one-time Accessibility and Screen Recording consent; workers are
-`lume clone` copies. Apple's license grants no redistribution and Cua's
-guidance is to keep a consented seed private, so it is never pushed to a
-registry and carries a `seed:` name instead of a digest or alias.
+`macos/` is the one family that produces no artifact. The deliverable is a
+stopped Lume VM on a dedicated Apple Silicon host, holding an operator's
+one-time Accessibility and Screen Recording consent; workers are `lume clone`
+copies. Apple's license grants no redistribution and Cua's guidance is to keep
+a consented seed private, so it is never pushed to a registry and the catalog
+would carry a `seed:` name instead of a digest or alias.
 
-Nothing in it has run. The design's prerequisite 5 host — a dedicated Apple
-Silicon machine in the lab, not a personal workstation — does not exist, so the
-recipe, pins, and runbook are reviewed inputs to that first build and no more.
-There is deliberately no `catalog.yaml` row yet: the server still answers
+`macos/tahoe/desktop` is built and qualified on the lab's Mac Studio: clone in
+2–3 s, Driver answering with both TCC grants about 30 s after boot, and no
+clone ever needing consent again. `macos/sequoia/desktop` is recorded but not
+qualified — Sequoia's last full restore image is a year old, and it clears no
+gate that Tahoe does not.
+
+There is still deliberately no `catalog.yaml` row: the server answers
 `platform "mac" is not available yet`, and a catalog entry would advertise an
-image no `instance.create` can launch.
+image no `instance.create` can launch. `internal/lume` is the next change, not
+this one.
 
 `images-validate.yml` checks what a Linux runner can: the scripts parse and
-every pin they read still resolves. Everything else waits on the host. The
-operator procedure, its gates, and the clone-smoke evidence live in
-[`macos/sequoia/desktop/README.md`](macos/sequoia/desktop/README.md).
+every pin they read still resolves. The operator procedure, its gates, the
+measurements, and the open findings (a clone re-runs Setup Assistant; Lume's
+API accepts a third guest and silently ignores it) are in
+[`macos/README.md`](macos/README.md).
 
 ## Publication and import
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Provision the macOS seed guest: base assertions, an automation public key,
-# the pinned Cua Driver, its login-session LaunchAgent, and Screen Sharing.
+# the pinned Cua Driver, and its login-session LaunchAgent.
 #
 # Runs on the Apple Silicon host against a RUNNING Lume VM. Idempotent: every
 # step is safe to repeat against an already provisioned seed.
@@ -9,20 +9,19 @@
 # human in the guest's graphical session; see README.md, then run verify.sh.
 #
 # Usage:
-#   images/macos/sequoia/desktop/provision.sh --vm <name> --key <public-key-file>
-#                                             [--pins <file>] [--recipe <file>]
-#                                             [--no-screen-sharing]
+#   images/macos/provision.sh --vm <name> --key <public-key-file>
+#                             --recipe <train>/desktop/image.yaml
+#                             [--pins <file>]
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=images/macos/lib.sh
-. "$here/../../lib.sh"
+. "$here/lib.sh"
 
 vm=""
 key_file=""
-pins="$here/../../pins.lock.yaml"
-recipe="$here/image.yaml"
-screen_sharing=1
+recipe=""
+pins="$here/pins.lock.yaml"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -30,8 +29,7 @@ while [ $# -gt 0 ]; do
     --key) key_file=${2:?--key needs a value}; shift 2 ;;
     --pins) pins=${2:?--pins needs a value}; shift 2 ;;
     --recipe) recipe=${2:?--recipe needs a value}; shift 2 ;;
-    --no-screen-sharing) screen_sharing=0; shift ;;
-    -h|--help) sed -n '2,13p' "$BASH_SOURCE"; exit 0 ;;
+    -h|--help) sed -n '2,14p' "$BASH_SOURCE"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -39,6 +37,8 @@ done
 [ -n "$vm" ] || die "--vm is required"
 [ -n "$key_file" ] || die "--key is required (the PUBLIC half only)"
 [ -r "$key_file" ] || die "cannot read $key_file"
+[ -n "$recipe" ] || die "--recipe is required (for example $here/tahoe/desktop/image.yaml)"
+[ -r "$recipe" ] || die "cannot read $recipe"
 grep -qE '^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp[0-9]+) ' "$key_file" ||
   die "$key_file does not look like an OpenSSH public key"
 grep -q 'PRIVATE KEY' "$key_file" && die "$key_file is a private key; pass the .pub file"
@@ -59,7 +59,7 @@ driver_bundle=$(pin "$pins" cua_driver bundle_id)
 driver_team=$(pin "$pins" cua_driver team_identifier)
 app_path=$(pin "$pins" cua_driver app_install_path)
 
-launch_label=io.gilman.agentcompute.cua-driver
+launch_label=com.trycua.cua_driver_daemon
 
 log "asserting the guest base ($expect_version / $expect_build / $expect_arch)"
 guest_run "$vm" \
@@ -137,10 +137,43 @@ esac
 echo "driver ok: $got_driver ($got_bundle, team $got_team)"
 SCRIPT
 
-log "installing the login-session LaunchAgent"
+log "settling macOS first-login setup"
+guest_run "$vm" "GUEST_USER=$LUME_GUEST_USER" "GUEST_PASSWORD=$LUME_GUEST_PASSWORD" <<'SCRIPT'
+sudo_pw() { printf '%s\n' "$GUEST_PASSWORD" | sudo -S -p '' "$@"; }
+plist=/Library/Preferences/com.apple.loginwindow.plist
+
+# Lume's offline unattended setup enables autologin but does not complete Setup
+# Assistant: macOS still runs its MiniBuddy flow at the account's first login,
+# full-screen, before the desktop is usable. Worse for this image, a clone
+# re-runs it from the Apple Account step even after the seed completed it, so a
+# disposable worker would hand an agent an onboarding wizard instead of a
+# desktop.
+#
+# loginwindow tracks that per account in AccountInfo:FirstLogins. Raising the
+# count past its first-login value is what actually suppresses the flow -- the
+# documented com.apple.SetupAssistant "DidSee*" keys do not, measured on
+# 26.6.2. This is plain preference state, not a TCC or SIP bypass.
+current=$(sudo_pw /usr/libexec/PlistBuddy -c "Print :AccountInfo:FirstLogins:$GUEST_USER" "$plist" 2>/dev/null || echo 0)
+case "$current" in
+  ''|*[!0-9]*) current=0 ;;
+esac
+if [ "$current" -lt 2 ]; then
+  sudo_pw /usr/libexec/PlistBuddy -c "Set :AccountInfo:FirstLogins:$GUEST_USER 2" "$plist" >/dev/null 2>&1 ||
+    sudo_pw /usr/libexec/PlistBuddy -c "Add :AccountInfo:FirstLogins:$GUEST_USER integer 2" "$plist" >/dev/null
+  echo "first-login flow suppressed for $GUEST_USER (was $current)"
+else
+  echo "first-login flow already suppressed for $GUEST_USER ($current)"
+fi
+
+# The seed must also not drift: a guest that installs its own macOS updates
+# stops matching the pinned build the recipe asserts.
+sudo_pw softwareupdate --schedule off >/dev/null 2>&1 || true
+SCRIPT
+
+log "installing the Driver LaunchAgent"
 guest_run "$vm" "LABEL=$launch_label" "APP_PATH=$app_path" <<'SCRIPT'
 plist="$HOME/Library/LaunchAgents/$LABEL.plist"
-mkdir -p "$HOME/Library/LaunchAgents"
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 cat >"$plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -149,52 +182,46 @@ cat >"$plist" <<PLIST
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/open</string>
-    <string>-g</string>
-    <string>-a</string>
-    <string>$APP_PATH</string>
-    <string>--args</string>
+    <string>$APP_PATH/Contents/MacOS/cua-driver</string>
     <string>serve</string>
   </array>
   <key>RunAtLoad</key><true/>
-  <key>StandardOutPath</key><string>$HOME/Library/Logs/cua-driver-serve.out.log</string>
-  <key>StandardErrorPath</key><string>$HOME/Library/Logs/cua-driver-serve.err.log</string>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/cua-driver-daemon.out.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/cua-driver-daemon.err.log</string>
 </dict>
 </plist>
 PLIST
 plutil -lint "$plist" >/dev/null
 
-# The daemon is started through LaunchServices rather than by executing the
-# bundle binary directly, so the responsible process is CuaDriver.app and the
-# app-owned TCC grants apply. KeepAlive is deliberately absent: `open` exits
-# immediately after handing off, so a KeepAlive agent would respawn forever.
-mkdir -p "$HOME/Library/Logs"
+# The agent execs the binary inside the app bundle, so launchd is the parent and
+# the daemon is its own responsible process: `permissions status` then reports
+# attribution "driver-daemon" with bundle id com.trycua.driver and
+# responsible_ppid 1. Starting it with `open -g -a CuaDriver --args serve`
+# instead makes `open` the responsible process, and the driver refuses to read
+# its own TCC state ("no CuaDriver daemon is running under the driver's own
+# identity") even though the process is the same binary. The label is the one
+# `cua-driver diagnose` looks for.
 launchctl bootout "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$(id -u)" "$plist"
-launchctl kickstart "gui/$(id -u)/$LABEL"
+launchctl kickstart -k "gui/$(id -u)/$LABEL"
+sleep 3
+# `cua-driver status | head` makes the CLI panic on a broken pipe, so read it whole.
+status=$(/usr/local/bin/cua-driver status 2>&1)
+printf '%s\n' "$status" | sed -n '1,3p'
 echo "launch agent loaded: $LABEL"
 SCRIPT
-
-if [ "$screen_sharing" -eq 1 ]; then
-  log "enabling Screen Sharing (host-reachable VNC fallback)"
-  guest_run "$vm" "GUEST_PASSWORD=$LUME_GUEST_PASSWORD" <<'SCRIPT'
-sudo_pw() { printf '%s\n' "$GUEST_PASSWORD" | sudo -S -p '' "$@"; }
-sudo_pw launchctl enable system/com.apple.screensharing
-sudo_pw launchctl kickstart -k system/com.apple.screensharing
-echo "screen sharing enabled on 5900 (guest NAT address only)"
-SCRIPT
-fi
 
 log "provisioned $vm"
 cat <<NEXT
 
-Next, and only a human can do it (see README.md):
-  lume attach $vm
-  # in the guest's graphical session:
+Next, and only a human can do it (see $(dirname "$recipe")/../../README.md):
+  # open the guest console: 'lume attach $vm' from a GUI session, or the
+  # vnc:// URL that 'lume get $vm --format json' reports
   /usr/local/bin/cua-driver permissions grant
   /usr/local/bin/cua-driver call list_apps '{}'
   /usr/local/bin/cua-driver call get_desktop_state '{}'
 
 Then gate the seed:
-  images/macos/sequoia/desktop/verify.sh --vm $vm
+  $here/verify.sh --vm $vm --recipe $recipe
 NEXT

@@ -11,34 +11,35 @@
 # survived cloning.
 #
 # Usage:
-#   images/macos/sequoia/desktop/verify.sh --vm <name> [--identity <private-key>]
-#                                          [--pins <file>] [--recipe <file>]
-#                                          [--no-screen-sharing]
+#   images/macos/verify.sh --vm <name> --recipe <train>/desktop/image.yaml
+#                          [--identity <private-key>] [--pins <file>] [--clone]
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=images/macos/lib.sh
-. "$here/../../lib.sh"
+. "$here/lib.sh"
 
 vm=""
 identity=""
-pins="$here/../../pins.lock.yaml"
-recipe="$here/image.yaml"
-screen_sharing=1
+recipe=""
+pins="$here/pins.lock.yaml"
+clone=0
 
 while [ $# -gt 0 ]; do
   case $1 in
     --vm) vm=${2:?--vm needs a value}; shift 2 ;;
     --identity) identity=${2:?--identity needs a value}; shift 2 ;;
     --pins) pins=${2:?--pins needs a value}; shift 2 ;;
+    --clone) clone=1; shift ;;
     --recipe) recipe=${2:?--recipe needs a value}; shift 2 ;;
-    --no-screen-sharing) screen_sharing=0; shift ;;
     -h|--help) sed -n '2,16p' "$BASH_SOURCE"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
 
 [ -n "$vm" ] || die "--vm is required"
+[ -n "$recipe" ] || die "--recipe is required (for example $here/tahoe/desktop/image.yaml)"
+[ -r "$recipe" ] || die "cannot read $recipe"
 require_cmd lume jq awk base64
 require_running "$vm"
 
@@ -49,7 +50,7 @@ driver_version=$(pin "$pins" cua_driver version)
 driver_bundle=$(pin "$pins" cua_driver bundle_id)
 driver_team=$(pin "$pins" cua_driver team_identifier)
 app_path=$(pin "$pins" cua_driver app_install_path)
-launch_label=io.gilman.agentcompute.cua-driver
+launch_label=com.trycua.cua_driver_daemon
 
 failures=0
 check() {
@@ -75,6 +76,18 @@ check_base() {
 [ "$(sw_vers -productVersion)" = "$WANT_VERSION" ] || { echo "productVersion mismatch" >&2; exit 1; }
 [ "$(sw_vers -buildVersion)" = "$WANT_BUILD" ] || { echo "buildVersion mismatch" >&2; exit 1; }
 [ "$(uname -m)" = "$WANT_ARCH" ] || { echo "architecture mismatch" >&2; exit 1; }
+SCRIPT
+}
+
+check_desktop_session() {
+  guest_run "$vm" <<'SCRIPT'
+[ "$(stat -f%Su /dev/console)" = "lume" ] || { echo "console user is not lume" >&2; exit 1; }
+pgrep -x Finder >/dev/null || { echo "Finder is not running" >&2; exit 1; }
+pgrep -x Dock >/dev/null || { echo "Dock is not running" >&2; exit 1; }
+if pgrep -f "Setup Assistant.app/Contents/MacOS" >/dev/null; then
+  echo "Setup Assistant owns the session" >&2
+  exit 1
+fi
 SCRIPT
 }
 
@@ -158,7 +171,9 @@ SCRIPT
   if [ -n "$identity" ]; then
     address=$(guest_address "$vm")
     [ -n "$address" ] || { echo "no NAT address for $vm" >&2; return 1; }
-    local_png=$(mktemp /tmp/ac-verify.XXXXXX.png)
+    # BSD mktemp only substitutes a trailing run of X's, so the .png suffix is
+    # added after the template is expanded.
+    local_png="$(mktemp /tmp/ac-verify-XXXXXX).png"
     scp -q -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
       -i "$identity" "$LUME_GUEST_USER@$address:$guest_png" "$local_png" || {
       echo "scp from $address failed" >&2
@@ -178,22 +193,24 @@ SCRIPT
   guest_run "$vm" "PNG=$guest_png" <<<'rm -f "$PNG"'
 }
 
-check_screen_sharing() {
-  guest_run "$vm" <<'SCRIPT'
-nc -z -G 2 127.0.0.1 5900
-SCRIPT
-}
-
 log "verifying $vm at $(guest_address "$vm")"
 check "guest base matches the pinned IPSW" check_base
+# Measured: a clone re-runs macOS's first-login Setup Assistant even though the
+# seed completed it and keeps it suppressed across its own reboots, and killing
+# Setup Assistant logs the session out. The Driver works anyway -- grants,
+# accessibility tree and capture all pass -- but the visible desktop is the
+# wizard. --clone acknowledges that open defect instead of hiding it; the seed
+# itself is still gated on a clean session.
+if [ "$clone" -eq 0 ]; then
+  check "the desktop session is the agent's, not Setup Assistant's" check_desktop_session
+else
+  printf 'SKIP  desktop session check (clone: Setup Assistant re-runs, see README)\n'
+fi
 check "driver app identity matches the pin" check_driver_identity
 check "driver LaunchAgent is loaded" check_launch_agent
 check "TCC grants are held by the driver daemon" check_permissions
 check "accessibility tree is readable" check_accessibility_tree
 check "desktop capture and file pull work" check_screenshot
-if [ "$screen_sharing" -eq 1 ]; then
-  check "screen sharing is listening" check_screen_sharing
-fi
 # Second pass over the consent-sensitive calls. A grant that only works once is
 # a prompt that a human happened to answer, not a seeded grant.
 check "grants survive a repeat call" check_permissions
