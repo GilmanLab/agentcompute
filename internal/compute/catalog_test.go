@@ -180,3 +180,40 @@ func TestWindowsCatalogRequiresLocalAlias(t *testing.T) {
 		})
 	}
 }
+
+func TestMacCatalogRequiresSeed(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, seed, reference, alias, platform string
+		valid                                  bool
+	}{
+		{name: "host-local seed", seed: "ac-seed-macos-tahoe-desktop", platform: "mac", valid: true},
+		{name: "seed infers mac", seed: "ac-seed-macos-tahoe-desktop", valid: true},
+		{name: "missing source", platform: "mac"},
+		{name: "digest", reference: "ghcr.io/example/macos@sha256:6b3ecd8336b6fce7006e764e01373199e2cc1cf46172132b53e0aaebd27be889", platform: "mac"},
+		{name: "alias", alias: "macos/tahoe", platform: "mac"},
+		{name: "seed on incus", seed: "ac-seed-macos-tahoe-desktop", platform: "incus"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			image := CatalogImage{
+				Name: "macos/tahoe/desktop", OS: "macos", Version: "26.6.2",
+				Kind: "vm", Kinds: []string{"vm"}, Desktop: true, Platform: tt.platform,
+				Seed: tt.seed, Reference: tt.reference, Alias: tt.alias,
+				CPUs: 4, MemoryMB: 8192, DiskGB: 100,
+			}
+			catalog, err := NewCatalog([]CatalogImage{image})
+			if !tt.valid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			got, ok := catalog.Lookup(image.Name)
+			require.True(t, ok)
+			assert.Equal(t, "mac", got.Platform)
+			assert.Equal(t, "ac-seed-macos-tahoe-desktop", got.Seed)
+			assert.Empty(t, got.Reference)
+			assert.Empty(t, got.Alias)
+		})
+	}
+}

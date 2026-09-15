@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -55,4 +56,32 @@ func TestWindowsCallDoesNotReplayAfterLostResponse(t *testing.T) {
 	_, err = driver.Call(ctx, ref, "click", `{}`)
 	require.Error(t, err)
 	require.Equal(t, int32(1), effects.Load(), "a transport failure must not duplicate a GUI action")
+}
+
+func TestMacDriverReadyUsesLumeHome(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	ref := compute.Ref{Sandbox: "demo", Name: "desk"}
+	backend := computemocks.NewMockBackend(t)
+	backend.EXPECT().GetSandbox(mock.Anything, ref.Sandbox).
+		Return(compute.Sandbox{ExpiresAt: time.Now().Add(time.Hour)}, nil)
+	inst := compute.Instance{Ref: ref, OS: "macos", Status: "Running"}
+	backend.EXPECT().GetInstance(mock.Anything, ref).Return(inst, nil).Times(3)
+	backend.EXPECT().Exec(mock.Anything, mock.MatchedBy(func(req compute.ExecRequest) bool {
+		if req.User != "lume" || req.Cwd != "/Users/lume" || req.Env["HOME"] != "/Users/lume" {
+			return false
+		}
+		joined := strings.Join(req.Argv, " ")
+		return strings.HasPrefix(joined, "/usr/local/bin/cua-driver status") && !strings.Contains(joined, "--socket")
+	}), mock.Anything, mock.Anything).Return(int64(0), nil)
+
+	service, err := compute.New(backend, nil, compute.Options{})
+	require.NoError(t, err)
+	driver := NewDriver(service, nil)
+	t.Cleanup(func() { _ = driver.Close() })
+
+	ready, err := driver.Ready(ctx, ref)
+	require.NoError(t, err)
+	require.True(t, ready)
 }

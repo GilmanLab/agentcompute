@@ -23,7 +23,7 @@ func TestCreateSandboxHidesPhysicalNetworkIdentity(t *testing.T) {
 	created := time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC)
 	expires := created.Add(240 * time.Minute)
 	tc.sandbox.EXPECT().
-		CreateSandbox(mock.Anything, "", time.Duration(0), string(trustedSubjectID)).
+		CreateSandbox(mock.Anything, "", time.Duration(0), string(trustedSubjectID), platformIncus).
 		Return(compute.Sandbox{Name: "demo", Platform: platformIncus, CreatedAt: created, ExpiresAt: expires}, nil)
 	tc.sandbox.EXPECT().
 		GetSandbox(mock.Anything, "demo").
@@ -61,6 +61,47 @@ func TestListSandboxesEmptyItemsAreNonNil(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out.Items)
 	assert.Empty(t, out.Items)
+}
+
+func TestCreateSandboxMacOmitsDefaultNetwork(t *testing.T) {
+	t.Parallel()
+
+	tc := newTestDeps(t)
+	created := time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC)
+	expires := created.Add(240 * time.Minute)
+	platform := platformMac
+	tc.sandbox.EXPECT().
+		CreateSandbox(mock.Anything, "", time.Duration(0), string(trustedSubjectID), platformMac).
+		Return(compute.Sandbox{Name: "demo", Platform: platformMac, CreatedAt: created, ExpiresAt: expires}, nil)
+
+	out, err := sandboxAPI{sandboxes: tc.sandbox}.create(
+		context.Background(),
+		authz.Subject{ID: trustedSubjectID},
+		sandboxCreateIn{Platform: &platform},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "demo", out.Name)
+	assert.Equal(t, platformMac, out.Platform)
+	assert.Empty(t, out.Network.Name)
+}
+
+func TestImageListPlatformMac(t *testing.T) {
+	t.Parallel()
+
+	tc := newTestDeps(t)
+	platform := platformMac
+	tc.image.EXPECT().
+		ListImages("", (*bool)(nil), platformMac).
+		Return([]compute.CatalogImage{{
+			Name: "macos/tahoe/desktop", OS: "macos", Version: "26.6.2",
+			Kind: "vm", Desktop: true, Platform: platformMac,
+		}})
+
+	out, err := imageAPI{images: tc.image}.list(context.Background(), authz.Subject{}, imageListIn{Platform: &platform})
+	require.NoError(t, err)
+	require.Len(t, out.Items, 1)
+	assert.Equal(t, "macos/tahoe/desktop", out.Items[0].Name)
+	assert.Equal(t, platformMac, out.Items[0].Platform)
 }
 
 func TestNetCreateRejectsUnknownKind(t *testing.T) {

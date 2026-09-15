@@ -43,6 +43,22 @@ func routerImage() compute.CatalogImage {
 	}
 }
 
+func macosImage() compute.CatalogImage {
+	return compute.CatalogImage{
+		Name:     "macos/tahoe/desktop",
+		OS:       "macos",
+		Version:  "26.6.2",
+		Platform: "mac",
+		Kind:     "vm",
+		Kinds:    []string{"vm"},
+		Desktop:  true,
+		Seed:     "ac-seed-macos-tahoe-desktop",
+		CPUs:     4,
+		MemoryMB: 8192,
+		DiskGB:   100,
+	}
+}
+
 func liveSandbox(name string) compute.Sandbox {
 	now := time.Now()
 	return compute.Sandbox{
@@ -52,6 +68,34 @@ func liveSandbox(name string) compute.Sandbox {
 		CreatedAt: now.Add(-time.Hour),
 		ExpiresAt: now.Add(time.Hour),
 	}
+}
+
+func liveMacSandbox(name string) compute.Sandbox {
+	now := time.Now()
+	return compute.Sandbox{
+		Name:      name,
+		Platform:  "mac",
+		CreatedAt: now.Add(-time.Hour),
+		ExpiresAt: now.Add(time.Hour),
+	}
+}
+
+type mixedContext struct {
+	incus   *mocks.MockBackend
+	mac     *mocks.MockBackend
+	service *compute.Service
+}
+
+func newMixedContext(t *testing.T) *mixedContext {
+	t.Helper()
+
+	incus := mocks.NewMockBackend(t)
+	mac := mocks.NewMockBackend(t)
+	catalog, err := compute.NewCatalog([]compute.CatalogImage{routerImage(), macosImage()})
+	require.NoError(t, err)
+	service, err := compute.New(incus, catalog, compute.Options{Host: "lab01", Mac: mac})
+	require.NoError(t, err)
+	return &mixedContext{incus: incus, mac: mac, service: service}
 }
 
 func expiredSandbox() compute.Sandbox {
