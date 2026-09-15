@@ -1,0 +1,57 @@
+{
+  "date": "2026-09-15",
+  "scope": "Local Studio identity diagnosis; not deployed-service acceptance",
+  "lume": "0.5.3",
+  "guest_os": "macOS 26.6.2 (25G83)",
+  "initial_comparison": {
+    "machine_identifier_equal": false,
+    "hardware_model_equal": true,
+    "mac_equal": false,
+    "seed_uuid": "7671F5CC-D659-59AC-9BB4-ECE0283E747B",
+    "clone_uuid": "9F05700A-5898-5990-BCB1-B4D9B8430A44",
+    "seed_serial": "Z6LYT369NM",
+    "clone_serial": "ZYD9XXRPJW",
+    "system_loginwindow_and_system_user_setup_plists": "identical",
+    "byhost_loginwindow": "clone adds a UUID-named plist; both contain MiniBuddyLaunch=false"
+  },
+  "pinning": {
+    "changed_field": "machineIdentifier",
+    "mac_preserved": true,
+    "result_uuid": "7671F5CC-D659-59AC-9BB4-ECE0283E747B",
+    "result_serial": "Z6LYT369NM",
+    "fresh_first_boot": "desktop without Setup Assistant",
+    "two_pinned_guests": "concurrent running, both strict gates passed after launchctl kickstart",
+    "tcc": "accessibility=true, screen_recording=true, attribution=driver-daemon",
+    "reboot_control": "An already-booted unpinned clone also lost the wizard after reboot; first-boot controls are required."
+  },
+  "driver_residual": "LaunchAgent sometimes remained speculative with zero runs in pinned and unpinned clones; kickstart of existing gui/501/com.trycua.cua_driver_daemon restored readiness without consent changes.",
+  "wizard_gate_regression": {
+    "old": {
+      "code": 0,
+      "stdout": "== verifying ac-identity-control-20260915 at 192.168.64.12\nPASS  guest base matches the pinned IPSW\nSKIP  desktop session check (clone: Setup Assistant re-runs, see README)\nPASS  driver app identity matches the pin\nPASS  driver LaunchAgent is loaded\nPASS  TCC grants are held by the driver daemon\nPASS  accessibility tree is readable\npulled /tmp/ac-verify-hQrmSM.png (367148 bytes) over scp from 192.168.64.12\nPASS  desktop capture and file pull work\nPASS  grants survive a repeat call\nPASS  accessibility tree survives a repeat call\n== ac-identity-control-20260915 is qualified\n",
+      "stderr": ""
+    },
+    "fixed": {
+      "code": 1,
+      "stdout": "== verifying ac-identity-control-20260915 at 192.168.64.12 (clone=1)\nPASS  guest base matches the pinned IPSW\nSetup Assistant owns the session\n\nFAIL  the desktop session is the agent's, not Setup Assistant's\nPASS  driver app identity matches the pin\nPASS  driver LaunchAgent is loaded\nPASS  TCC grants are held by the driver daemon\nPASS  accessibility tree is readable\npulled /tmp/ac-verify-Mt9XiS.png (367125 bytes) over scp from 192.168.64.12\nPASS  desktop capture and file pull work\nPASS  grants survive a repeat call\nPASS  accessibility tree survives a repeat call\n",
+      "stderr": "error: 1 check(s) failed for ac-identity-control-20260915\n"
+    }
+  },
+  "pin_recipe_atomic_replace_exit": 0,
+  "pf": "anchor and parent declaration syntax checked; not installed or traffic-tested",
+  "cleanup": {
+    "remaining_vms": [
+      {
+        "name": "ac-seed-macos-tahoe-desktop",
+        "status": "stopped"
+      }
+    ]
+  },
+  "service_acceptance": "blocked: permitted HTTP transport lacks guest exec/files, sidecars, identity setter and host-global capacity count",
+  "service_timings": "not measured",
+  "upstream": {
+    "vnc_bind": "https://github.com/trycua/cua/issues/3878",
+    "ssh_argv": "https://github.com/trycua/cua/issues/3879",
+    "silent_third_start": "https://github.com/trycua/cua/issues/3880"
+  }
+}
