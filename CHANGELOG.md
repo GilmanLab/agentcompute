@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/GilmanLab/agentcompute/compare/v0.1.0...v0.1.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **http:** support authenticated loopback reverse proxies ([#34](https://github.com/GilmanLab/agentcompute/issues/34)) ([bd80c97](https://github.com/GilmanLab/agentcompute/commit/bd80c97f981af3bcd7c8fafc02ead4802ac0978c))
+
 ## 0.1.0 (2026-09-15)
 
 

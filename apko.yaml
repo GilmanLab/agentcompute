@@ -48,4 +48,4 @@ annotations:
   org.opencontainers.image.title: agentcompute
   org.opencontainers.image.description: agentcompute CodeMode MCP server
   org.opencontainers.image.source: https://github.com/GilmanLab/agentcompute
-  org.opencontainers.image.version: "0.1.0" # x-release-please-version
+  org.opencontainers.image.version: "0.1.1" # x-release-please-version
