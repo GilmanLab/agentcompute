@@ -108,6 +108,21 @@ func (c *Client) WriteFile(ctx context.Context, req compute.FileWriteRequest) (c
 	return compute.FileWriteResult{Bytes: int64(len(req.Content))}, nil
 }
 
+// DeleteFile removes a guest file through the Incus agent.
+func (c *Client) DeleteFile(ctx context.Context, ref compute.Ref, path string) error {
+	if err := c.requireInstance(ctx, ref); err != nil {
+		return err
+	}
+	err := c.Scoped(ctx, projectName(ref.Sandbox), "").DeleteInstanceFile(ref.Name, path)
+	if err != nil {
+		if errors.Is(mapError(err), compute.ErrNotFound) {
+			return fmt.Errorf("guest file missing: %w", os.ErrNotExist)
+		}
+		return mapError(err)
+	}
+	return nil
+}
+
 func parseOctalMode(mode string) (int, error) {
 	value, err := strconv.ParseUint(mode, 8, 32)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,59 @@ func (s *Service) ExecJSON(ctx context.Context, req ExecRequest) (ExecResult, er
 		return ExecResult{}, agentError("Driver output exceeds the 4 MiB JSON limit")
 	}
 	return result, nil
+}
+
+// OpenExec starts a guest command and returns attached stdin/stdout.
+// The caller must Close the stream. The start context does not bound a
+// successful stream; Close and process death do. Live sandbox expiry is
+// checked at open.
+func (s *Service) OpenExec(ctx context.Context, req ExecRequest) (io.ReadWriteCloser, error) {
+	if err := validateRef(req.Ref); err != nil {
+		return nil, err
+	}
+	if err := validateExec(req); err != nil {
+		return nil, err
+	}
+	if len(req.Argv) == 0 {
+		return nil, agentError("exec argv is required")
+	}
+	if _, err := s.SandboxExpiry(ctx, req.Ref.Sandbox); err != nil {
+		return nil, err
+	}
+	inst, err := s.GetInstance(ctx, req.Ref)
+	if err != nil {
+		return nil, err
+	}
+	if inst.Status != statusRunning && inst.Status != "Ready" {
+		return nil, agentErrorf("instance %q in sandbox %q is not running", req.Ref.Name, req.Ref.Sandbox)
+	}
+	if strings.HasPrefix(strings.ToLower(inst.OS), "windows") && req.User != "" {
+		return nil, agentError("Windows exec uses the Incus agent service identity; user is unsupported")
+	}
+	stream, err := s.backend.OpenExec(ctx, req)
+	if err != nil {
+		return nil, s.mapBackend(ctx, "open exec", err)
+	}
+	return stream, nil
+}
+
+// DeleteFile removes a guest file for an internal consumer.
+// Missing files retain [os.ErrNotExist].
+func (s *Service) DeleteFile(ctx context.Context, ref Ref, path string) error {
+	if err := validateRef(ref); err != nil {
+		return err
+	}
+	if err := validateFilePath(path); err != nil {
+		return err
+	}
+	if _, err := s.SandboxExpiry(ctx, ref.Sandbox); err != nil {
+		return err
+	}
+	err := s.backend.DeleteFile(ctx, ref, path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return s.mapBackend(ctx, "delete file", err)
+	}
+	return err
 }
 
 // ReadBinaryFile opens a guest file for bounded streaming by an internal consumer.

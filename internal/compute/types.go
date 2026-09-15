@@ -205,6 +205,7 @@ type Backend interface {
 	GetInstance(context.Context, Ref) (Instance, error)
 	DeleteInstance(context.Context, Ref) error
 	Exec(context.Context, ExecRequest, io.Writer, io.Writer) (int64, error)
+	OpenExec(context.Context, ExecRequest) (io.ReadWriteCloser, error)
 	ListNetworks(context.Context, string) ([]Network, error)
 	CreateNetwork(context.Context, string, Network) (Network, error)
 	AttachNIC(context.Context, Ref, string, string, string, string) (NIC, error)
@@ -222,6 +223,7 @@ type Backend interface {
 	WaitInstance(context.Context, WaitRequest) (WaitResult, error)
 	ReadFile(context.Context, FileReadRequest) (FileReadResult, error)
 	ReadBinaryFile(context.Context, Ref, string) (io.ReadCloser, error)
+	DeleteFile(context.Context, Ref, string) error
 	WriteFile(context.Context, FileWriteRequest) (FileWriteResult, error)
 	CreateSnapshot(context.Context, Ref, string) error
 	RestoreSnapshot(context.Context, Ref, string) error

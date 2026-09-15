@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/meigma/codemode"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -289,4 +290,56 @@ func TestPublishBoundedPNGSetsCoordinateScale(t *testing.T) {
 	assert.Equal(t, 20, shot.Height)
 	assert.InDelta(t, 2.5, shot.Scale, 1e-9)
 	assert.NotEmpty(t, shot.URL)
+}
+
+func TestClassifyMCPMapsNativeResults(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		result  *mcp.CallToolResult
+		wantOK  bool
+		wantSum string
+		want    string
+	}{
+		{
+			name: "structured object is native JSON",
+			result: &mcp.CallToolResult{
+				StructuredContent: map[string]any{"pid": json.Number("1220")},
+			},
+			wantOK: true,
+			want:   `{"pid":1220}`,
+		},
+		{
+			name: "isError is not an effect claim",
+			result: &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "no such window"}},
+			},
+			wantOK:  false,
+			wantSum: "no such window",
+			want:    jsonNull,
+		},
+		{
+			name: "native OK text",
+			result: &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{Text: "[OK]"}},
+			},
+			wantOK:  true,
+			wantSum: "[OK]",
+			want:    jsonNull,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := classifyMCP(tt.result)
+			assert.Equal(t, tt.wantOK, got.OK)
+			if tt.wantSum != "" {
+				assert.Equal(t, tt.wantSum, got.Summary)
+			}
+			assert.Equal(t, tt.want, got.Result)
+		})
+	}
 }

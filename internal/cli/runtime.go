@@ -202,8 +202,13 @@ func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime
 		DefaultTTL:         time.Duration(cfg.Sandbox.DefaultTTLMinutes) * time.Minute,
 		MaxTTL:             time.Duration(cfg.Sandbox.MaxTTLMinutes) * time.Minute,
 		Logger:             logger,
-		OnSandboxExpired:   screenshots.PurgeSandbox,
-		OnReap:             screenshots.Sweep,
+		OnSandboxExpired: func(name string) {
+			screenshots.PurgeSandbox(name)
+			if driver != nil {
+				driver.CloseSandbox(name)
+			}
+		},
+		OnReap: screenshots.Sweep,
 		DesktopReady: func(ctx context.Context, ref compute.Ref) (bool, error) {
 			return driver.Ready(ctx, ref)
 		},
@@ -227,7 +232,7 @@ func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime
 		close: func() error {
 			cancel()
 			<-done
-			return errors.Join(screenshots.Close(), client.Close())
+			return errors.Join(driver.Close(), screenshots.Close(), client.Close())
 		},
 	}, nil
 }

@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -32,7 +33,7 @@ const (
 	driverRuntime         = "/run/user/1000"
 	driverUID             = "1000"
 	driverCommandOverhead = 3
-	windowsDriverBin      = `C:\ProgramData\agentcompute\cua-driver\cua-driver.exe`
+	windowsDriverProxy    = `C:\ProgramData\agentcompute\cua-driver\cua-driver-proxy.exe`
 	windowsDriverSocket   = `\\.\pipe\cua-driver`
 	windowsDriverHome     = `C:\ProgramData\agentcompute`
 	vncPort               = "5900"
@@ -48,8 +49,11 @@ const (
 
 // Driver proxies native Cua Driver CLI calls inside Linux and Windows guests.
 type Driver struct {
-	compute *compute.Service
-	store   *Store
+	compute  *compute.Service
+	store    *Store
+	mu       sync.Mutex
+	sessions map[string]*windowsSession
+	closed   bool
 }
 
 // Info reports Driver catalog metadata, readiness, and a human VNC endpoint.
@@ -58,9 +62,9 @@ type Info struct {
 	Ready bool
 	// OS is the catalog operating system family for the instance image.
 	OS string
-	// DriverVersion is the version string from guest dump-docs.
+	// DriverVersion is the version string from guest dump-docs or MCP initialize.
 	DriverVersion string
-	// Tools are native tool names from guest dump-docs, in dump-docs order.
+	// Tools are native tool names from guest dump-docs or MCP ListTools, in discovery order.
 	Tools []string
 	// VNC is an existing TCP forward to port 5900, or a guest address if none exists.
 	VNC string
@@ -80,10 +84,10 @@ type CallResult struct {
 
 // NewDriver returns a Driver that execs through compute and publishes PNGs to store.
 func NewDriver(service *compute.Service, store *Store) *Driver {
-	return &Driver{compute: service, store: store}
+	return &Driver{compute: service, store: store, sessions: make(map[string]*windowsSession)}
 }
 
-// Info discovers dump-docs, probes daemon status, and reports an existing VNC endpoint.
+// Info discovers dump-docs or MCP tools, probes daemon status, and reports an existing VNC endpoint.
 func (d *Driver) Info(ctx context.Context, ref compute.Ref) (Info, error) {
 	inst, err := d.compute.GetInstance(ctx, ref)
 	if err != nil {
@@ -93,7 +97,10 @@ func (d *Driver) Info(ctx context.Context, ref compute.Ref) (Info, error) {
 		osName, osErr := d.imageOS(ctx, ref, inst.Image)
 		return Info{OS: osName, Tools: []string{}}, osErr
 	}
-	version, tools, err := d.discoverDocs(ctx, ref, inst.OS)
+	if windowsGuest(inst.OS) {
+		return d.windowsInfo(ctx, ref, inst)
+	}
+	version, tools, err := d.discoverDocs(ctx, ref)
 	if err != nil {
 		return Info{}, err
 	}
@@ -124,7 +131,10 @@ func (d *Driver) Enable(ctx context.Context, ref compute.Ref) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if _, _, err := d.discoverDocs(ctx, ref, inst.OS); err != nil {
+	if windowsGuest(inst.OS) {
+		return d.Ready(ctx, ref)
+	}
+	if _, _, err := d.discoverDocs(ctx, ref); err != nil {
 		return false, err
 	}
 	return d.Ready(ctx, ref)
@@ -149,7 +159,10 @@ func (d *Driver) Ready(ctx context.Context, ref compute.Ref) (bool, error) {
 	if !strings.EqualFold(inst.Status, "Running") && !strings.EqualFold(inst.Status, "Ready") {
 		return false, nil
 	}
-	result, err := d.execDriver(ctx, ref, inst.OS, []string{"status"})
+	if windowsGuest(inst.OS) {
+		return d.windowsReady(ctx, ref)
+	}
+	result, err := d.execDriver(ctx, ref, []string{"status"})
 	if err != nil {
 		return false, err
 	}
@@ -172,6 +185,9 @@ func (d *Driver) Call(ctx context.Context, ref compute.Ref, tool, args string) (
 	if err != nil {
 		return CallResult{}, err
 	}
+	if windowsGuest(inst.OS) {
+		return d.callWindows(ctx, ref, tool, payload)
+	}
 	path, err := randomGuestPNG(inst.OS)
 	if err != nil {
 		return CallResult{}, err
@@ -183,7 +199,7 @@ func (d *Driver) Call(ctx context.Context, ref compute.Ref, tool, args string) (
 		}
 	}()
 
-	result, err := d.execDriver(ctx, ref, inst.OS, callArgv(tool, payload, path))
+	result, err := d.execDriver(ctx, ref, callArgv(tool, payload, path))
 	if err != nil {
 		return CallResult{}, err
 	}
@@ -241,13 +257,16 @@ func (d *Driver) Screenshot(
 	if err != nil {
 		return Screenshot{}, err
 	}
+	if windowsGuest(inst.OS) {
+		return d.screenshotWindows(ctx, ref, tool, payload, pid, maxDimension)
+	}
 	path, err := randomGuestPNG(inst.OS)
 	if err != nil {
 		return Screenshot{}, err
 	}
 	defer d.removeGuestFile(ctx, ref, path)
 
-	result, err := d.execDriver(ctx, ref, inst.OS, callArgv(tool, payload, path))
+	result, err := d.execDriver(ctx, ref, callArgv(tool, payload, path))
 	if err != nil {
 		return Screenshot{}, err
 	}
@@ -288,8 +307,8 @@ func (d *Driver) Screenshot(
 	return shot, nil
 }
 
-func (d *Driver) discoverDocs(ctx context.Context, ref compute.Ref, osName string) (string, []string, error) {
-	result, err := d.execDriver(ctx, ref, osName, []string{"dump-docs", "--type", "mcp"})
+func (d *Driver) discoverDocs(ctx context.Context, ref compute.Ref) (string, []string, error) {
+	result, err := d.execDriver(ctx, ref, []string{"dump-docs", "--type", "mcp"})
 	if err != nil {
 		return "", nil, err
 	}
@@ -338,22 +357,19 @@ func (d *Driver) vncEndpoint(ctx context.Context, ref compute.Ref, inst compute.
 func (d *Driver) execDriver(
 	ctx context.Context,
 	ref compute.Ref,
-	osName string,
 	args []string,
 ) (compute.ExecResult, error) {
-	bin, socket := driverBin, driverSocket
-	req := compute.ExecRequest{Ref: ref}
-	if strings.HasPrefix(strings.ToLower(osName), "windows") {
-		bin, socket = windowsDriverBin, windowsDriverSocket
-		req.Cwd = windowsDriverHome
-	} else {
-		req.User, req.Cwd, req.Env = driverUID, driverHome, driverEnv()
+	req := compute.ExecRequest{
+		Ref:  ref,
+		User: driverUID,
+		Cwd:  driverHome,
+		Env:  driverEnv(),
 	}
 	req.Argv = make([]string, 0, len(args)+driverCommandOverhead)
-	req.Argv = append(req.Argv, bin)
+	req.Argv = append(req.Argv, driverBin)
 	req.Argv = append(req.Argv, args...)
 	if args[0] != "dump-docs" {
-		req.Argv = append(req.Argv, "--socket", socket)
+		req.Argv = append(req.Argv, "--socket", driverSocket)
 	}
 	return d.compute.ExecJSON(ctx, req)
 }
@@ -364,18 +380,7 @@ func (d *Driver) removeGuestFile(ctx context.Context, ref compute.Ref, path stri
 	}
 	rmCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), guestCleanupTimeout)
 	defer cancel()
-	req := compute.ExecRequest{
-		Ref:  ref,
-		Argv: []string{"/bin/rm", "-f", "--", path},
-		User: driverUID,
-		Cwd:  driverHome,
-		Env:  driverEnv(),
-	}
-	if strings.HasPrefix(path, `C:\`) {
-		req.Argv = []string{"cmd.exe", "/c", "del", "/q", path}
-		req.User, req.Cwd, req.Env = "", windowsDriverHome, nil
-	}
-	_, _ = d.compute.ExecJSON(rmCtx, req)
+	_ = d.compute.DeleteFile(rmCtx, ref, path)
 }
 
 func (d *Driver) pullScreenshot(

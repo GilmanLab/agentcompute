@@ -112,3 +112,15 @@ func TestExecRejectsUnsupportedUIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenExecRejectsExpiredSandbox(t *testing.T) {
+	t.Parallel()
+
+	tc := newTestContext(t)
+	tc.backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(expiredSandbox(), nil)
+	_, err := tc.service.OpenExec(t.Context(), compute.ExecRequest{
+		Ref:  compute.Ref{Sandbox: "demo", Name: "web"},
+		Argv: []string{`C:\ProgramData\agentcompute\cua-driver\cua-driver-proxy.exe`, "mcp"},
+	})
+	requireAgentContains(t, err, "expired")
+}

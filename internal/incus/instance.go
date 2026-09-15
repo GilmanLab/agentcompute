@@ -243,6 +243,123 @@ func (c *Client) Exec(ctx context.Context, req compute.ExecRequest, stdout, stde
 	return code, nil
 }
 
+// OpenExec starts a guest command and returns attached stdin/stdout.
+// Close sends SIGKILL and waits a bounded teardown. The start context does
+// not bound a successful stream.
+func (c *Client) OpenExec(ctx context.Context, req compute.ExecRequest) (io.ReadWriteCloser, error) {
+	if req.Ref.Sandbox == "" || req.Ref.Name == "" {
+		return nil, errors.New("instance reference is required")
+	}
+	if len(req.Argv) == 0 {
+		return nil, errors.New("exec argv is required")
+	}
+	if _, _, err := c.getProject(ctx, req.Ref.Sandbox); err != nil {
+		return nil, err
+	}
+
+	stdinR, stdinW := io.Pipe()
+	stdoutR, stdoutW := io.Pipe()
+	dataDone := make(chan bool)
+	conn := &execConn{
+		stdin:    stdinW,
+		stdout:   stdoutR,
+		stdoutW:  stdoutW,
+		dataDone: make(chan struct{}),
+		closed:   make(chan struct{}),
+	}
+
+	post := api.InstanceExecPost{
+		Command:     req.Argv,
+		WaitForWS:   true,
+		Interactive: false,
+		Environment: req.Env,
+		Cwd:         req.Cwd,
+	}
+	if req.User != "" && req.User != "root" {
+		uid, err := strconv.ParseUint(req.User, 10, 32)
+		if err != nil {
+			_ = stdinR.Close()
+			_ = stdoutR.Close()
+			_ = stdinW.Close()
+			_ = stdoutW.Close()
+			return nil, fmt.Errorf("exec user: %w", err)
+		}
+		post.User = uint32(uid)
+	}
+
+	args := &incusclient.InstanceExecArgs{
+		Stdin:    stdinR,
+		Stdout:   stdoutW,
+		Stderr:   io.Discard,
+		DataDone: dataDone,
+		Control: func(ws *websocket.Conn) {
+			defer ws.Close()
+			<-conn.closed
+			_ = ws.SetWriteDeadline(time.Now().Add(execTeardownBound))
+			_ = ws.WriteJSON(api.InstanceExecControl{Command: "signal", Signal: execSignalKill})
+		},
+	}
+
+	op, err := c.Scoped(ctx, projectName(req.Ref.Sandbox), "").ExecInstance(req.Ref.Name, post, args)
+	if err != nil {
+		_ = stdinW.Close()
+		_ = stdoutW.Close()
+		_ = stdinR.Close()
+		_ = stdoutR.Close()
+		return nil, mapError(err)
+	}
+	conn.op = op
+	go func() {
+		<-dataDone
+		_ = stdoutW.Close()
+		close(conn.dataDone)
+	}()
+	if err := ctx.Err(); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// execConn is a bidirectional guest stdio stream started by OpenExec.
+type execConn struct {
+	stdin     *io.PipeWriter
+	stdout    *io.PipeReader
+	stdoutW   *io.PipeWriter
+	op        incusclient.Operation
+	dataDone  chan struct{}
+	closed    chan struct{}
+	writeMu   sync.Mutex
+	closeOnce sync.Once
+}
+
+func (e *execConn) Read(p []byte) (int, error) {
+	return e.stdout.Read(p)
+}
+
+func (e *execConn) Write(p []byte) (int, error) {
+	e.writeMu.Lock()
+	defer e.writeMu.Unlock()
+	return e.stdin.Write(p)
+}
+
+func (e *execConn) Close() error {
+	e.closeOnce.Do(func() {
+		close(e.closed)
+		_ = e.stdin.Close()
+		waitCtx, cancel := context.WithTimeout(context.Background(), execTeardownBound)
+		defer cancel()
+		select {
+		case <-e.dataDone:
+		case <-waitCtx.Done():
+		}
+		_ = waitOp(waitCtx, e.op)
+		_ = e.stdout.Close()
+		_ = e.stdoutW.Close()
+	})
+	return nil
+}
+
 func drainExec(ctx context.Context, dataDone <-chan bool) error {
 	select {
 	case <-dataDone:
