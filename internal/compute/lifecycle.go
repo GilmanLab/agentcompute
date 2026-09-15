@@ -40,7 +40,7 @@ type WaitRequest struct {
 
 // WaitResult is the observed state after a wait.
 type WaitResult struct {
-	// Status is the observed Incus state.
+	// Status is the observed guest state.
 	Status string
 	// Elapsed is time spent waiting.
 	Elapsed time.Duration
@@ -362,8 +362,7 @@ func (s *Service) mapBackend(ctx context.Context, op string, err error) error {
 	if err == nil {
 		return nil
 	}
-	var agent *codemode.AgentError
-	if errors.As(err, &agent) {
+	if _, ok := errors.AsType[*codemode.AgentError](err); ok {
 		return err
 	}
 	return s.backendError(ctx, op, err)

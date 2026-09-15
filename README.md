@@ -43,7 +43,7 @@ images_file: images/catalog.yaml
 
 OVN requires the fleet-managed central, chassis TLS configuration, and physical uplink. To use the bridge fallback, set `default_network_kind: bridge` and configure `incus.host`.
 
-Pass its path with `--config` or `AGENTCOMPUTE_CONFIG`. YAML and TOML are strict: unknown keys fail startup. Catalog and certificate paths resolve relative to the configuration file.
+Pass its path with `--config` or `AGENTCOMPUTE_CONFIG`. YAML and TOML are strict: unknown keys fail startup. Catalog and credential paths resolve relative to the configuration file.
 
 Run the local STDIO transport:
 
@@ -57,7 +57,9 @@ Run Streamable HTTP on its loopback default:
 go run ./cmd/agentcompute http --config agentcompute.yaml --addr localhost:8080
 ```
 
-Both commands build shared Incus, catalog, compute, and CodeMode dependencies once. HTTP reuses them across sessions. Startup reconciles digest-pinned images; upstream `remote:alias` images are fetched on first use.
+Both commands build shared backend, catalog, compute, and CodeMode dependencies once. HTTP reuses them across sessions. Startup reconciles digest-pinned Incus images; upstream `remote:alias` images are fetched on first use. Mac `seed:` entries remain host-local and bypass Incus reconciliation.
+
+For Mac guests, configure the optional Lume backend using the [macOS runbook](images/macos/README.md#configure-the-server). Create a sandbox with `platform="mac"` and select `macos/tahoe/desktop`. Mac guests use Lume's NAT network; cluster placement and network overrides are unsupported.
 
 For a local MCP client, build the binary and configure its absolute path:
 
@@ -97,9 +99,9 @@ OVN instances may use an explicit online `host`. Without one, placement prefers 
 
 An OVN network with `nat=false` is isolated: it has no direct outside path and consumes no external address. Attach a router instance or use `net.peer` for reachability. Isolated networks reject external forwards. Operator-management and OOB denies are immutable, including against broader user allow rules.
 
-Restoring a snapshot stages a copy before deleting the current instance, then recreates it under the same agent-visible name and ownership. The Incus identity and NIC MAC can change, so the DHCP lease can change too; the original instance's snapshots are consumed. Low-level Incus access remains blocked.
+On Incus, restoring a snapshot stages a copy before deleting the current instance, then recreates it under the same agent-visible name and ownership. The Incus identity and NIC MAC can change, so the DHCP lease can change too; the original instance's snapshots are consumed. Low-level Incus access remains blocked. Lume snapshots are stopped host-local clones: creating one temporarily stops a running guest, and restoring one retains the named snapshot for reuse.
 
-Exec retains 64 KiB per stream while draining the rest. `stdout_truncated` and `stderr_truncated` report overflow. An exec-only timeout returns `timed_out=true`; caller cancellation remains an error. `user` accepts a numeric UID or `root`. macOS is not available.
+Exec retains 64 KiB per stream while draining the rest. `stdout_truncated` and `stderr_truncated` report overflow. An exec-only timeout returns `timed_out=true`; caller cancellation remains an error. Linux `user` accepts a numeric UID or `root`. Mac exec defaults to `lume` (UID 501); other numeric UIDs and `root` require guest sudo access. Windows exec uses the Incus agent service identity and does not accept `user`.
 
 Only `main()`'s final converted value is returned. Intermediate capability results remain inside the worker and do not enter the model's context.
 

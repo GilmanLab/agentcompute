@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -51,8 +50,8 @@ func (s *Service) OpenExec(ctx context.Context, req ExecRequest) (io.ReadWriteCl
 	if inst.Status != statusRunning && inst.Status != "Ready" {
 		return nil, agentErrorf("instance %q in sandbox %q is not running", req.Ref.Name, req.Ref.Sandbox)
 	}
-	if strings.HasPrefix(strings.ToLower(inst.OS), "windows") && req.User != "" {
-		return nil, agentError("Windows exec uses the Incus agent service identity; user is unsupported")
+	if err = validateExecUser(req, inst); err != nil {
+		return nil, err
 	}
 	stream, err := s.backend.OpenExec(ctx, req)
 	if err != nil {

@@ -50,7 +50,12 @@ const (
 
 // sandboxService is the sandbox lifecycle surface consumed by sandbox.* handlers.
 type sandboxService interface {
-	CreateSandbox(ctx context.Context, name string, ttl time.Duration, subject string) (compute.Sandbox, error)
+	CreateSandbox(
+		ctx context.Context,
+		name string,
+		ttl time.Duration,
+		subject, platform string,
+	) (compute.Sandbox, error)
 	ListSandboxes(ctx context.Context) ([]compute.Sandbox, error)
 	GetSandbox(ctx context.Context, name string) (compute.Sandbox, []compute.Instance, []compute.Network, error)
 	ExtendSandbox(ctx context.Context, name string, ttl time.Duration) (compute.Sandbox, error)

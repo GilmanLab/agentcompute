@@ -9,7 +9,7 @@ desktop-control credential.
 `provision.sh`, `verify.sh`, and `lib.sh` are shared by every train; each train
 directory holds only `image.yaml` and `unattended.yaml`.
 
-## Status: seed qualified; remote backend blocked
+## Seed qualification
 
 `macos/tahoe/desktop` exists and passes the gate on `studio-1` (Mac Studio
 M2 Max, 64 GB, macOS 26.6.2 / 25G83). The host is the owner's amendment to
@@ -36,34 +36,154 @@ current, matches the host's own build, and has a publisher-independent digest.
 | Backend account | `agentcompute`, standard (not admin), hidden, member of `com.apple.access_ssh` |
 | VM store | `/Users/agentcompute/.lume` |
 | API | `lume serve --port 7777`, `/Library/LaunchDaemons/io.gilman.agentcompute.lume-serve.plist`, bound to `127.0.0.1` only |
-| Server key | authorized only for `agentcompute`, `restrict,port-forwarding,permitopen="127.0.0.1:7777",command=/usr/local/libexec/agentcompute-no-shell` |
-| Root-owned duplicate of those limits | `/etc/ssh/sshd_config.d/110-agentcompute.conf` (`Match User agentcompute`) |
-| Guest key | `/Users/agentcompute/.ssh/guest_ed25519`; only the public half enters a guest |
+| Approved server key policy | `from="<server-tailnet-ip>",no-agent-forwarding,no-X11-forwarding`; normal shell and local TCP forwarding |
+| Root-owned account policy | `/etc/ssh/sshd_config.d/110-agentcompute.conf` (`Match User agentcompute`) |
+| Guest key | Per-image key on the server; the seed's provisioned key is `/Users/agentcompute/.ssh/guest_ed25519` on Studio |
 
-`restrict` alone does **not** stop command execution — a key with
-`restrict,port-forwarding,permitopen=…` and no forced command still runs
-`ssh host <command>`. The forced command is what makes it forwarding-only, and
-the `sshd_config.d` drop-in repeats every limit somewhere the account cannot
-edit (it owns its own `authorized_keys`, and `lume serve` runs as it).
+The dedicated account is the containment boundary, not a forwarding-only key.
+It must remain hidden, standard, and unable to use sudo. The owner's home must
+deny traversal by this account; a `staff`-readable home is insufficient because
+both accounts belong to `staff`.
 
-## Remote transport boundary
+The approved SSH policy below is **not installed yet**: the existing server
+VM's identity and source IP are still needed. The old forced-command policy
+remains active. The account's hidden/non-admin status, failed `sudo -n true`,
+and owner-home denial were verified; same-key rejection from a different source
+has not been exercised.
 
-The forwarding-only server key reaches the Lume API, not the host's shell or
-guest SSH. Lume 0.5.3 has no HTTP routes for guest exec/SCP, arbitrary sidecar
-I/O, or setting a clone's machine identifier. Its clone request always
-regenerates the identifier. The current boundary therefore cannot implement
-the planned remote backend. Do not enable shell access, SFTP, guest-port
-forwarding, or another forwarding destination to work around it.
+## Authorize the remote transport
 
-The owner must approve a host-side API mechanism for those operations before
-server implementation can continue. A host-global capacity authority is also
-needed: `/lume/host/status` counts only running VMs visible through the daemon
-account's configured storage locations, including Linux VMs. It does not
-enumerate the owner's other-account macOS VMs.
+First verify the agentcompute server VM's tailnet IPv4 address. Restrict its
+public key in `~agentcompute/.ssh/authorized_keys`:
+
+```text
+from="<server-tailnet-ip>",no-agent-forwarding,no-X11-forwarding ssh-ed25519 <public-key> agentcompute server
+```
+
+Replace the forwarding-only root drop-in with the following policy, substituting
+that same verified address. Keep it owned by `root:wheel`, mode `0644`.
+
+```text
+Match User agentcompute
+    AllowUsers agentcompute@<server-tailnet-ip>
+    AuthenticationMethods publickey
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    AllowTcpForwarding local
+    PermitTunnel no
+    X11Forwarding no
+    AllowAgentForwarding no
+    GatewayPorts no
+Match all
+```
+
+Remove `ForceCommand` and `PermitOpen`; do not retain `restrict` on the key.
+The root-owned source and forwarding restrictions prevent the account from
+widening its access by editing `authorized_keys`. Password and keyboard-interactive
+authentication must stay disabled for this account.
+
+Before opening a new connection, run `sudo sshd -t` and inspect
+`sudo sshd -T -C user=agentcompute,host=studio-1,addr=<server-tailnet-ip>`.
+Keep an operator session available during the change. From the server, verify
+normal shell access and that `sudo -n true` fails. Check that the account cannot
+read or traverse subdirectories of `/Users/josh`; on Studio the home directory
+is owner-only (`0700`). Attempt authentication with the **same key** from a
+different source address and require refusal. A failure caused by the tailnet
+ACL alone does not prove the SSH source restriction.
+
+Lifecycle remains HTTP over the SSH connection to `127.0.0.1:7777`. Guest exec
+and file transfer use system SSH through `ssh -J agentcompute@studio-1` to
+the NAT lease, with a separate per-image guest key. Files use the SFTP subsystem
+over that connection. Verify both SSH host keys;
+do not forward an agent or install private keys in a guest. Host metadata uses
+same-directory temporary files followed by `mv`; identity pinning edits a
+stopped clone's configuration before its first run.
+
+Lume 0.5.3 has no HTTP routes for guest exec, sidecar I/O, or setting a clone's
+machine identifier. Its clone request always regenerates the identifier.
 
 Source: Lume 0.5.3's [HTTP routes](https://github.com/trycua/cua/blob/754eec754991e1760100621e9bfe7ec1395cc7db/libs/lume/src/Server/Server.swift#L203-L401),
 [clone implementation](https://github.com/trycua/cua/blob/754eec754991e1760100621e9bfe7ec1395cc7db/libs/lume/src/LumeController.swift#L296-L386),
 and [host-status handler](https://github.com/trycua/cua/blob/754eec754991e1760100621e9bfe7ec1395cc7db/libs/lume/src/Server/Handlers.swift#L901-L940).
+
+## Configure the server
+
+Add this section to the server's existing Incus configuration. Use Studio's
+tailnet **IPv4** address so the connection uses the source family authorized
+above; do not use either LAN address. Replace the example credential paths
+with files owned by the server's service account.
+
+```yaml
+lume:
+  host: <studio-tailnet-ipv4>
+  identity_file: /etc/agentcompute/ssh/studio_ed25519
+  known_hosts_file: /etc/agentcompute/ssh/known_hosts
+  guest_known_hosts_file: /etc/agentcompute/ssh/guest_known_hosts
+  guest_keys:
+    macos/tahoe/desktop: /etc/agentcompute/ssh/tahoe_ed25519
+```
+
+Private keys must be readable only by the service account. The host key and
+guest key are distinct. Key-map entries use catalog image names, not VM names.
+Relative paths resolve beside the server configuration file.
+
+Verify Studio's SSH host key through operator access, and the guest host key
+through the qualified seed. The host known-hosts file identifies Studio's
+tailnet address. The guest known-hosts file identifies the **seed name**:
+
+```text
+ac-seed-macos-tahoe-desktop ssh-ed25519 <verified-seed-host-key>
+```
+
+Clones retain that SSH host key while their NAT leases change. Do not enroll
+each new lease with `StrictHostKeyChecking=no` or trust an unverified
+`ssh-keyscan` result. The generated jump configuration selects the host and
+guest identities separately; neither needs an SSH agent.
+
+The catalog's `seed:` value refers to the stopped VM in this account's Lume
+store. Mac entries bypass Incus image reconciliation. Omitting the `lume`
+section leaves the Incus-only runtime available.
+
+Keep Lume's LaunchDaemon stdout and stderr at
+`/Users/agentcompute/lume-serve.out.log` and
+`/Users/agentcompute/lume-serve.err.log`. The capacity failure check reads only
+new log bytes from the attempted run. Keep sandbox sidecars under
+`/Users/agentcompute/.agentcompute/sandboxes`; do not discard them when
+restarting or upgrading the server, since they are also the reaper's ownership
+records.
+
+## Verify the backend
+
+Local checks pass with Go 1.26.6: repository lint, `go test -race ./...`,
+`go build ./...`, a Linux/amd64 build with `CGO_ENABLED=0`, and the compiled
+artifact's offline startup smoke check. Transport tests use real system SSH
+with ProxyJump and a native SFTP server; the Lume HTTP service is a fixture.
+These checks do not qualify a deployed MCP service.
+
+After installing and proving the source-restricted SSH policy, run the live
+backend lane from the authorized server VM. Set `STUDIO_TAILNET_IP` to Studio's
+verified tailnet IPv4 address and adjust the credential paths to match its
+configuration:
+
+```sh
+AGENTCOMPUTE_TEST_LUME=1 \
+AGENTCOMPUTE_TEST_LUME_HOST="$STUDIO_TAILNET_IP" \
+AGENTCOMPUTE_TEST_LUME_IDENTITY_FILE=/etc/agentcompute/ssh/studio_ed25519 \
+AGENTCOMPUTE_TEST_LUME_KNOWN_HOSTS=/etc/agentcompute/ssh/known_hosts \
+AGENTCOMPUTE_TEST_LUME_GUEST_KNOWN_HOSTS=/etc/agentcompute/ssh/guest_known_hosts \
+AGENTCOMPUTE_TEST_LUME_GUEST_KEY=/etc/agentcompute/ssh/tahoe_ed25519 \
+go test ./internal/lume -run '^TestLiveLumeLifecycle$' -count=1 -timeout=25m
+```
+
+The lane creates a uniquely named sandbox and guest, waits for desktop/Driver
+readiness, checks guest execution, and deletes the sandbox on cleanup. It is
+a backend API check, not a substitute for deployed MCP acceptance.
+
+Deployed qualification remains pending: create without Setup Assistant,
+`sw_vers`, app listing, screenshot retrieval, snapshot restore, restart
+rediscovery and TTL deletion, unsupported-network AgentErrors, two concurrent
+guests and third-guest refusal. Creation and screenshot service timings have
+not been measured. PF and tailnet ACLs have not been changed.
 
 ## Restrict VNC before serving workers
 
@@ -132,9 +252,10 @@ Upstream bind-address request:
 
 ## Build a seed
 
-All commands run on the Mac host from a checkout of this repository. The pin
-reader is the recipe's own, so a runbook command cannot disagree with
-`pins.lock.yaml`:
+Run the seed procedures on the Mac from a checkout readable by `agentcompute`,
+for example under `/Users/agentcompute/src/agentcompute`, not the owner's
+protected home. All relative paths below refer to that checkout. The pin reader
+is the recipe's own, so a command cannot disagree with `pins.lock.yaml`:
 
 ```sh
 pins=images/macos/pins.lock.yaml
@@ -270,9 +391,10 @@ sudo -u agentcompute -H images/macos/verify.sh \
   --identity /Users/agentcompute/.ssh/guest_ed25519
 ```
 
-All ten checks must pass (6 s measured). `--identity` exercises the scp pull
-the server will use; without it that leg is skipped and the run is not a full
-gate. Reboot the seed once and re-run it before declaring the seed done, then
+All ten checks must pass (6 s measured). `--identity` exercises an independent
+SCP pull of the screenshot; the backend uses SFTP over the same SSH jump path.
+Without it that leg is skipped and the run is not a full gate. Reboot the seed
+once and re-run it before declaring the seed done, then
 stop the VM and leave it stopped.
 
 ### 8. Clone smoke
@@ -284,8 +406,8 @@ curl -sS -X POST http://127.0.0.1:7777/lume/vms/clone -H 'Content-Type: applicat
 
 Before the clone's **first boot**, copy only `machineIdentifier` from the
 stopped seed. Keep the clone's generated MAC; copying the MAC would create a
-network collision. Run this local host procedure as the `agentcompute`
-account, not through the forwarding-only server key:
+network collision. Run this as the `agentcompute` account, either locally or
+through its source-restricted SSH shell:
 
 ```sh
 sudo -u agentcompute -H /bin/bash -euo pipefail <<'PIN'
@@ -348,22 +470,34 @@ Both pinned and unpinned clones sometimes left the Driver LaunchAgent in
 `pended nondemand spawn = speculative`, with zero runs. `launchctl kickstart`
 started the existing app-owned daemon; both grants then remained true.
 
+A subsequent disposable-clone investigation found a second seed LaunchAgent,
+`io.gilman.agentcompute.cua-driver`, which runs `open -g -a`. The canonical job
+sometimes exits with `daemon already running`, while the daemon belongs to an
+`application.com.trycua.driver.*` launchd job. Removing the stale launcher from
+that clone and rebooting did not eliminate this behavior. Both grants remained
+true after kickstart. The cold-boot scheduling cause remains unresolved; this
+experiment did not modify the seed or grant new permissions.
+
 ## Host-wide guest-count rule
 
-Before clone/start, reserve capacity against the host's running macOS guests
-and pending starts, including the owner's VMs and the seed if running. Refuse
-the third before sending a mutating Lume request:
+Before a create/start request makes any Lume HTTP call, inspect the dedicated
+account's inventory with `/usr/local/bin/lume ls --format json`. Count running
+**macOS** guests regardless of name, including a running seed, and serialize
+pending starts. Refuse a third Lume-owned running macOS guest:
 
 ```text
-macOS guest limit reached (2 per host); the owner's macOS VMs share this budget
+macOS guest limit reached (2 per host); other accounts may also occupy slots
 ```
 
-Creation, restart/start, and reaper recovery need the same host-wide authority
-and serialized reservations. Counting only `ac-*` names or the backend
-account's `lume ls` is insufficient. Enumeration is needed to establish the
-count, so “before any API call” means before any **mutating** API call, not
-before the inventory read. Lume 0.5.3 supplies no authoritative cross-account
-count; this gate is a server prerequisite, not implemented by these scripts.
+This inventory is not a host-wide authority: another account's VM is invisible
+to it. Apple enforces the host-wide limit. If HTTP accepts a run but the VM
+stays stopped and the daemon's new log output reports the limit, return an
+explicit error naming Apple's two-guest limit and the possibility that another
+account holds a slot. Do not mistake an old log entry for this run's failure,
+or report Running from HTTP's `202` response alone.
+
+Start and restart require the same gate. Reaper rediscovery must not start a
+stopped guest merely because its sidecar exists.
 See [trycua/cua#3880](https://github.com/trycua/cua/issues/3880).
 
 ## Measurements

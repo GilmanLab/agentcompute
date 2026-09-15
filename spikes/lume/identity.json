@@ -25,6 +25,36 @@
     "reboot_control": "An already-booted unpinned clone also lost the wizard after reboot; first-boot controls are required."
   },
   "driver_residual": "LaunchAgent sometimes remained speculative with zero runs in pinned and unpinned clones; kickstart of existing gui/501/com.trycua.cua_driver_daemon restored readiness without consent changes.",
+  "driver_followup": {
+    "vm": "ac-p8-launchd-diagnosis",
+    "identity_pinned_before_first_boot": true,
+    "seed_launchers": [
+      "com.trycua.cua_driver_daemon: direct app executable serve, RunAtLoad, KeepAlive",
+      "io.gilman.agentcompute.cua-driver: open -g -a app --args serve, RunAtLoad"
+    ],
+    "observed_failure": "canonical job exits 1 with daemon already running; daemon is owned by application.com.trycua.driver.*",
+    "experiment": "booted pinned clone, removed only obsolete launcher in clone, stopped Driver, stopped and restarted clone",
+    "result": "canonical job still reported spawn scheduled and last exit 1; daemon remained available with both grants and driver-daemon attribution",
+    "kickstart_exit": 0,
+    "root_cause": "cold-boot scheduling remains unresolved; duplicate launcher removal alone did not resolve it",
+    "seed_modified": false,
+    "clone_deleted": true
+  },
+  "host_containment_followup": {
+    "account": "agentcompute",
+    "hidden": true,
+    "admin_member": false,
+    "sudo_noninteractive_exit": 1,
+    "owner_home_mode": "0700",
+    "unreadable_and_untraversable": [
+      "/Users/josh/code",
+      "/Users/josh/Documents",
+      "/Users/josh/.ssh",
+      "/Users/josh/Library"
+    ],
+    "new_ssh_policy": "syntax checked without installation; verified server tailnet IP still required",
+    "wrong_source_authentication": "not yet exercised"
+  },
   "wizard_gate_regression": {
     "old": {
       "code": 0,
@@ -47,7 +77,17 @@
       }
     ]
   },
-  "service_acceptance": "blocked: permitted HTTP transport lacks guest exec/files, sidecars, identity setter and host-global capacity count",
+  "backend_checks": {
+    "toolchain": "go1.26.6 darwin/arm64",
+    "repository_lint": "passed",
+    "full_race_suite": "passed",
+    "native_build": "passed",
+    "linux_amd64_cgo_disabled_build": "passed",
+    "offline_artifact_startup_smoke": "passed",
+    "transport_fixture": "real system SSH ProxyJump and native SFTP server; fake Lume HTTP",
+    "live_lane": "not run; authorized server target and source-restricted SSH policy are pending"
+  },
+  "service_acceptance": "not qualified: server target required for source-restricted SSH deployment; approved account-shell amendment supersedes the HTTP-only transport blocker",
   "service_timings": "not measured",
   "upstream": {
     "vnc_bind": "https://github.com/trycua/cua/issues/3878",

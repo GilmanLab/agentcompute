@@ -40,6 +40,11 @@ func windowsGuest(osName string) bool {
 	return strings.HasPrefix(strings.ToLower(osName), "windows")
 }
 
+func macGuest(osName string) bool {
+	lower := strings.ToLower(osName)
+	return lower == "macos" || lower == "darwin"
+}
+
 func sessionKey(ref compute.Ref) string {
 	return ref.Sandbox + "/" + ref.Name
 }
