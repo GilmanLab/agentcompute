@@ -1,7 +1,9 @@
 # images
 
-Lab-built Incus images for agentcompute: the Alpine `router` system container,
-two minimal Ubuntu 24.04 runner VMs, and an Ubuntu 24.04 Xorg desktop VM.
+Lab-built guest images for agentcompute: the Alpine `router` system container,
+two minimal Ubuntu 24.04 runner VMs, an Ubuntu 24.04 Xorg desktop VM, the
+cluster-local Windows VMs, and one non-Incus family — a host-local macOS seed
+built by Lume on an Apple Silicon host.
 `runner` has no sudo grant; `runner-publisher` permits only the root-owned
 image-build wrapper.
 
@@ -19,6 +21,9 @@ image-build wrapper.
 | `publish.py` | Protected-source gate, immutable-tag lookup, assembly, qualification, publication, and verified fetch-back. |
 | `catalog-pr.py` | Opens the public catalog digest PR from verified release evidence. |
 | `ci-incus.py` | Configures the pinned Incus CLI and restricted HTTPS identity. |
+| `macos/pins.lock.yaml` | Lume, Cua Driver, and Sequoia IPSW pins for the host-local macOS seed, with provenance labels and one open digest gate. |
+| `macos/lib.sh` | Host helpers shared by the seed scripts: the pin reader and the `lume ssh` command transport. |
+| `macos/sequoia/desktop/` | Seed recipe and operator runbook: `image.yaml`, `unattended.yaml`, `provision.sh`, `verify.sh`, `README.md`. Produces no publishable artifact. |
 | `../cmd/image-publish` | Immutable imgoci publication and verified fetch-back CLI. |
 
 Phase 7 router and Windows findings are maintained in the central
@@ -90,6 +95,27 @@ guest-file API and return as URLs rather than embedded image data.
 
 See the [Phase 6 desktop spike report](../spikes/desktop/README.md) for direct
 Driver results, timing, screenshot scaling, VNC, and reboot evidence.
+
+### macOS seed (not built)
+
+`macos/sequoia/desktop/` is the one family that produces no artifact. The
+deliverable is a stopped Lume VM on a dedicated Apple Silicon host, holding an
+operator's one-time Accessibility and Screen Recording consent; workers are
+`lume clone` copies. Apple's license grants no redistribution and Cua's
+guidance is to keep a consented seed private, so it is never pushed to a
+registry and carries a `seed:` name instead of a digest or alias.
+
+Nothing in it has run. The design's prerequisite 5 host — a dedicated Apple
+Silicon machine in the lab, not a personal workstation — does not exist, so the
+recipe, pins, and runbook are reviewed inputs to that first build and no more.
+There is deliberately no `catalog.yaml` row yet: the server still answers
+`platform "mac" is not available yet`, and a catalog entry would advertise an
+image no `instance.create` can launch.
+
+`images-validate.yml` checks what a Linux runner can: the scripts parse and
+every pin they read still resolves. Everything else waits on the host. The
+operator procedure, its gates, and the clone-smoke evidence live in
+[`macos/sequoia/desktop/README.md`](macos/sequoia/desktop/README.md).
 
 ## Publication and import
 

@@ -1,0 +1,145 @@
+schema_version: 1
+recipe_revision: 1
+architecture: arm64
+
+# Pins for the host-local macOS seed. Provenance labels follow
+# images/windows/pins.lock.yaml: `published` means the publisher documents the
+# exact digest recorded here; `derived` means it was computed from a verified
+# container; `measured` means no publisher digest exists. macOS adds one case
+# the Windows family did not need: `aggregated`, where a third party republishes
+# a digest that Apple itself does not document. An `aggregated` entry never
+# gates a build on its own — see `gate` on the IPSW entry.
+#
+# Nothing here has run yet. The Mac host that Phase 8 requires (design
+# prerequisite 5) does not exist, so every value below is verified by
+# publisher metadata only, never by a local build.
+
+host:
+  # Lume's documented host floor, not a purchasing recommendation.
+  # https://cua.ai/docs/reference/lume/limits
+  platform: Apple Silicon
+  macos_minimum: "13"
+  memory_minimum_gb: 16
+  free_disk_minimum_gb: 50
+  # Apple's Virtualization framework caps concurrent macOS guests at two per
+  # host. The seed counts against that cap whenever it is running.
+  max_concurrent_macos_guests: 2
+
+lume:
+  version: 0.5.3
+  archive: lume-0.5.3-darwin-arm64.tar.gz
+  archive_root: lume
+  url: https://github.com/trycua/cua/releases/download/lume-v0.5.3/lume-0.5.3-darwin-arm64.tar.gz
+  size: 6009673
+  sha256: af5d0556763a7f0116153c220aaabe44974e775091ac57e38da2abb2959c63e8
+  provenance: published
+  published_by: https://api.github.com/repos/trycua/cua/releases (asset digest)
+  prerelease: false
+  license: MIT
+  # The binary-only tarball, not the .pkg and not a curl-pipe installer. The
+  # .pkg variant (lume-0.5.3-darwin-arm64.pkg.tar.gz,
+  # sha256:3da80c0577b34a8e4df61e719962e7506664c0fa660ac1a130c03e9248a31e6f)
+  # installs the same binary through Installer.app and is not used.
+  serve:
+    # `lume serve` binds loopback by default. Reaching it from the
+    # agentcompute server requires an explicit bind address or an SSH tunnel;
+    # that decision belongs to the deployment, not to this image.
+    port: 7777
+  cli_surface:
+    # Commands this recipe depends on, all present in 0.5.3.
+    - create
+    - setup
+    - run
+    - stop
+    - clone
+    - delete
+    - ls
+    - get
+    - ssh
+    - attach
+
+cua_driver:
+  version: 0.28.1
+  archive: cua-driver-rs-0.28.1-darwin-arm64.tar.gz
+  archive_root: cua-driver-rs-0.28.1-darwin-arm64
+  url: https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.28.1/cua-driver-rs-0.28.1-darwin-arm64.tar.gz
+  size: 70074352
+  sha256: b3cb3781feb9855dfcdd616bc5c9c8e627453e3e16a073c1446326691a549b24
+  provenance: published
+  published_by: https://api.github.com/repos/trycua/cua/releases (asset digest)
+  # Every cua-driver-rs release in the monorepo is marked prerelease, including
+  # the newest (0.28.1). There is no non-prerelease Driver to pin. 0.28.1 is the
+  # same version the Linux desktop (images/pins.yaml) and Windows images
+  # (images/windows/pins.lock.yaml) already run, under the same project-specific
+  # pin exception.
+  prerelease: true
+  # TCC grants are attached to the code-signing identity plus bundle id, which
+  # is what makes an operator's one-time consent survive `lume clone`. These
+  # values are measured from the pinned archive and must be re-asserted in the
+  # guest after installation (verify.sh does).
+  bundle_id: com.trycua.driver
+  bundle_short_version: 0.28.1
+  team_identifier: YCK386LBJ7
+  signing_authority: "Developer ID Application: Cua AI, Inc. (YCK386LBJ7)"
+  app_install_path: /Applications/CuaDriver.app
+  # Upstream's release installer symlinks the CLI into ~/.local/bin. The seed
+  # adds /usr/local/bin/cua-driver so the guest path matches the Linux desktop
+  # image's constant and the server needs no macOS-specific binary path.
+  cli_paths:
+    - /Users/lume/.local/bin/cua-driver
+    - /usr/local/bin/cua-driver
+
+sequoia_ipsw:
+  train: sequoia
+  product_version: "15.6.1"
+  build: 24G90
+  released: 2025-08-20
+  device_class: VirtualMac2,1
+  url: https://updates.cdn-apple.com/2025SummerFCS/fullrestores/093-10809/CFD6DD38-DAF0-40DA-854F-31AAD1294C6F/UniversalMac_15.6.1_24G90_Restore.ipsw
+  size: 16814137790
+  sha256: 3d87686b691ac765eb6a6b3082b2334e2af9710096a00432dd519af89ff2ea78
+  provenance: aggregated
+  published_by: null
+  aggregated_by: https://api.appledb.dev/ios/macOS/main.json
+  # Apple's own IPSW catalog
+  # (https://mesu.apple.com/assets/macos/com_apple_macOSIPSW/com_apple_macOSIPSW.xml)
+  # lists only the current train and carries no digest for the restore image,
+  # so no Apple-published SHA-256 exists for this file. The URL and size were
+  # confirmed live (HTTP 200, Content-Length 16814137790, Last-Modified
+  # 2025-08-18) on 2026-09-14.
+  gate: blocked
+  gate_reason: the SHA-256 above is republished by AppleDB, not documented by
+    Apple, and has not been measured locally. Closing this gate requires
+    downloading the IPSW on the Mac host, measuring it, and recording the match
+    here. A mismatch is a stop, not a pin update.
+  # 15.6.1 is the LAST Sequoia release Apple published as a full restore image.
+  # 15.7.x and 15.8 (24H23) ship only as InstallAssistant packages and OTA
+  # assets, so a Sequoia seed built from an IPSW is pinned roughly a year behind
+  # the train's current security level. macOS 26 (Tahoe) 26.6.2 (25G83,
+  # 2026-08-17,
+  # sha256:885503b7f4b06609e9a512f2befd40f59730640a3f1233e3892d60affdd51c95)
+  # is both current and covered by Lume's `tahoe` preset, which upstream calls
+  # the verified one. Changing trains is the design owner's call; this file does
+  # not make it.
+  license: Apple macOS Software License Agreement. At most two additional
+    virtual instances per Apple-branded host, development and testing use, no
+    redistribution. Host-local seed only, never a registry.
+
+unattended:
+  # `lume create --unattended` accepts a built-in preset name or a YAML path.
+  # This recipe passes the path so the health-check budget is explicit and
+  # reviewable; the file is otherwise the upstream sequoia preset.
+  preset_source: https://github.com/trycua/cua/blob/lume-v0.5.3/libs/lume/src/Resources/unattended-presets/sequoia.yml
+  recipe_file: images/macos/sequoia/desktop/unattended.yaml
+  # Upstream still reports that the Sequoia preset can stop on Setup Assistant's
+  # Accessibility step at first display boot (trycua/cua#2155 closed, docs not).
+  # First GUI boot is therefore a blocking qualification, not an assumption.
+  first_display_boot_gate: required
+  default_account:
+    user: lume
+    password: lume
+    # Lume documents this account and its password. The seed keeps them: the
+    # guest is NAT-only and reachable only from the Mac host, and rotating the
+    # password would break `lume ssh` and `lume shutdown` defaults. Automation
+    # authenticates with an installed public key instead.
+    rotated: false

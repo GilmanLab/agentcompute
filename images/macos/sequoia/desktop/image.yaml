@@ -1,0 +1,77 @@
+schema_version: 1
+
+# Host-local macOS seed definition. Unlike every other family in images/, this
+# recipe produces no artifact to publish: the deliverable is a stopped Lume VM
+# on one Apple Silicon host, carrying an operator's one-time TCC consent.
+# Apple's license does not grant redistribution and Cua's own guidance is to
+# keep a consented seed private, so there is no registry reference here.
+
+name: macos/sequoia/desktop
+platform: mac
+os: macos
+version: "15.6.1"
+kind: vm
+kinds:
+  - vm
+desktop: true
+description: macOS Sequoia desktop with Cua Driver and operator-granted TCC
+
+# The catalog row this recipe backs. `seed` is the Lume VM name on the Mac
+# host, which replaces the digest or alias the Incus families carry.
+seed: ac-seed-macos-sequoia-desktop
+
+expect:
+  # `sw_vers` must report exactly this. A different build means a different
+  # IPSW than images/macos/pins.lock.yaml pins.
+  product_version: "15.6.1"
+  build_version: 24G90
+  architecture: arm64
+
+# `lume create` geometry. The disk is sparse: the configured size is the
+# guest's logical disk, and host allocation grows with writes. 100GB matches
+# Lume's macOS default and leaves room for the Driver and a desktop session
+# without making each clone's worst case 150GB on a shared host.
+create:
+  cpu: 4
+  memory: 8GB
+  disk_size: 100GB
+  display: 1440x900
+  unattended: images/macos/sequoia/desktop/unattended.yaml
+
+# Defaults the catalog reports to agents. Two running guests is Apple's
+# ceiling for the whole host, so an 8GB guest is the largest size that leaves
+# the second slot usable on a 32GB host.
+defaults:
+  cpus: 4
+  memory_mb: 8192
+  disk_gb: 100
+
+guest:
+  account: lume
+  # Installed by provision.sh; the private half never enters the guest.
+  authorized_key_owner: agentcompute server on the Mac host
+  driver:
+    app: /Applications/CuaDriver.app
+    cli: /usr/local/bin/cua-driver
+    launch_agent: /Users/lume/Library/LaunchAgents/io.gilman.agentcompute.cua-driver.plist
+    # The daemon is started through LaunchServices so the responsible process
+    # is CuaDriver.app and the TCC grants apply to it.
+    start_command: /usr/bin/open -g -a /Applications/CuaDriver.app --args serve
+  vnc_fallback:
+    # macOS Screen Sharing inside the guest, reachable from the Mac host only.
+    # Lume also exposes its own VNC listener for every running VM
+    # (`lume run` reports vncUrl), which serves the same console purpose from
+    # outside the guest; see README.md for why both exist for now.
+    service: system/com.apple.screensharing
+    port: 5900
+
+# Consent is a human step and cannot be scripted. verify.sh is the gate that
+# decides whether the seed is usable, and clone-smoke is what proves the grant
+# survives duplication.
+qualification:
+  operator_consent_required: true
+  gates:
+    - first display boot shows no Setup Assistant
+    - verify.sh passes against the seed
+    - verify.sh passes against a fresh clone with no new consent prompt
+    - the seed is stopped and untouched after two clone cycles
