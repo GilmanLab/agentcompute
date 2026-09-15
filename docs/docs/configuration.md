@@ -90,19 +90,19 @@ The runtime identity must manage projects and default-project networks. The Phas
 | Flag | Environment | Default | Meaning |
 | --- | --- | --- | --- |
 | `--addr` | `AGENTCOMPUTE_ADDR` | `localhost:8080` | Listen address. |
-| `--auth-token` | `AGENTCOMPUTE_AUTH_TOKEN` | Empty | Demonstration shared bearer token; empty disables token validation. |
+| `--auth-tokens-file` | `AGENTCOMPUTE_AUTH_TOKENS_FILE` | Empty | JSON credential file mapping identity names to bearer tokens. |
 | `--insecure` | `AGENTCOMPUTE_INSECURE` | `false` | Permit a non-loopback bind without authentication. |
 
-A non-loopback bind without `--auth-token` fails unless `--insecure` explicitly permits unauthenticated exposure. Cross-origin protection is enabled independently of this bind check.
+A non-loopback bind without a credential file fails unless `--insecure` explicitly permits unauthenticated exposure. A configured file requires authentication even on loopback. Cross-origin protection is independent of authentication.
 
-The shared token is not a production credential system. It does not validate a signed token, issuer, audience, expiry, or per-client scope. See [Security](security.md).
+The credential is a JSON object such as `{"agent-name":"<random-token>"}`. Names and tokens must be nonempty, contain no whitespace or control characters, and be unique. Empty, malformed, or unreadable files fail startup. Generate high-entropy tokens; never put their values in flags, environment variables, or the runtime configuration. Under systemd, use `LoadCredential=auth-tokens.json:/etc/agentcompute/credentials/auth-tokens.json` and pass `--auth-tokens-file %d/auth-tokens.json`. Replace the source file and restart the service to rotate or revoke a token. See [Security](security.md).
 
 ## Subject resolution by transport
 
 | Mode | Resolver | Subject ID | Trust boundary |
 | --- | --- | --- | --- |
 | STDIO | `mcpserver.StaticSubject` | `local` | Ownership of the launched process. |
-| HTTP with valid demo token | `mcpserver.ContextSubject` | `shared-token` | The demo SDK verifier sets `auth.TokenInfo.UserID` after constant-time token validation. The token value is not stored as identity. |
+| HTTP with a valid bearer token | `mcpserver.ContextSubject` | Credential entry name | Constant-time comparison of SHA-256 token digests; only the verified name enters `auth.TokenInfo.UserID`. |
 | HTTP on loopback without a token | `mcpserver.ContextSubject` | `development` | Explicit unauthenticated development identity passed through the MCP receiving bridge. |
 | HTTP with `--insecure` and no token | `mcpserver.ContextSubject` | `development` | Explicit unauthenticated network identity passed through the MCP receiving bridge. |
 

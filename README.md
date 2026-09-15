@@ -136,9 +136,9 @@ The server keeps authentication identity outside program source, tool arguments,
 
 - STDIO uses `mcpserver.StaticSubject` with the non-secret subject ID `local`. Process ownership is the authentication boundary.
 - HTTP uses `mcpserver.ContextSubject`. The receiving MCP middleware reads the SDK-authenticated `req.GetExtra().TokenInfo.UserID`, stores that non-secret identity with `authz.WithSubject`, and then lets the CodeMode adapter resolve it. Setting an arbitrary value only on the outer `net/http` request context is not sufficient.
-- The demo verifier sets `TokenInfo.UserID` to `shared-token`; the token value is not used as identity. Allowed loopback and explicitly insecure unauthenticated modes send `development` through the same receiving bridge.
+- HTTP reads `--auth-tokens-file` (`AGENTCOMPUTE_AUTH_TOKENS_FILE`), a JSON object mapping identity names to bearer tokens. The verified name becomes `TokenInfo.UserID` and `user.agentcompute.subject`; token values are never identities. Load the file through a systemd credential and restart after rotation. Allowed loopback and explicitly insecure unauthenticated modes use `development`.
 
-The CLI currently passes `authz.AllowAll()` explicitly. This permits every capability for every resolved subject; persisted `subject` metadata is not an ownership authorization check. `internal/mcpserver.New` supplies no fallback authorizer. Do not expose this slice as a multi-tenant service without replacing the authentication and authorization seams.
+The CLI passes `authz.AllowAll()` explicitly. Every authenticated identity can manage every agentcompute sandbox; subject metadata records attribution, not ownership authorization. This is a trusted-operator service, not a multi-tenant boundary.
 
 Discovery is not filtered by per-invocation authorization. An authenticated subject can search and describe every statically enabled capability; authorization runs for each native capability call during `execute`. Do not put secrets or tenant-sensitive data in capability names, summaries, descriptions, search terms, or field names. Disable a capability at build time if its existence must be hidden.
 

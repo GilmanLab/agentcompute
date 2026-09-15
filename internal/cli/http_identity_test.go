@@ -6,12 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/meigma/codemode"
 	"github.com/meigma/codemode/authz"
 	hostmcp "github.com/meigma/codemode/mcpserver"
-	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,17 +40,8 @@ func TestHTTPAuthorizationUsesEachVerifiedIdentity(t *testing.T) {
 	require.NoError(t, err)
 	server.AddReceivingMiddleware(installHTTPSubject(true))
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
-	verifier := func(_ context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
-		if token != "alice-credential" && token != "bob-credential" {
-			return nil, auth.ErrInvalidToken
-		}
-		id := "bob"
-		if token == "alice-credential" {
-			id = "alice"
-		}
-		return &auth.TokenInfo{UserID: id, Expiration: time.Now().Add(time.Hour)}, nil
-	}
-	httpServer := httptest.NewServer(auth.RequireBearerToken(verifier, nil)(handler))
+	tokens := testBearerTokens(t, `{"alice":"alice-credential","bob":"bob-credential"}`)
+	httpServer := httptest.NewServer(requireBearerTokens(tokens)(handler))
 	t.Cleanup(httpServer.Close)
 	alice := connectHTTPSession(t, httpServer.URL, "alice-credential")
 	bob := connectHTTPSession(t, httpServer.URL, "bob-credential")
