@@ -4,6 +4,9 @@
 
 ### Added
 
+- Operator-only sandbox pins with configurable identity allowlists, persistent
+  Incus and Lume metadata, visible attribution, and per-scan reaper logs.
+  Unpinning restores the existing TTL; pinned workloads remain usable after expiry.
 - Optional Lume macOS backend with identity-pinned clones, durable sandbox
   metadata, snapshot recovery, SSH guest execution, and SFTP file transfer.
 - Mac platform dispatch and the Tahoe desktop seed catalog entry, qualified

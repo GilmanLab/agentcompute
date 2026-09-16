@@ -60,6 +60,30 @@ func TestCreatePinPersistsAttributionAndKeepsTTLLimit(t *testing.T) {
 	requireAgentMessage(t, err, "ttl exceeds maximum of 1440 minutes")
 }
 
+func TestPinExistingSandboxPreservesCreatorAndExpiry(t *testing.T) {
+	t.Parallel()
+	backend := mocks.NewMockBackend(t)
+	service, err := compute.New(backend, nil, compute.Options{PinIdentities: []string{"omp"}})
+	require.NoError(t, err)
+	box := liveSandbox("demo")
+	box.Subject = "creator"
+	backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(box, nil)
+	backend.EXPECT().PinSandbox(mock.Anything, "demo", true, "omp", mock.Anything).
+		RunAndReturn(func(_ context.Context, _ string, pinned bool, subject string, since time.Time) (compute.Sandbox, error) {
+			box.Pinned, box.PinnedBy, box.PinnedAt = pinned, subject, since
+			return box, nil
+		}).
+		Once()
+	expiry := box.ExpiresAt
+	got, err := service.PinSandbox(t.Context(), "demo", true, "omp")
+	require.NoError(t, err)
+	assert.True(t, got.Pinned)
+	assert.Equal(t, "omp", got.PinnedBy)
+	assert.WithinDuration(t, time.Now(), got.PinnedAt, time.Second)
+	assert.Equal(t, "creator", got.Subject)
+	assert.Equal(t, expiry, got.ExpiresAt)
+}
+
 func TestExpiredPinSurvivesScansUntilUnpinned(t *testing.T) {
 	t.Parallel()
 	for _, platform := range []string{"incus", "mac"} {
