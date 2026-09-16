@@ -41,8 +41,8 @@ func (_m *MocksandboxService) EXPECT() *MocksandboxService_Expecter {
 }
 
 // CreateSandbox provides a mock function for the type MocksandboxService
-func (_mock *MocksandboxService) CreateSandbox(ctx context.Context, name string, ttl time.Duration, subject string) (compute.Sandbox, error) {
-	ret := _mock.Called(ctx, name, ttl, subject)
+func (_mock *MocksandboxService) CreateSandbox(ctx context.Context, name string, ttl time.Duration, subject string, platform string) (compute.Sandbox, error) {
+	ret := _mock.Called(ctx, name, ttl, subject, platform)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateSandbox")
@@ -50,16 +50,16 @@ func (_mock *MocksandboxService) CreateSandbox(ctx context.Context, name string,
 
 	var r0 compute.Sandbox
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Duration, string) (compute.Sandbox, error)); ok {
-		return returnFunc(ctx, name, ttl, subject)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Duration, string, string) (compute.Sandbox, error)); ok {
+		return returnFunc(ctx, name, ttl, subject, platform)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Duration, string) compute.Sandbox); ok {
-		r0 = returnFunc(ctx, name, ttl, subject)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Duration, string, string) compute.Sandbox); ok {
+		r0 = returnFunc(ctx, name, ttl, subject, platform)
 	} else {
 		r0 = ret.Get(0).(compute.Sandbox)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, time.Duration, string) error); ok {
-		r1 = returnFunc(ctx, name, ttl, subject)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, time.Duration, string, string) error); ok {
+		r1 = returnFunc(ctx, name, ttl, subject, platform)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -76,11 +76,12 @@ type MocksandboxService_CreateSandbox_Call struct {
 //   - name string
 //   - ttl time.Duration
 //   - subject string
-func (_e *MocksandboxService_Expecter) CreateSandbox(ctx interface{}, name interface{}, ttl interface{}, subject interface{}) *MocksandboxService_CreateSandbox_Call {
-	return &MocksandboxService_CreateSandbox_Call{Call: _e.mock.On("CreateSandbox", ctx, name, ttl, subject)}
+//   - platform string
+func (_e *MocksandboxService_Expecter) CreateSandbox(ctx interface{}, name interface{}, ttl interface{}, subject interface{}, platform interface{}) *MocksandboxService_CreateSandbox_Call {
+	return &MocksandboxService_CreateSandbox_Call{Call: _e.mock.On("CreateSandbox", ctx, name, ttl, subject, platform)}
 }
 
-func (_c *MocksandboxService_CreateSandbox_Call) Run(run func(ctx context.Context, name string, ttl time.Duration, subject string)) *MocksandboxService_CreateSandbox_Call {
+func (_c *MocksandboxService_CreateSandbox_Call) Run(run func(ctx context.Context, name string, ttl time.Duration, subject string, platform string)) *MocksandboxService_CreateSandbox_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -98,11 +99,16 @@ func (_c *MocksandboxService_CreateSandbox_Call) Run(run func(ctx context.Contex
 		if args[3] != nil {
 			arg3 = args[3].(string)
 		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -113,7 +119,7 @@ func (_c *MocksandboxService_CreateSandbox_Call) Return(sandbox compute.Sandbox,
 	return _c
 }
 
-func (_c *MocksandboxService_CreateSandbox_Call) RunAndReturn(run func(ctx context.Context, name string, ttl time.Duration, subject string) (compute.Sandbox, error)) *MocksandboxService_CreateSandbox_Call {
+func (_c *MocksandboxService_CreateSandbox_Call) RunAndReturn(run func(ctx context.Context, name string, ttl time.Duration, subject string, platform string) (compute.Sandbox, error)) *MocksandboxService_CreateSandbox_Call {
 	_c.Call.Return(run)
 	return _c
 }

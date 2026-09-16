@@ -103,6 +103,8 @@ func TestExecRejectsUnsupportedUIDs(t *testing.T) {
 		t.Run(user, func(t *testing.T) {
 			t.Parallel()
 			tc := newTestContext(t)
+			tc.backend.EXPECT().GetInstance(mock.Anything, compute.Ref{Sandbox: "demo", Name: "web"}).
+				Return(runningInstance(), nil)
 			_, err := tc.service.Exec(t.Context(), compute.ExecRequest{
 				Ref:  compute.Ref{Sandbox: "demo", Name: "web"},
 				User: user,

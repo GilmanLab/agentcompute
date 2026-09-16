@@ -32,6 +32,8 @@ const (
 	driverHome            = "/home/automation"
 	driverRuntime         = "/run/user/1000"
 	driverUID             = "1000"
+	macDriverUser         = "lume"
+	macDriverHome         = "/Users/lume"
 	driverCommandOverhead = 3
 	windowsDriverProxy    = `C:\ProgramData\agentcompute\cua-driver\cua-driver-proxy.exe`
 	windowsDriverSocket   = `\\.\pipe\cua-driver`
@@ -348,6 +350,12 @@ func (d *Driver) imageOS(ctx context.Context, ref compute.Ref, imageName string)
 }
 
 func (d *Driver) vncEndpoint(ctx context.Context, ref compute.Ref, inst compute.Instance) (string, error) {
+	if inst.VNCURL != "" {
+		return inst.VNCURL, nil
+	}
+	if macGuest(inst.OS) {
+		return "", nil
+	}
 	fwd, err := d.compute.InstanceForward(ctx, ref, vncTargetPort, "tcp")
 	if err != nil {
 		return "", err
@@ -374,12 +382,23 @@ func (d *Driver) execDriver(
 	ref compute.Ref,
 	args []string,
 ) (compute.ExecResult, error) {
-	req := compute.ExecRequest{
-		Ref:  ref,
-		User: driverUID,
-		Cwd:  driverHome,
-		Env:  driverEnv(),
+	inst, err := d.compute.GetInstance(ctx, ref)
+	if err != nil {
+		return compute.ExecResult{}, err
 	}
+	req := compute.ExecRequest{Ref: ref}
+	if macGuest(inst.OS) {
+		req.User = macDriverUser
+		req.Cwd = macDriverHome
+		req.Env = map[string]string{"HOME": macDriverHome}
+		req.Argv = make([]string, 0, len(args)+1)
+		req.Argv = append(req.Argv, driverBin)
+		req.Argv = append(req.Argv, args...)
+		return d.compute.ExecJSON(ctx, req)
+	}
+	req.User = driverUID
+	req.Cwd = driverHome
+	req.Env = driverEnv()
 	req.Argv = make([]string, 0, len(args)+driverCommandOverhead)
 	req.Argv = append(req.Argv, driverBin)
 	req.Argv = append(req.Argv, args...)

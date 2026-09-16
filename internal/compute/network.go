@@ -93,8 +93,28 @@ func isBaselineRule(id string) bool {
 	return id == BaselineEgressMgmt || id == BaselineEgressOOB
 }
 
+func (s *Service) rejectIfMac(ctx context.Context, name string) error {
+	if !s.hasMac || !validName(name) {
+		return nil
+	}
+	box, err := s.backend.GetSandbox(ctx, name)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil
+		}
+		return s.backendError(ctx, "get sandbox", err)
+	}
+	if box.Platform == platformMac {
+		return unsupportedOnMac()
+	}
+	return nil
+}
+
 // ListNetworks returns agent-facing networks in a sandbox.
 func (s *Service) ListNetworks(ctx context.Context, sandbox string) ([]Network, error) {
+	if err := s.rejectIfMac(ctx, sandbox); err != nil {
+		return nil, err
+	}
 	if err := validateName(sandbox); err != nil {
 		return nil, err
 	}
@@ -113,6 +133,9 @@ func (s *Service) ListNetworks(ctx context.Context, sandbox string) ([]Network, 
 
 // GetNetwork returns one agent-facing network.
 func (s *Service) GetNetwork(ctx context.Context, sandbox, name string) (Network, error) {
+	if err := s.rejectIfMac(ctx, sandbox); err != nil {
+		return Network{}, err
+	}
 	if err := validateName(sandbox); err != nil {
 		return Network{}, err
 	}
@@ -127,6 +150,10 @@ func (s *Service) GetNetwork(ctx context.Context, sandbox, name string) (Network
 		}
 		return Network{}, s.backendError(ctx, "get sandbox", err)
 	}
+	return s.backendNetwork(ctx, sandbox, name)
+}
+
+func (s *Service) backendNetwork(ctx context.Context, sandbox, name string) (Network, error) {
 	network, err := s.backend.GetNetwork(ctx, sandbox, name)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -139,12 +166,14 @@ func (s *Service) GetNetwork(ctx context.Context, sandbox, name string) (Network
 
 // DeleteNetwork deletes a network that has no attached NICs.
 func (s *Service) DeleteNetwork(ctx context.Context, sandbox, name string) error {
-	if name != reservedDefault {
-		if err := validateName(name); err != nil {
-			return err
-		}
-	} else {
+	if err := s.rejectIfMac(ctx, sandbox); err != nil {
+		return err
+	}
+	if name == reservedDefault {
 		return agentErrorf("name %q is reserved", name)
+	}
+	if err := validateName(name); err != nil {
+		return err
 	}
 	return s.withLiveSandbox(ctx, sandbox, func(Sandbox) error {
 		instances, err := s.backend.ListInstances(ctx, sandbox)
@@ -170,6 +199,9 @@ func (s *Service) DeleteNetwork(ctx context.Context, sandbox, name string) error
 
 // DetachNIC removes a NIC under the sandbox gate.
 func (s *Service) DetachNIC(ctx context.Context, ref Ref, nic string) error {
+	if err := s.rejectIfMac(ctx, ref.Sandbox); err != nil {
+		return err
+	}
 	if err := validateRef(ref); err != nil {
 		return err
 	}
@@ -189,6 +221,9 @@ func (s *Service) DetachNIC(ctx context.Context, ref Ref, nic string) error {
 
 // PeerNetworks routes between two OVN networks in a sandbox.
 func (s *Service) PeerNetworks(ctx context.Context, sandbox, network, peer string) error {
+	if err := s.rejectIfMac(ctx, sandbox); err != nil {
+		return err
+	}
 	if err := validateNetworkName(network); err != nil {
 		return err
 	}
@@ -202,19 +237,13 @@ func (s *Service) PeerNetworks(ctx context.Context, sandbox, network, peer strin
 		if isBridgeSandbox(box) {
 			return agentError("network peering requires OVN networks")
 		}
-		left, err := s.backend.GetNetwork(ctx, sandbox, network)
+		left, err := s.backendNetwork(ctx, sandbox, network)
 		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				return networkNotFound(network, sandbox)
-			}
-			return s.backendError(ctx, "get network", err)
+			return err
 		}
-		right, err := s.backend.GetNetwork(ctx, sandbox, peer)
+		right, err := s.backendNetwork(ctx, sandbox, peer)
 		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				return networkNotFound(peer, sandbox)
-			}
-			return s.backendError(ctx, "get network", err)
+			return err
 		}
 		if left.Kind != kindOVN || right.Kind != kindOVN {
 			return agentError("network peering requires OVN networks")
@@ -228,6 +257,9 @@ func (s *Service) PeerNetworks(ctx context.Context, sandbox, network, peer strin
 
 // AddACLRule appends a network-scoped rule without allowing baseline overrides.
 func (s *Service) AddACLRule(ctx context.Context, sandbox, network string, rule ACLRule) (ACLRule, error) {
+	if err := s.rejectIfMac(ctx, sandbox); err != nil {
+		return ACLRule{}, err
+	}
 	if err := validateNetworkName(network); err != nil {
 		return ACLRule{}, err
 	}
@@ -263,6 +295,9 @@ func (s *Service) AddACLRule(ctx context.Context, sandbox, network string, rule 
 
 // RemoveACLRule deletes an agent ACL rule; baseline IDs are not removable.
 func (s *Service) RemoveACLRule(ctx context.Context, sandbox, network, rule string) error {
+	if err := s.rejectIfMac(ctx, sandbox); err != nil {
+		return err
+	}
 	if err := validateNetworkName(network); err != nil {
 		return err
 	}
@@ -294,6 +329,9 @@ func (s *Service) CreateForward(
 	port, listenPort int64,
 	protocol string,
 ) (Forward, error) {
+	if err := s.rejectIfMac(ctx, sandbox); err != nil {
+		return Forward{}, err
+	}
 	ref, listenPort, protocol, err := prepareForward(sandbox, network, ref, port, listenPort, protocol)
 	if err != nil {
 		return Forward{}, err
@@ -313,6 +351,9 @@ func (s *Service) CreateForward(
 // InstanceForward finds an existing scalar port forward to a guest.
 // An empty Address means no matching forward; this method never exposes a port.
 func (s *Service) InstanceForward(ctx context.Context, ref Ref, targetPort int64, protocol string) (Forward, error) {
+	if err := s.rejectIfMac(ctx, ref.Sandbox); err != nil {
+		return Forward{}, err
+	}
 	if err := validateRef(ref); err != nil {
 		return Forward{}, err
 	}
@@ -332,6 +373,9 @@ func (s *Service) InstanceForward(ctx context.Context, ref Ref, targetPort int64
 // ImpairNIC applies Linux-only tc netem settings inside a guest. It is not gated.
 func (s *Service) ImpairNIC(ctx context.Context, ref Ref, nic string, impairment Impairment) error {
 	if err := validateRef(ref); err != nil {
+		return err
+	}
+	if err := s.rejectIfMac(ctx, ref.Sandbox); err != nil {
 		return err
 	}
 	if err := validateName(nic); err != nil {
@@ -581,7 +625,7 @@ func (s *Service) requireLinuxGuest(ctx context.Context, inst Instance) error {
 		}
 	}
 	lowerOS := strings.ToLower(osName)
-	if strings.HasPrefix(lowerOS, "windows") || lowerOS == "darwin" || lowerOS == "macos" {
+	if strings.HasPrefix(lowerOS, "windows") || lowerOS == "darwin" || lowerOS == osMacOS {
 		return agentErrorf("net.impair is not supported on %s guests", osName)
 	}
 	stdout := newDrainingWriter(execOutputLimit)

@@ -18,10 +18,10 @@ func TestCreateSandboxNameValidation(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
-	_, err := tc.service.CreateSandbox(t.Context(), "Default", 0, "subj")
+	_, err := tc.service.CreateSandbox(t.Context(), "Default", 0, "subj", "")
 	requireAgentMessage(t, err, `invalid name "Default"`)
 
-	_, err = tc.service.CreateSandbox(t.Context(), "none", 0, "subj")
+	_, err = tc.service.CreateSandbox(t.Context(), "none", 0, "subj", "")
 	requireAgentMessage(t, err, `name "none" is reserved`)
 }
 
@@ -45,7 +45,7 @@ func TestCreateSandboxZeroTTLUsesOptionsDefault(t *testing.T) {
 			return nil
 		})
 
-	got, err := service.CreateSandbox(t.Context(), "demo", 0, "subj")
+	got, err := service.CreateSandbox(t.Context(), "demo", 0, "subj", "")
 	require.NoError(t, err)
 	assert.WithinDuration(t, time.Now().Add(configured), got.ExpiresAt, time.Second)
 }
@@ -67,7 +67,7 @@ func TestCreateSandboxGeneratedNameRetriesCollision(t *testing.T) {
 		})
 	tc.backend.EXPECT().CreateSandbox(mock.Anything, mock.AnythingOfType("compute.Sandbox")).Return(nil)
 
-	box, err := tc.service.CreateSandbox(t.Context(), "", 0, "subj")
+	box, err := tc.service.CreateSandbox(t.Context(), "", 0, "subj", "")
 	require.NoError(t, err)
 	assert.NotEqual(t, collision, box.Name)
 }
@@ -151,17 +151,17 @@ func TestCreateNetworkRejectsBridgeInOVNSandbox(t *testing.T) {
 	requireAgentMessage(t, err, `cannot create a "bridge" network in a "ovn" sandbox`)
 }
 
-func TestCreateInstanceRejectsMacPlatform(t *testing.T) {
+func TestCreateInstanceRejectsPlatformMismatch(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
-	image := routerImage()
-	image.Platform = "mac"
+	tc.backend.EXPECT().GetSandbox(mock.Anything, "demo").Return(liveSandbox("demo"), nil)
+	image := macosImage()
 	_, err := tc.service.CreateInstance(t.Context(), compute.CreateInstance{
 		Ref:   compute.Ref{Sandbox: "demo", Name: "web"},
 		Image: image,
 	})
-	requireAgentMessage(t, err, `platform "mac" is not available yet`)
+	requireAgentMessage(t, err, `image "macos/tahoe/desktop" is not available on platform "incus"`)
 }
 
 func TestCreateInstanceDoesNotHoldGateDuringWait(t *testing.T) {

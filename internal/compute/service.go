@@ -18,6 +18,7 @@ const (
 	kindOVN           = "ovn"
 	kindContainer     = "container"
 	kindVM            = "vm"
+	osMacOS           = "macos"
 	statusRunning     = "Running"
 	numericUIDBase    = 10
 	numericUIDBitSize = 32
@@ -43,6 +44,8 @@ type Options struct {
 	OnReap func()
 	// DesktopReady probes the guest session after Incus agent readiness.
 	DesktopReady func(context.Context, Ref) (bool, error)
+	// Mac is the optional Lume backend. Nil leaves Incus-only operation.
+	Mac Backend
 }
 
 // Service orchestrates sandboxes against a Backend and an immutable catalog.
@@ -58,6 +61,7 @@ type Service struct {
 	onSandboxExpired   func(string)
 	onReap             func()
 	desktopReady       func(context.Context, Ref) (bool, error)
+	hasMac             bool
 }
 
 // New constructs a Service. Bridge defaults require Host; zero TTLs select the documented defaults.
@@ -93,6 +97,9 @@ func New(backend Backend, catalog *Catalog, opts Options) (*Service, error) {
 	if kind == kindBridge && opts.Host == "" {
 		return nil, errors.New("host is required for bridge sandboxes")
 	}
+	if opts.Mac != nil {
+		backend = newRouter(backend, opts.Mac)
+	}
 	return &Service{
 		backend:            backend,
 		catalog:            catalog,
@@ -105,6 +112,7 @@ func New(backend Backend, catalog *Catalog, opts Options) (*Service, error) {
 		onSandboxExpired:   opts.OnSandboxExpired,
 		onReap:             opts.OnReap,
 		desktopReady:       opts.DesktopReady,
+		hasMac:             opts.Mac != nil,
 	}, nil
 }
 
@@ -136,18 +144,32 @@ func (s *Service) ListImages(osName string, desktop *bool, platform string) []Ca
 }
 
 // CreateSandbox creates a sandbox project, generating an adjective-noun name when name is empty.
-func (s *Service) CreateSandbox(ctx context.Context, name string, ttl time.Duration, subject string) (Sandbox, error) {
+// An empty platform selects incus.
+func (s *Service) CreateSandbox(
+	ctx context.Context,
+	name string,
+	ttl time.Duration,
+	subject, platform string,
+) (Sandbox, error) {
 	ttl, err := s.resolveTTL(ttl)
 	if err != nil {
 		return Sandbox{}, err
 	}
 	if name == "" {
-		return s.createGeneratedSandbox(ctx, ttl, subject)
+		platform, err = s.resolvePlatform(platform)
+		if err != nil {
+			return Sandbox{}, err
+		}
+		return s.createGeneratedSandbox(ctx, ttl, subject, platform)
 	}
-	if err := validateName(name); err != nil {
+	if err = validateName(name); err != nil {
 		return Sandbox{}, err
 	}
-	return s.createNamedSandbox(ctx, name, ttl, subject)
+	platform, err = s.resolvePlatform(platform)
+	if err != nil {
+		return Sandbox{}, err
+	}
+	return s.createNamedSandbox(ctx, name, ttl, subject, platform)
 }
 
 // ListSandboxes returns every owned sandbox discovered from the backend.
@@ -174,6 +196,9 @@ func (s *Service) GetSandbox(ctx context.Context, name string) (Sandbox, []Insta
 	instances, err := s.backend.ListInstances(ctx, name)
 	if err != nil {
 		return Sandbox{}, nil, nil, s.backendError(ctx, "list instances", err)
+	}
+	if box.Platform == platformMac {
+		return box, nonNil(instances), []Network{}, nil
 	}
 	networks, err := s.backend.ListNetworks(ctx, name)
 	if err != nil {
@@ -342,8 +367,8 @@ func (s *Service) exec(ctx context.Context, req ExecRequest, outputLimit int) (E
 	if inst.Status != statusRunning && inst.Status != "Ready" {
 		return ExecResult{}, agentErrorf("instance %q in sandbox %q is not running", req.Ref.Name, req.Ref.Sandbox)
 	}
-	if strings.HasPrefix(strings.ToLower(inst.OS), "windows") && req.User != "" {
-		return ExecResult{}, agentError("Windows exec uses the Incus agent service identity; user is unsupported")
+	if err = validateExecUser(req, inst); err != nil {
+		return ExecResult{}, err
 	}
 
 	stdout := newDrainingWriter(outputLimit)
@@ -383,6 +408,9 @@ func (s *Service) exec(ctx context.Context, req ExecRequest, outputLimit int) (E
 
 // CreateNetwork creates an additional agent-facing network in a live sandbox.
 func (s *Service) CreateNetwork(ctx context.Context, sandbox string, network Network) (Network, error) {
+	if err := s.rejectIfMac(ctx, sandbox); err != nil {
+		return Network{}, err
+	}
 	network, err := prepareNetwork(network)
 	if err != nil {
 		return Network{}, err
@@ -401,6 +429,9 @@ func (s *Service) CreateNetwork(ctx context.Context, sandbox string, network Net
 
 // AttachNIC attaches an instance to a metadata-resolved network.
 func (s *Service) AttachNIC(ctx context.Context, ref Ref, network, nic, ip, mac string) (NIC, error) {
+	if err := s.rejectIfMac(ctx, ref.Sandbox); err != nil {
+		return NIC{}, err
+	}
 	if err := validateAttachment(ref, network, nic); err != nil {
 		return NIC{}, err
 	}
@@ -502,13 +533,17 @@ func (s *Service) createPreparedNetwork(
 	return created, nil
 }
 
-func (s *Service) createGeneratedSandbox(ctx context.Context, ttl time.Duration, subject string) (Sandbox, error) {
+func (s *Service) createGeneratedSandbox(
+	ctx context.Context,
+	ttl time.Duration,
+	subject, platform string,
+) (Sandbox, error) {
 	for range nameGenerateTries {
 		name, err := generateName()
 		if err != nil {
 			return Sandbox{}, err
 		}
-		box, err := s.createNamedSandbox(ctx, name, ttl, subject)
+		box, err := s.createNamedSandbox(ctx, name, ttl, subject, platform)
 		if err == nil {
 			return box, nil
 		}
@@ -524,7 +559,7 @@ func (s *Service) createNamedSandbox(
 	ctx context.Context,
 	name string,
 	ttl time.Duration,
-	subject string,
+	subject, platform string,
 ) (Sandbox, error) {
 	unlock, err := s.gate.Lock(ctx, name)
 	if err != nil {
@@ -541,15 +576,17 @@ func (s *Service) createNamedSandbox(
 
 	now := time.Now()
 	box := Sandbox{
-		Name:        name,
-		Platform:    platformIncus,
-		Subject:     subject,
-		NetworkKind: s.defaultNetworkKind,
-		CreatedAt:   now,
-		ExpiresAt:   now.Add(ttl),
+		Name:      name,
+		Platform:  platform,
+		Subject:   subject,
+		CreatedAt: now,
+		ExpiresAt: now.Add(ttl),
 	}
-	if s.defaultNetworkKind == kindBridge {
-		box.Host = s.host
+	if platform != platformMac {
+		box.NetworkKind = s.defaultNetworkKind
+		if s.defaultNetworkKind == kindBridge {
+			box.Host = s.host
+		}
 	}
 	if err := s.backend.CreateSandbox(ctx, box); err != nil {
 		return Sandbox{}, s.backendError(ctx, "create sandbox", err)
@@ -591,7 +628,10 @@ func (s *Service) beginInstance(ctx context.Context, req CreateInstance) (Pendin
 }
 
 func (s *Service) prepareCreate(box Sandbox, req CreateInstance) (CreateInstance, error) {
-	if isBridgeSandbox(box) {
+	if err := validateCreatePlatform(box, req); err != nil {
+		return CreateInstance{}, err
+	}
+	if box.Platform != platformMac && isBridgeSandbox(box) {
 		if box.Host == "" {
 			box.Host = s.host
 		}
@@ -617,6 +657,24 @@ func (s *Service) prepareCreate(box Sandbox, req CreateInstance) (CreateInstance
 		}
 	}
 	return req, nil
+}
+
+func validateCreatePlatform(box Sandbox, req CreateInstance) error {
+	sandboxPlatform := box.Platform
+	if sandboxPlatform == "" {
+		sandboxPlatform = platformIncus
+	}
+	imagePlatform := req.Image.Platform
+	if imagePlatform == "" {
+		imagePlatform = platformIncus
+	}
+	if sandboxPlatform != imagePlatform {
+		return agentErrorf("image %q is not available on platform %q", req.Image.Name, sandboxPlatform)
+	}
+	if sandboxPlatform == platformMac && (req.Host != "" || (req.Network != "" && req.Network != reservedDefault)) {
+		return unsupportedOnMac()
+	}
+	return nil
 }
 
 func (s *Service) withLiveSandbox(ctx context.Context, name string, fn func(Sandbox) error) error {
@@ -658,6 +716,23 @@ func (s *Service) resolveTTL(ttl time.Duration) (time.Duration, error) {
 	return ttl, nil
 }
 
+func (s *Service) resolvePlatform(platform string) (string, error) {
+	if platform == "" {
+		platform = platformIncus
+	}
+	switch platform {
+	case platformIncus:
+		return platformIncus, nil
+	case platformMac:
+		if !s.hasMac {
+			return "", agentErrorf("platform %q is not available yet", platformMac)
+		}
+		return platformMac, nil
+	default:
+		return "", agentErrorf("unsupported platform %q", platform)
+	}
+}
+
 func (s *Service) backendError(ctx context.Context, op string, err error) error {
 	if err == nil {
 		return nil
@@ -678,13 +753,27 @@ func validateRef(ref Ref) error {
 }
 
 func validateExec(req ExecRequest) error {
+	if req.Cwd != "" && !absoluteGuestPath(req.Cwd) {
+		return agentError("cwd must be an absolute path")
+	}
+	return nil
+}
+
+func validateExecUser(req ExecRequest, inst Instance) error {
+	osName := strings.ToLower(inst.OS)
+	if strings.HasPrefix(osName, "windows") {
+		if req.User != "" {
+			return agentError("Windows exec uses the Incus agent service identity; user is unsupported")
+		}
+		return nil
+	}
+	if (osName == osMacOS || osName == "darwin") && req.User == "lume" {
+		return nil
+	}
 	if req.User != "" && req.User != "root" {
 		if _, err := strconv.ParseUint(req.User, numericUIDBase, numericUIDBitSize); err != nil {
 			return agentError("user must be a numeric UID")
 		}
-	}
-	if req.Cwd != "" && !absoluteGuestPath(req.Cwd) {
-		return agentError("cwd must be an absolute path")
 	}
 	return nil
 }
@@ -694,10 +783,12 @@ func validateInstanceImage(req CreateInstance) error {
 	if platform == "" {
 		platform = platformIncus
 	}
-	if platform != platformIncus {
+	switch platform {
+	case platformIncus, platformMac:
+		return nil
+	default:
 		return agentErrorf("platform %q is not available yet", platform)
 	}
-	return nil
 }
 
 func validateInstanceKind(kind string, image CatalogImage) error {
