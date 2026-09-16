@@ -261,6 +261,16 @@ func TestInvalidDesktopArguments(t *testing.T) {
 	}
 }
 
+func TestMacGuestUsesUnixScreenshotPath(t *testing.T) {
+	t.Parallel()
+	assert.True(t, macGuest("macos"))
+	assert.True(t, macGuest("darwin"))
+	assert.False(t, macGuest("ubuntu"))
+	path, err := randomGuestPNG("macos")
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(path, "/tmp/cua-"))
+}
+
 func TestBoundImageHonorsMaxDimension(t *testing.T) {
 	t.Parallel()
 

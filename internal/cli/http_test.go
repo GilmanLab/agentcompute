@@ -8,6 +8,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -59,15 +63,15 @@ func TestCheckBindSecurity(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		addr      string
-		authToken string
-		insecure  bool
-		wantErr   bool
+		name          string
+		addr          string
+		authenticated bool
+		insecure      bool
+		wantErr       bool
 	}{
 		{name: "loopback without auth is allowed", addr: "localhost:8080"},
 		{name: "loopback ip without auth is allowed", addr: "127.0.0.1:8080"},
-		{name: "non-loopback with auth is allowed", addr: "0.0.0.0:8080", authToken: "secret"},
+		{name: "non-loopback with auth is allowed", addr: "0.0.0.0:8080", authenticated: true},
 		{name: "non-loopback with insecure is allowed", addr: "0.0.0.0:8080", insecure: true},
 		{name: "non-loopback without auth is refused", addr: "0.0.0.0:8080", wantErr: true},
 		{name: "all interfaces without auth is refused", addr: ":8080", wantErr: true},
@@ -77,7 +81,7 @@ func TestCheckBindSecurity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := checkBindSecurity(tt.addr, tt.authToken, tt.insecure)
+			err := checkBindSecurity(tt.addr, tt.authenticated, tt.insecure)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -91,7 +95,7 @@ func TestRequireBearerToken(t *testing.T) {
 	t.Parallel()
 
 	const token = "s3cret-token"
-	middleware := requireBearerToken(token, "localhost:8080")
+	middleware := requireBearerTokens(testBearerTokens(t, `{"operator":"s3cret-token"}`))
 
 	tests := []struct {
 		name          string
@@ -194,21 +198,6 @@ func TestHTTPCommandReadsAddrFromEnvironment(t *testing.T) {
 	require.ErrorContains(t, err, "0.0.0.0:65535", "the refusal must mention the env-provided address")
 }
 
-// TestEnvBindingResolvesHyphenatedFlag covers the SetEnvKeyReplacer hop that the
-// addr test does not: the "auth-token" flag binds to AGENTCOMPUTE_AUTH_TOKEN
-// (hyphen -> underscore). A regression dropping the replacer would break this
-// while the hyphen-free addr key kept working, so it is tested explicitly. It
-// binds flags directly rather than serving, keeping the test deterministic.
-func TestEnvBindingResolvesHyphenatedFlag(t *testing.T) {
-	t.Setenv(templateinfo.EnvPrefix()+"_AUTH_TOKEN", "from-env")
-
-	vp := viper.New()
-	httpCmd := newHTTPCommand(Options{Viper: vp})
-	require.NoError(t, initializeConfig(httpCmd, vp))
-
-	assert.Equal(t, "from-env", vp.GetString(authTokenFlag))
-}
-
 func TestServeHTTPExposesCodeModeTools(t *testing.T) {
 	t.Parallel()
 
@@ -221,44 +210,102 @@ func TestServeHTTPExposesCodeModeTools(t *testing.T) {
 	assertCodeModeExecute(t, session)
 }
 
-func TestServeHTTPRejectsMissingBearerThenServes(t *testing.T) {
+func TestServeHTTPReverseProxy(t *testing.T) {
 	t.Parallel()
 
-	const token = "s3cret-token"
-	ln := startHTTPListener(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	for _, authenticated := range []bool{false, true} {
+		name := "unauthenticated"
+		if authenticated {
+			name = "authenticated"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			const token = "s3cret-token"
+			cfg := httpConfig{
+				build:  BuildInfo{Version: "test"},
+				logger: slog.New(slog.DiscardHandler),
+				deps:   *testDependencies(t),
+			}
+			if authenticated {
+				cfg.authTokens = testBearerTokens(t, `{"operator":"s3cret-token"}`)
+			}
+			ln := startHTTPListener(t)
+			cfg.addr = ln.Addr().String()
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			serveErr := make(chan error, 1)
+			go func() { serveErr <- serveHTTP(ctx, ln, cfg) }()
+			t.Cleanup(func() {
+				cancel()
+				select {
+				case err := <-serveErr:
+					require.NoError(t, err)
+				case <-time.After(serverExitTimeout):
+					t.Fatal("serveHTTP did not return after context cancellation")
+				}
+			})
+			endpoint := "http://" + ln.Addr().String()
+			waitForHTTP(t, endpoint)
+			target, err := url.Parse(endpoint)
+			require.NoError(t, err)
+			proxy := httputil.NewSingleHostReverseProxy(target)
+			front := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				r.Host = "compute.example"
+				proxy.ServeHTTP(w, r)
+			}))
+			t.Cleanup(front.Close)
 
-	serveErr := make(chan error, 1)
-	deps := *testDependencies(t)
-	go func() {
-		serveErr <- serveHTTP(ctx, ln, httpConfig{
-			build:     BuildInfo{Version: "test"},
-			addr:      ln.Addr().String(),
-			authToken: token,
-			logger:    slog.New(slog.DiscardHandler),
-			deps:      deps,
+			resp, err := http.Get(front.URL)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+			if !authenticated {
+				assert.Equal(t, http.StatusForbidden, resp.StatusCode,
+					"unauthenticated loopback must retain DNS rebinding protection")
+				return
+			}
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+			session := connectHTTPSession(t, front.URL, token)
+			assertCodeModeExecute(t, session)
+
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, front.URL, nil)
+			require.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Origin", "https://attacker.example")
+			resp, err = http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+			assert.Equal(t, http.StatusForbidden, resp.StatusCode,
+				"authenticated proxy must retain cross-origin protection")
 		})
-	}()
-
-	endpoint := "http://" + ln.Addr().String()
-	waitForHTTP(t, endpoint)
-
-	resp, err := http.Get(endpoint + "/")
-	require.NoError(t, err, "unauthenticated request")
-	require.NoError(t, resp.Body.Close())
-	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-
-	session := connectHTTPSession(t, endpoint, token)
-	assertCodeModeExecute(t, session)
-
-	cancel()
-	select {
-	case err := <-serveErr:
-		require.NoError(t, err, "context cancellation is a clean shutdown")
-	case <-time.After(serverExitTimeout):
-		t.Fatal("serveHTTP did not return after context cancellation")
 	}
+}
+
+func TestHTTPRejectsInvalidCredentialFileBeforeBackendStartup(t *testing.T) {
+	for _, content := range []string{
+		`{}`, `null`, `{"alice":""}`, `{"":"token"}`,
+		`{"alice":"secret","alice":"other"}`, `{"alice":"same","bob":"same"}`,
+		`{"alice":123}`, `{"alice":"secret"} {}`, `{"alice":"has space"}`, `{"alice":"secret"`,
+	} {
+		t.Run(content, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "auth-tokens.json")
+			require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+			t.Setenv(templateinfo.EnvPrefix()+"_AUTH_TOKENS_FILE", path)
+			root := NewRootCommand(Options{Viper: viper.New()})
+			root.SetArgs([]string{httpCommandName})
+			err := root.ExecuteContext(context.Background())
+			require.ErrorContains(t, err, "bearer")
+			assert.NotContains(t, err.Error(), "secret")
+		})
+	}
+}
+
+func testBearerTokens(t *testing.T, content string) []bearerIdentity {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "auth-tokens.json")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+	tokens, err := loadBearerTokens(path)
+	require.NoError(t, err)
+	return tokens
 }
 
 func startHTTPListener(t *testing.T) net.Listener {

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/meigma/codemode/authz"
@@ -28,28 +26,16 @@ const (
 	httpCommandName = "http"
 	// Flag (and viper key) names for the http subcommand. Shared between flag
 	// registration and value retrieval so the two cannot drift.
-	addrFlag      = "addr"
-	authTokenFlag = "auth-token"
-	insecureFlag  = "insecure"
+	addrFlag           = "addr"
+	credentialFileFlag = "auth-tokens-file" //nolint:gosec // G101: flag name, not credential material.
+	insecureFlag       = "insecure"
 	// httpShutdownTimeout bounds how long graceful shutdown waits for in-flight
 	// requests to finish before the server is forced closed.
 	httpShutdownTimeout = 10 * time.Second
 	// httpReadHeaderTimeout bounds how long the server waits to read request
 	// headers, mitigating Slowloris-style attacks.
 	httpReadHeaderTimeout = 10 * time.Second
-	// demoAuthScope is the single scope advertised and required by the
-	// DEMO-ONLY bearer-token seam. A real deployment derives scopes from the
-	// validated token instead.
-	demoAuthScope = "mcp"
-	// demoTokenLifetime is the synthetic expiry reported for the demo token.
-	// The middleware requires a non-zero expiration; a real verifier would read
-	// the token's own exp claim instead.
-	demoTokenLifetime = time.Hour
 )
-
-// httpSharedTokenSubjectID is the demo non-secret identity installed after the
-// shared bearer token verifies. It is not the token value.
-const httpSharedTokenSubjectID authz.SubjectID = "shared-token"
 
 // httpDevelopmentSubjectID is the explicit development identity for allowed
 // loopback and --insecure unauthenticated HTTP modes.
@@ -61,8 +47,8 @@ type httpConfig struct {
 	build BuildInfo
 	// addr is the host:port to bind.
 	addr string
-	// authToken enables the DEMO-ONLY bearer middleware when non-empty.
-	authToken string
+	// authTokens holds validated credential digests and their non-secret identities.
+	authTokens []bearerIdentity
 	// insecure permits a non-loopback bind without authentication.
 	insecure bool
 	// logger receives the server's diagnostics and lifecycle events. It must
@@ -93,9 +79,13 @@ func newHTTPCommand(options Options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			tokens, err := loadBearerTokens(options.Viper.GetString(credentialFileFlag))
+			if err != nil {
+				return err
+			}
 			if bindErr := checkBindSecurity(
 				options.Viper.GetString(addrFlag),
-				options.Viper.GetString(authTokenFlag),
+				len(tokens) > 0,
 				options.Viper.GetBool(insecureFlag),
 			); bindErr != nil {
 				return bindErr
@@ -107,7 +97,7 @@ func newHTTPCommand(options Options) *cobra.Command {
 			runErr := runHTTP(cmd.Context(), httpConfig{
 				build:       options.Build,
 				addr:        options.Viper.GetString(addrFlag),
-				authToken:   options.Viper.GetString(authTokenFlag),
+				authTokens:  tokens,
 				insecure:    options.Viper.GetBool(insecureFlag),
 				logger:      logger,
 				deps:        rt.deps,
@@ -124,13 +114,11 @@ func newHTTPCommand(options Options) *cobra.Command {
 		"localhost:8080",
 		fmt.Sprintf("address to listen on (env %s_ADDR)", templateinfo.EnvPrefix()),
 	)
-	// --auth-token is empty by default, which disables auth. See requireBearerToken
-	// for the heavy caveats: this is a DEMO-ONLY seam, not production auth.
 	cmd.Flags().String(
-		authTokenFlag,
+		credentialFileFlag,
 		"",
 		fmt.Sprintf(
-			"DEMO-ONLY shared bearer token; empty disables auth (env %s_AUTH_TOKEN)",
+			"JSON credential file mapping identity names to bearer tokens (env %s_AUTH_TOKENS_FILE)",
 			templateinfo.EnvPrefix(),
 		),
 	)
@@ -152,7 +140,7 @@ func newHTTPCommand(options Options) *cobra.Command {
 // runHTTP validates the bind configuration, binds the listener, and serves the
 // MCP server on it until the context is cancelled.
 func runHTTP(ctx context.Context, cfg httpConfig) error {
-	if err := checkBindSecurity(cfg.addr, cfg.authToken, cfg.insecure); err != nil {
+	if err := checkBindSecurity(cfg.addr, len(cfg.authTokens) > 0, cfg.insecure); err != nil {
 		return err
 	}
 
@@ -184,13 +172,18 @@ func serveHTTP(ctx context.Context, ln net.Listener, cfg httpConfig) error {
 		closeErr := ln.Close()
 		return errors.Join(err, closeErr)
 	}
-	mcpServer.AddReceivingMiddleware(installHTTPSubject(cfg.authToken != ""))
+	mcpServer.AddReceivingMiddleware(installHTTPSubject(len(cfg.authTokens) > 0))
 
 	handler := mcp.NewStreamableHTTPHandler(
 		func(*http.Request) *mcp.Server {
 			return mcpServer
 		},
-		nil,
+		&mcp.StreamableHTTPOptions{
+			// Authenticated reverse proxies preserve the public Host header.
+			// Bearer verification below remains mandatory before SDK dispatch.
+			// Unauthenticated loopback servers retain DNS rebinding protection.
+			DisableLocalhostProtection: len(cfg.authTokens) > 0,
+		},
 	)
 
 	// MUST: the SDK does NOT enable Origin verification by default. Wrapping the
@@ -198,12 +191,9 @@ func serveHTTP(ctx context.Context, ln net.Listener, cfg httpConfig) error {
 	// cross-origin browser requests, mitigating CSRF and DNS-rebinding attacks.
 	rootHandler := http.NewCrossOriginProtection().Handler(handler)
 
-	// When a token is configured, gate the server behind the DEMO-ONLY bearer
-	// middleware. The middleware runs outside CrossOriginProtection so that
-	// unauthenticated requests are rejected as early as possible. The shared
-	// demo identity is installed only after the verifier succeeds.
-	if cfg.authToken != "" {
-		rootHandler = requireBearerToken(cfg.authToken, cfg.addr)(rootHandler)
+	// Authenticate before accepting MCP requests, including through a loopback proxy.
+	if len(cfg.authTokens) > 0 {
+		rootHandler = requireBearerTokens(cfg.authTokens)(rootHandler)
 	}
 	if cfg.screenshots != nil {
 		mux := http.NewServeMux()
@@ -262,14 +252,14 @@ func serveHTTP(ctx context.Context, ln net.Listener, cfg httpConfig) error {
 // anyone who can reach the port — CrossOriginProtection only stops browser
 // cross-origin requests, not direct clients such as curl. Such a configuration
 // is allowed only when the operator explicitly opts in with --insecure.
-func checkBindSecurity(addr, authToken string, insecure bool) error {
-	if isLoopbackHost(addr) || authToken != "" || insecure {
+func checkBindSecurity(addr string, authenticated, insecure bool) error {
+	if isLoopbackHost(addr) || authenticated || insecure {
 		return nil
 	}
 
 	return fmt.Errorf(
 		"refusing to bind non-loopback address %q without authentication: "+
-			"set --auth-token (env %s_AUTH_TOKEN) to require a bearer token, "+
+			"set --auth-tokens-file (env %s_AUTH_TOKENS_FILE) to require a bearer token, "+
 			"or pass --insecure to expose all tools unauthenticated (UNSAFE)",
 		addr,
 		templateinfo.EnvPrefix(),
@@ -302,61 +292,8 @@ func isLoopbackHost(addr string) bool {
 	}
 }
 
-// requireBearerToken builds DEMO-ONLY bearer-token middleware.
-//
-// WARNING: This is a placeholder, NOT production authorization. It compares the
-// presented bearer token to a single shared secret. It does not validate a JWT
-// signature, issuer, audience, or expiry, and a shared static token cannot be
-// revoked or scoped per client.
-//
-// To make this production-grade, replace the TokenVerifier below with a real
-// OAuth 2.1 resource-server verifier that:
-//   - validates the access token's signature against the authorization
-//     server's JWKS;
-//   - checks the issuer (iss) and audience (aud) claims, binding the token to
-//     this resource server per RFC 8707;
-//   - checks expiry (exp/nbf) and the required scopes;
-//   - publishes /.well-known/oauth-protected-resource (RFC 9728) so clients can
-//     discover the authorization server.
-//
-// See the README for the full upgrade path.
-func requireBearerToken(token, addr string) func(http.Handler) http.Handler {
-	secret := []byte(token)
-
-	verifier := func(_ context.Context, presented string, _ *http.Request) (*auth.TokenInfo, error) {
-		// Constant-time comparison avoids leaking the secret length/contents
-		// through timing. ConstantTimeCompare reports inequality for differing
-		// lengths, so no separate length check is needed.
-		if subtle.ConstantTimeCompare([]byte(presented), secret) != 1 {
-			return nil, auth.ErrInvalidToken
-		}
-
-		// The middleware requires a non-zero expiration and the configured
-		// scopes. A real verifier would read these from the validated token.
-		// UserID is the demo non-secret identity, never the shared secret.
-		return &auth.TokenInfo{
-			Scopes:     []string{demoAuthScope},
-			Expiration: time.Now().Add(demoTokenLifetime),
-			UserID:     string(httpSharedTokenSubjectID),
-		}, nil
-	}
-
-	return auth.RequireBearerToken(verifier, &auth.RequireBearerTokenOptions{
-		// Advertised to unauthenticated clients via the WWW-Authenticate header
-		// so they can discover the (here, hypothetical) authorization server.
-		//
-		// Caveat (demo-only): this naively reuses the bind address, so it is
-		// wrong for binds that are not a routable host:port — for example
-		// ":8080" yields "http://:8080/..." and "0.0.0.0" advertises a
-		// non-routable address. A real deployment configures the externally
-		// reachable resource URL explicitly rather than deriving it from --addr.
-		ResourceMetadataURL: fmt.Sprintf("http://%s/.well-known/oauth-protected-resource", addr),
-		Scopes:              []string{demoAuthScope},
-	})
-}
-
 // installHTTPSubject copies per-request identity into the MCP handler context.
-// TokenInfo is present only after the demo bearer verifier succeeds. Unauthenticated
+// TokenInfo is present only after the bearer verifier succeeds. Unauthenticated
 // loopback and --insecure modes receive the explicit development identity.
 // When a token is configured and TokenInfo is missing, the subject is left
 // unset so ContextSubject fails closed.

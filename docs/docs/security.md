@@ -20,22 +20,24 @@ The adapter resolves a trusted `authz.Subject` before search, description, or ex
 - STDIO uses `StaticSubject` with subject ID `local`. This is appropriate only when ownership of the local process is the authentication boundary.
 - HTTP uses `ContextSubject`. The SDK authentication verifier places a stable, non-secret identity in `auth.TokenInfo.UserID`.
 - The `installHTTPSubject` receiving middleware reads `req.GetExtra().TokenInfo.UserID` from each MCP request, stores an `authz.Subject` with `authz.WithSubject` on the MCP handler context, and then lets `ContextSubject` resolve it.
-- A valid demo bearer token produces the fixed user ID `shared-token`. The token value is never used as the user or subject ID.
+- A valid bearer token produces its credential entry's name as the user ID. The token value is never used as the user or subject ID.
 - Allowed loopback and explicit `--insecure` requests without a token pass the fixed development ID `development` through the same bridge.
 
 The MCP SDK establishes the receiving handler context, so setting an arbitrary value only on the outer `net/http` request context is not sufficient. Program source, capability arguments, MCP `_meta`, and unvalidated request headers cannot establish or replace identity.
 
-## Replace demo authentication before deployment
+## Authenticate the deployed HTTP endpoint
 
-HTTP defaults to `localhost:8080` and enables standard-library cross-origin protection. A non-loopback address without a token is refused unless `--insecure` explicitly permits unauthenticated exposure.
+HTTP defaults to `localhost:8080` and enables standard-library cross-origin protection. A non-loopback address without a credential file is refused unless `--insecure` explicitly permits unauthenticated exposure. A configured credential file requires a valid token on loopback too, including requests proxied by Tailscale Serve.
 
-Cross-origin protection mitigates browser-origin attacks; it does not authenticate direct clients. The shared-token seam only performs constant-time comparison with one configured secret. It does not validate a signature, issuer, audience, expiry, revocation state, or client-specific scope.
+With bearer authentication configured, a reverse proxy may preserve its public `Host` header when forwarding to loopback. The server disables only the SDK's localhost-host restriction in that mode; bearer verification still runs before MCP dispatch, and cross-origin protection stays enabled. Without bearer authentication, loopback requests with a non-localhost `Host` remain forbidden.
 
-For production, implement the MCP authorization requirements for an OAuth 2.1 protected resource, including protected-resource metadata, audience-restricted access tokens, PKCE with S256 where applicable, and validation against a trusted authorization server. The real verifier must set `auth.TokenInfo.UserID` to the authenticated caller's stable, non-secret identity. Keep the receiving bridge and `ContextSubject`; do not replace them with an outer HTTP context wrapper.
+Cross-origin protection does not authenticate direct clients. Named static tokens are loaded once from `--auth-tokens-file` and compared using constant-time SHA-256 digest comparisons on every request. The verified name becomes the sandbox subject. Rotate or revoke a token by replacing the credential file and restarting the process. Tokens have no inherent expiry or per-client scopes; this is not an OAuth resource server and does not advertise a nonexistent authorization server.
+
+Keep the listener on loopback, terminate public-root HTTPS with Tailscale Serve, and deliver secret files with systemd credentials. Do not use `--insecure` in deployment. Screenshot URLs remain short-lived bearer capabilities mounted beside MCP, so protect their transport and avoid recording them in shared logs.
 
 STDIO servers do not use HTTP OAuth. They obtain any credentials needed by handlers from the launched process's environment or another local trust channel.
 
-## Treat `AllowAll` as an explicit demo policy
+## Treat `AllowAll` as a trusted-operator policy
 
 The CLI passes `authz.AllowAll()` through `mcpserver.Options.Runtime.Authorizer`. CodeMode has no default authorizer, and the template constructor does not silently create one.
 

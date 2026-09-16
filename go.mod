@@ -9,10 +9,13 @@ require (
 	github.com/meigma/codemode v0.2.1
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/pelletier/go-toml/v2 v2.4.3
+	github.com/pkg/sftp v1.13.11
+	github.com/skeema/knownhosts v1.3.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
 	go.yaml.in/yaml/v3 v3.0.5
+	golang.org/x/crypto v0.55.0
 	golang.org/x/image v0.31.0
 )
 
@@ -51,7 +54,6 @@ require (
 	github.com/opencontainers/runtime-spec v1.3.0 // indirect
 	github.com/opencontainers/umoci v0.6.1-0.20251213054154-70fc5ee1f4df // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pkg/sftp v1.13.11 // indirect
 	github.com/pkg/xattr v0.4.12 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/rootless-containers/proto/go-proto v0.0.0-20260207013450-f6ee952d53d9 // indirect
@@ -77,7 +79,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.starlark.net v0.0.0-20260708150628-5395d018f003 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.6 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect

@@ -1,4 +1,4 @@
-// Package compute orchestrates disposable Incus sandboxes.
+// Package compute orchestrates disposable sandboxes.
 package compute
 
 import (
@@ -59,6 +59,8 @@ type Instance struct {
 	NICs []NIC
 	// Snapshots contains guest snapshot names.
 	Snapshots []string
+	// VNCURL is an optional backend-reported VNC endpoint, used when port forwards are unavailable.
+	VNCURL string
 }
 
 // NIC describes an attached interface using agent-facing network names.
@@ -121,6 +123,8 @@ type CatalogImage struct {
 	Reference string
 	// Alias names a qualified cluster-local image in the image-build project.
 	Alias string
+	// Seed is the host-local Lume VM name for macOS images.
+	Seed string
 	// Fingerprint is derived during reconciliation, not an image build identity.
 	Fingerprint string
 	// CPUs is the default CPU count.
