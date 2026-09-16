@@ -19,8 +19,8 @@ Migrating to a mini is moving that account's `~/.lume` directory and
 re-issuing one SSH key.
 
 First-boot clones require the identity-pinning step below. The clone gate now
-rejects Setup Assistant rather than skipping the desktop check. The local
-host procedure is qualified; it is not evidence of a deployed MCP backend.
+rejects Setup Assistant rather than skipping the desktop check. The seed and
+deployed MCP backend are qualified; see [Verify the backend](#verify-the-backend).
 
 `macos/sequoia/desktop` is recorded but **not** the qualified train. Sequoia's
 last full restore image is 15.6.1 (24G90, 2025-08-20) — a year behind that
@@ -45,11 +45,13 @@ It must remain hidden, standard, and unable to use sudo. The owner's home must
 deny traversal by this account; a `staff`-readable home is insufficient because
 both accounts belong to `staff`.
 
-The approved SSH policy below is **not installed yet**: the existing server
-VM's identity and source IP are still needed. The old forced-command policy
-remains active. The account's hidden/non-admin status, failed `sudo -n true`,
-and owner-home denial were verified; same-key rejection from a different source
-has not been exercised.
+Phase 9a installed this policy for `agentcompute01` (`100.65.152.20`,
+`agentcompute01.tailda715.ts.net`). Qualification confirmed that its private key
+matches Studio's installed public key and that both source restrictions name
+that address. Phase 9a proved same-key refusal from a different source.
+Studio remains untagged; the minimal tailnet policy is
+[networking#22](https://github.com/GilmanLab/networking/pull/22), not the older
+`tag:macbackend` proposal. Qualification changed no Mac permissions or ACLs.
 
 ## Authorize the remote transport
 
@@ -179,11 +181,42 @@ The lane creates a uniquely named sandbox and guest, waits for desktop/Driver
 readiness, checks guest execution, and deletes the sandbox on cleanup. It is
 a backend API check, not a substitute for deployed MCP acceptance.
 
-Deployed qualification remains pending: create without Setup Assistant,
-`sw_vers`, app listing, screenshot retrieval, snapshot restore, restart
-rediscovery and TTL deletion, unsupported-network AgentErrors, two concurrent
-guests and third-guest refusal. Creation and screenshot service timings have
-not been measured. PF and tailnet ACLs have not been changed.
+Live qualification ran from `agentcompute01` on 2026-09-16 UTC, using the
+existing source-pinned key and a build based on v0.1.1. The final acceptance
+build identifies source commit `4f7024d`. It retains the release's bearer
+authentication and loopback reverse-proxy fixes.
+
+MCP checks passed: Mac sandbox creation; Running guests without Setup
+Assistant on the fetched screenshot; `sw_vers`; Driver `list_apps`; screenshot
+URL retrieval from the agent workstation; snapshot restore recovering a
+pre-snapshot file; two running guests and third-guest refusal; unsupported
+network creation; restart rediscovery; and explicit sandbox deletion leaving
+only the stopped seed. A running TTL guest survived a server restart and was
+observed deleted 17.61 s after expiry. The final backend integration lane
+passed in 74.58 s.
+
+The final complete MCP run measured 37.46 s and 51.05 s for the two creates,
+and 4.74 s for screenshot creation plus HTTPS retrieval. These are individual
+observations, not cold-start guarantees: earlier creates took 80–98 s.
+Machine-readable evidence is in
+[`spikes/lume/qualification.json`](../../spikes/lume/qualification.json).
+
+Qualification used a runtime-only systemd override, then restored the
+fleet-pinned v0.1.1 binary, configuration, and catalog. Temporary credentials
+and binaries were removed. This is qualification evidence, not a permanent
+Lume rollout. PF and tailnet ACLs were not changed; the VNC restriction below
+remains an operator rollout prerequisite.
+
+Three live-only defects were fixed and regression-tested: SSH negotiated an
+unpinned host-key algorithm; Lume rejected an equal-size disk PATCH; and zsh
+rejected an empty sidecar glob after deletion. The backend now negotiates from
+known-host pins, omits unchanged disk sizes, and executes host scripts under
+`/bin/sh`.
+
+One concurrent-listing finding remains outside this qualification fix:
+`sandbox.list` can return a transient not-found error if another process deletes
+a listed sandbox before its details are read. This occurred during parallel
+live-lane teardown; the sequential lifecycle and TTL checks passed.
 
 ## Restrict VNC before serving workers
 
@@ -486,7 +519,7 @@ account's inventory with `/usr/local/bin/lume ls --format json`. Count running
 pending starts. Refuse a third Lume-owned running macOS guest:
 
 ```text
-macOS guest limit reached (2 per host); other accounts may also occupy slots
+macOS guest limit reached (2 per host); the owner's macOS VMs share this budget
 ```
 
 This inventory is not a host-wide authority: another account's VM is invisible

@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "qualified_at_utc": "2026-09-16T00:29:55.360544+00:00",
+  "source_commit": "4f7024d",
+  "base_release": "v0.1.1",
+  "server": {
+    "name": "agentcompute01",
+    "tailnet_ipv4": "100.65.152.20",
+    "magic_dns": "agentcompute01.tailda715.ts.net",
+    "cluster_member": "lab01"
+  },
+  "mac": {
+    "host": "studio-1",
+    "tailnet_ipv4": "100.122.142.76",
+    "lume_version": "0.5.3",
+    "seed": "ac-seed-macos-tahoe-desktop",
+    "guest_macos": "26.6.2",
+    "guest_build": "25G83",
+    "account": "agentcompute",
+    "studio_tagged": false
+  },
+  "policy": {
+    "installed_public_key_matches_server_private_key": true,
+    "authorized_source": "100.65.152.20",
+    "same_key_wrong_source_proof": "Established by Phase 9a; not repeated",
+    "ssh_policy_changed": false,
+    "mac_permissions_changed": false,
+    "pf_applied": false,
+    "tailnet_policy_changed": false,
+    "tailnet_policy_pr": "https://github.com/GilmanLab/networking/pull/22"
+  },
+  "checks": {
+    "live_lume_lane": {
+      "passed": true,
+      "seconds": 74.58,
+      "executed_as": "agentcompute on agentcompute01",
+      "binary": "cross-compiled Linux/amd64 go test executable"
+    },
+    "deployed_mcp": {
+      "passed": true,
+      "build_version": "0.1.1-phase8.4f7024d",
+      "bearer_subject": "omp",
+      "no_setup_assistant_on_fetched_screenshot": true,
+      "list_apps_ok": true,
+      "sw_vers": "macOS 26.6.2 (25G83)",
+      "snapshot_file_transition": [
+        "before",
+        "after",
+        "before"
+      ],
+      "two_instances_running": true,
+      "third_instance_error": "capability failed: macOS guest limit reached (2 per host); the owner's macOS VMs share this budget",
+      "network_create_error": "capability failed: unsupported on platform mac",
+      "restart_rediscovers_two_running_instances": true,
+      "same_machine_identifier_as_seed": true,
+      "distinct_seed_and_guest_MAC_addresses": true,
+      "delete_leaves_only_stopped_seed": true,
+      "empty_sandbox_list_after_delete": true
+    },
+    "ttl": {
+      "running_guest_rediscovered_after_restart": true,
+      "expires_at": "2026-09-16T00:20:33Z",
+      "first_observed_absent_at": "2026-09-16T00:20:50.610178+00:00",
+      "observed_seconds_after_expiry": 17.61,
+      "remaining_vms": "stopped seed only"
+    }
+  },
+  "final_mcp_timings_seconds": {
+    "sandbox_create": 0.159,
+    "create_one": 37.456,
+    "create_two": 51.049,
+    "sw_vers": 1.549,
+    "list_apps": 3.729,
+    "screenshot": 4.652,
+    "snapshot_create": 46.239,
+    "snapshot_restore": 35.268,
+    "refuse_three": 0.844,
+    "refuse_network": 0.107
+  },
+  "screenshot": {
+    "width": 1920,
+    "height": 1200,
+    "bytes": 1379304,
+    "sha256": "6f2cf56e15249591e1fa3200f91c2637c43e871bd0f133ffdb08b4e31c8b1666",
+    "https_fetch_seconds": 0.085,
+    "call_plus_fetch_seconds": 4.737,
+    "visual_observation": "macOS desktop, Terminal window and Dock; no Setup Assistant"
+  },
+  "delete_seconds": 18.516,
+  "fixed_findings": [
+    "Select SSH algorithms from verified known-host entries instead of negotiating an unpinned host key.",
+    "Omit diskSize when Lume clone capacity already equals the request; still apply CPU/memory and allow growth.",
+    "Execute host scripts under /bin/sh rather than inheriting zsh unmatched-glob failures."
+  ],
+  "regression_proof": [
+    "TestAPITunnelJSONDeleteAndErrors failed with multiple host keys before the fix and passed afterward.",
+    "TestCreateAppliesResourcesAndRejectsShrink failed for equal capacity before the fix and passed afterward.",
+    "TestDeleteSandboxDeletesExactMappedVMsOnly failed on the empty sidecar glob before the fix and passed afterward."
+  ],
+  "validation": [
+    "golangci-lint fmt",
+    "golangci-lint run: 0 issues",
+    "go test -race ./...: pass",
+    "go build ./...: pass",
+    "Linux/amd64 CGO_ENABLED=0 service and live-lane builds: pass"
+  ],
+  "residual_findings": [
+    "Concurrent sandbox.list can return a transient not-found error when another process deletes a listed sandbox before detail lookup; observed during parallel integration-lane teardown.",
+    "PF was not applied; wildcard VNC listener exposure remains a rollout prerequisite.",
+    "Existing Driver cold-boot scheduling/duplicate-launcher finding remains; no seed or TCC changes were made.",
+    "Incus credential remains unrestricted under the approved Phase 9a exception; not requalified here."
+  ],
+  "cleanup": {
+    "original_release_restored": "v0.1.1",
+    "fleet_managed_config_and_catalog_unchanged": true,
+    "runtime_override_removed": true,
+    "temporary_binaries_and_guest_credential_removed": true,
+    "unauthenticated_mcp_status": 401,
+    "remaining_vms": "stopped seed only",
+    "mac_ssh_policy_unchanged": true,
+    "permanent_lume_rollout": false
+  }
+}

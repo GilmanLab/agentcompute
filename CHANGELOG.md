@@ -6,8 +6,15 @@
 
 - Optional Lume macOS backend with identity-pinned clones, durable sandbox
   metadata, snapshot recovery, SSH guest execution, and SFTP file transfer.
-- Mac platform dispatch and the Tahoe desktop seed catalog entry. Deployment
-  qualification remains pending the server VM's source-restricted SSH setup.
+- Mac platform dispatch and the Tahoe desktop seed catalog entry, qualified
+  through deployed MCP on `agentcompute01`.
+
+### Fixed
+
+- Negotiate SSH host-key algorithms from the pinned known-host entries.
+- Omit unchanged disk sizes from Lume resource updates.
+- Run host scripts under `/bin/sh` so empty sandbox discovery works with a
+  zsh login shell.
 
 ## [0.1.1](https://github.com/GilmanLab/agentcompute/compare/v0.1.0...v0.1.1) (2026-09-15)
 
