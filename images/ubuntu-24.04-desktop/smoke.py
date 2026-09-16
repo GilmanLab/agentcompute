@@ -19,11 +19,9 @@ import hashlib
 import json
 import os
 import shutil
-import struct
 import subprocess
 import sys
 import time
-import zlib
 from pathlib import Path
 
 DRIVER_BIN = "/usr/local/bin/cua-driver"
@@ -35,11 +33,6 @@ GUEST_GID = "1000"
 X11_SOCKET = "/tmp/.X11-unix/X0"
 EDITOR_LAUNCH = "gnome-text-editor"
 GUEST_DESKTOP_PNG = "/tmp/agentcompute-desktop-smoke.png"
-# A frozen or unpainted X screen reads as one flat colour. The live GNOME
-# desktop has thousands of distinct colours in the wallpaper alone, so any
-# sample this dull means whole-desktop capture is broken.
-MIN_DESKTOP_COLORS = 16
-DESKTOP_SAMPLE_STEP = 4
 
 
 class Error(RuntimeError):
@@ -137,79 +130,23 @@ def guest_pull(remote: str, project: str, name: str, guest_path: str, target: Pa
         die(f"pulling {guest_path} failed: {(pulled.stderr or pulled.stdout or '').strip()}")
 
 
-def png_rows(raw: bytes) -> tuple[int, int, int, bytes]:
-    """Return width, height, bytes per pixel, and unfiltered 8-bit samples."""
-    if raw[:8] != b"\x89PNG\r\n\x1a\n":
+def screenshot_pixels(raw: bytes) -> bytes:
+    """Compare PNG image data without timestamps or other ancillary metadata."""
+    if not raw.startswith(b"\x89PNG\r\n\x1a\n"):
         die("screenshot is not a PNG")
     offset = 8
-    header: tuple[int, ...] = ()
-    compressed = bytearray()
-    while offset + 8 <= len(raw):
+    pixels = bytearray()
+    while offset + 12 <= len(raw):
         length = int.from_bytes(raw[offset : offset + 4], "big")
-        kind = raw[offset + 4 : offset + 8]
-        body = raw[offset + 8 : offset + 8 + length]
-        if kind == b"IHDR":
-            header = struct.unpack(">IIBBBBB", body)
-        elif kind == b"IDAT":
-            compressed += body
-        offset += 12 + length
-    if not header:
-        die("screenshot PNG has no IHDR")
-    width, height, depth, colour, _, _, interlace = header
-    channels = {0: 1, 2: 3, 4: 2, 6: 4}.get(colour)
-    if channels is None or depth != 8 or interlace != 0:
-        die(f"screenshot PNG is depth {depth} colour type {colour} interlace {interlace}")
-    stride = width * channels
-    data = zlib.decompress(bytes(compressed))
-    out = bytearray(height * stride)
-    previous = bytearray(stride)
-    position = 0
-    for row in range(height):
-        method = data[position]
-        position += 1
-        line = bytearray(data[position : position + stride])
-        position += stride
-        if method == 1:
-            for index in range(channels, stride):
-                line[index] = (line[index] + line[index - channels]) & 0xFF
-        elif method == 2:
-            for index in range(stride):
-                line[index] = (line[index] + previous[index]) & 0xFF
-        elif method == 3:
-            for index in range(stride):
-                left = line[index - channels] if index >= channels else 0
-                line[index] = (line[index] + ((left + previous[index]) >> 1)) & 0xFF
-        elif method == 4:
-            for index in range(stride):
-                left = line[index - channels] if index >= channels else 0
-                up = previous[index]
-                corner = previous[index - channels] if index >= channels else 0
-                estimate = left + up - corner
-                da, db, dc = abs(estimate - left), abs(estimate - up), abs(estimate - corner)
-                if da <= db and da <= dc:
-                    predictor = left
-                elif db <= dc:
-                    predictor = up
-                else:
-                    predictor = corner
-                line[index] = (line[index] + predictor) & 0xFF
-        elif method != 0:
-            die(f"screenshot PNG row {row} uses filter {method}")
-        out[row * stride : (row + 1) * stride] = line
-        previous = line
-    return width, height, channels, bytes(out)
-
-
-def distinct_colors(raw: bytes) -> int:
-    width, height, channels, pixels = png_rows(raw)
-    stride = width * channels
-    seen: set[bytes] = set()
-    for row in range(0, height, DESKTOP_SAMPLE_STEP):
-        line = pixels[row * stride : (row + 1) * stride]
-        for column in range(0, width, DESKTOP_SAMPLE_STEP):
-            start = column * channels
-            seen.add(line[start : start + 3])
-    return len(seen)
+        end = offset + 12 + length
+        if end > len(raw):
+            die("screenshot PNG contains a truncated chunk")
+        if raw[offset + 4 : offset + 8] == b"IDAT":
+            pixels.extend(raw[offset + 8 : end - 4])
+        offset = end
+    if not pixels:
+        die("screenshot PNG contains no image data")
+    return bytes(pixels)
 
 
 def main(argv: list[str]) -> int:
@@ -390,35 +327,39 @@ def main(argv: list[str]) -> int:
             die("list_apps did not include gnome-text-editor")
         note(f"list_apps returned {len(apps)} apps including {EDITOR_LAUNCH}", log)
 
-        captured = guest_exec(
-            remote,
-            project,
-            name,
+        def capture(filename: str) -> bytes:
+            captured = guest_exec(
+                remote, project, name,
+                [
+                    DRIVER_BIN, "call", "--socket", DRIVER_SOCKET,
+                    "--screenshot-out-file", GUEST_DESKTOP_PNG,
+                    "get_desktop_state", "{}",
+                ],
+                user=True,
+            )
+            if captured.returncode != 0:
+                die(f"get_desktop_state exited {captured.returncode}: {captured.stderr}")
+            target = evidence / filename
+            guest_pull(remote, project, name, GUEST_DESKTOP_PNG, target)
+            return screenshot_pixels(target.read_bytes())
+
+        before = capture("desktop-before.png")
+        launched = guest_exec(
+            remote, project, name,
             [
-                DRIVER_BIN,
-                "call",
-                "--socket",
-                DRIVER_SOCKET,
-                "--screenshot-out-file",
-                GUEST_DESKTOP_PNG,
-                "get_desktop_state",
-                "{}",
+                "systemd-run", "--user", "--collect",
+                "--unit=agentcompute-capture-smoke", EDITOR_LAUNCH,
             ],
             user=True,
         )
-        (evidence / "desktop-state.stdout").write_text(captured.stdout or "", encoding="utf-8")
-        (evidence / "desktop-state.stderr").write_text(captured.stderr or "", encoding="utf-8")
-        if captured.returncode != 0:
-            die(f"get_desktop_state exited {captured.returncode}: {captured.stderr}")
-        desktop_png = evidence / "desktop.png"
-        guest_pull(remote, project, name, GUEST_DESKTOP_PNG, desktop_png)
-        colors = distinct_colors(desktop_png.read_bytes())
-        if colors < MIN_DESKTOP_COLORS:
-            die(
-                f"whole-desktop screenshot holds {colors} distinct colours; the X screen "
-                "is unpainted or frozen (see images/README.md on the Driver cursor overlay)"
-            )
-        note(f"whole-desktop screenshot holds {colors} distinct colours", log)
+        if launched.returncode != 0:
+            die(f"launching {EDITOR_LAUNCH} failed: {launched.stderr}")
+        wait_until(
+            min(deadline, time.time() + 30),
+            "whole-desktop pixels to change after launching Text Editor",
+            lambda: capture("desktop.png") != before,
+        )
+        note("whole-desktop pixels changed after launching Text Editor", log)
 
         result = {
             "fingerprint": fingerprint,
@@ -431,7 +372,7 @@ def main(argv: list[str]) -> int:
             "x11": True,
             "cua_driver_unit": "active",
             "list_apps": len(apps),
-            "desktop_screenshot_colors": colors,
+            "desktop_capture_live": True,
             "security_nesting": "false",
         }
         (evidence / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

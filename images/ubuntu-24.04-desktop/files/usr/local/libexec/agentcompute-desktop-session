@@ -9,15 +9,8 @@ export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUN
 
 case "${1:-}" in
 cua-driver)
-	# --no-overlay: the Driver's agent-cursor overlay maps a full-screen,
-	# override-redirect, depth-24 window with save-unders. On this GNOME/Xorg
-	# session every root-window read is then served from that window's stale
-	# save-under instead of the live screen, so get_desktop_state and
-	# x0vncserver both return the frame from the moment the overlay appeared —
-	# solid black, because the daemon starts before Mutter's first composite.
-	# Per-window captures read redirected window pixmaps and stay correct,
-	# which is why only whole-desktop capture broke. Reproduced on 0.28.1 and
-	# 0.28.2; unmapping the overlay restores live pixels immediately.
+	# The cursor overlay freezes X root reads on GNOME/Xorg, including VNC.
+	# Disable that cosmetic overlay so whole-desktop capture stays live.
 	exec /usr/local/bin/cua-driver serve --no-overlay --socket "${XDG_RUNTIME_DIR}/cua-driver.sock"
 	;;
 x0vnc)
