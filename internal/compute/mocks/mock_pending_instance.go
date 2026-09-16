@@ -72,7 +72,7 @@ type MockPendingInstance_Wait_Call struct {
 
 // Wait is a helper method to define mock.On call
 //   - context1 context.Context
-func (_e *MockPendingInstance_Expecter) Wait(context1 interface{}) *MockPendingInstance_Wait_Call {
+func (_e *MockPendingInstance_Expecter) Wait(context1 any) *MockPendingInstance_Wait_Call {
 	return &MockPendingInstance_Wait_Call{Call: _e.mock.On("Wait", context1)}
 }
 
