@@ -1,0 +1,126 @@
+schema_version: 1
+recipe_revision: 1
+architecture: arm64
+
+# The Lume the Mac host's agentcompute service account runs.
+#
+# Released Lume 0.5.3 always starts a VNC listener on a wildcard address and
+# offers no switch to bind or disable it, which is the whole reason this file
+# exists. Upstream merged the disable path as cua#3209, and no Lume release
+# contains it yet: lume-v0.5.3 (2026-08-11) is still the newest tag, and the
+# commit landed 2026-08-16. So this host builds that exact commit from source,
+# account-locally, instead of waiting for a release or opening host ports.
+#
+# Scope of the source build: it installs ONLY under /Users/agentcompute. The
+# global /usr/local/bin/lume (released, Developer ID signed, notarized 0.5.3)
+# is untouched, and so are PF and Internet Sharing.
+
+lume:
+  source_build: true
+  # trycua/cua, the commit that merged "feat(lume): support running without a
+  # VNC listener (#3209)", committed 2026-08-16T21:02:51+02:00.
+  source_commit: ab957bdb7566f7e137b00654cc01167d9e42af38
+  source_url: https://github.com/trycua/cua.git
+  source_subpath: libs/lume
+  upstream_change: https://github.com/trycua/cua/pull/3209
+  # libs/lume/VERSION at this commit. It is the released version string with
+  # no suffix, so `lume --version` alone cannot tell this build apart from the
+  # global 0.5.3. Identify it by path and by installed_sha256, not by version.
+  version: 0.5.3
+  license: MIT
+
+  # Everything below is measured from the build that is installed on the host.
+  build_host: studio-1 (macOS 26.6.2 / 25G83, Apple M2 Max)
+  build_user: agentcompute
+  toolchain: Apple Swift 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101), Command Line Tools
+  build_command: swift build -c release --product lume --only-use-versions-from-resolved-file
+  # Dependency versions come from libs/lume/Package.resolved at the pinned
+  # commit and nothing else. Package.swift tracks two moving branches
+  # (mhdhejazi/Dynamic @ master, apple/swift-format @ release/6.0), so a free
+  # resolve here would silently pick up whatever those branches point at today.
+  dependency_resolution: Package.resolved only
+  source_dir: /Users/agentcompute/src/cua
+  app_install_dir: /Users/agentcompute/.local/share/lume
+  install_bin: /Users/agentcompute/bin/lume
+
+  # Ad-hoc signature. `com.apple.vm.networking` is deliberately NOT requested:
+  # it is Apple-granted, needs an embedded provisioning profile, and macOS
+  # kills an ad-hoc binary that carries it (upstream says so in
+  # scripts/install-local.sh). The seed is NAT-only, which needs only
+  # com.apple.security.virtualization.
+  entitlements_file: resources/lume.local.entitlements
+  entitlements:
+    - com.apple.security.virtualization
+  signing: adhoc
+  bundle_id: com.trycua.lume
+  # SHA-256 of the installed Mach-O executable,
+  # /Users/agentcompute/.local/share/lume/lume.app/Contents/MacOS/lume, after
+  # signing. This is the artifact identity the host runs; the wrapper below is
+  # just a two-line exec shim.
+  installed_sha256: 5643bfdc54079cf0d94403a2d49c25a72c9759ee84029f871020a941851609df
+  # SHA-256 of /Users/agentcompute/bin/lume, the launcher the backend and the
+  # service invoke.
+  wrapper_sha256: e26d62a32f80598fd0204de79a072c3ebbbd5de7f72ada3a44c73d1040e2f9fc
+  provenance: measured
+  published_by: null
+  # Measured on this host, not assumed: re-assembling, re-signing, and
+  # reinstalling from the same SwiftPM build tree reproduces
+  # installed_sha256 byte for byte, but a rebuild after `rm -rf .build`
+  # produces a different Mach-O from the same commit and the same
+  # Package.resolved. So installed_sha256 identifies the artifact this host
+  # was given, not a value a clean rebuild will land on.
+  #
+  # images/macos/build-lume.sh refuses to install anything whose hash is not
+  # the one above, and refuses before it touches the install paths. After a
+  # deliberate clean rebuild the operator re-reads the commit, writes the new
+  # hash here, and says why in the commit message. Do not relax that check
+  # into a warning.
+  bitwise_reproducible: false
+
+  # What this build adds over the released pin, and the exact shape of it.
+  vnc_policy:
+    cli: lume run <vm> --no-display --vnc disabled
+    http: 'POST /lume/vms/<name>/run with {"noDisplay": true, "vnc": "disabled"}'
+    # `disabled` conflicts with a display, so the HTTP body must also set
+    # noDisplay: true. The server validates before it starts anything
+    # (Handlers.swift handleRunVM -> validatedVNCPolicy(noDisplayDefault:
+    # false)), and answers 400 otherwise.
+    values:
+      - enabled
+      - disabled
+    default: enabled
+    rejects:
+      - --display vnc
+      - --vnc-port
+      - --vnc-password
+
+  build_script: images/macos/build-lume.sh
+
+# The released pin this host would fall back to, and the only Lume the global
+# install has ever been. Identical to images/macos/pins.lock.yaml `lume`;
+# repeated here so a rollback needs one file, not two.
+fallback:
+  version: 0.5.3
+  archive: lume-0.5.3-darwin-arm64.tar.gz
+  archive_root: lume
+  url: https://github.com/trycua/cua/releases/download/lume-v0.5.3/lume-0.5.3-darwin-arm64.tar.gz
+  size: 6009673
+  sha256: af5d0556763a7f0116153c220aaabe44974e775091ac57e38da2abb2959c63e8
+  provenance: published
+  published_by: https://api.github.com/repos/trycua/cua/releases (asset digest)
+  installed_at: /usr/local/bin/lume
+  # Only a manual rollback reference: backend startup rejects this release.
+  # Never automatically fall back to a wildcard VNC listener.
+  vnc_policy: none available
+
+# Delete this source build and return to a released pin as soon as one carries
+# cua#3209.
+revisit:
+  condition: the first trycua/cua `lume-v*` release whose tree contains
+    ab957bdb7566f7e137b00654cc01167d9e42af38 (that is, the first release after
+    lume-v0.5.3 that includes cua#3209).
+  action: replace this file's source-build fields with the release archive and
+    published SHA-256, install it account-locally, and retire
+    images/macos/build-lume.sh. Keep the account-local path and disabled policy.
+  checked: 2026-09-15
+  newest_release_at_check: lume-v0.5.3 (2026-08-11), does not contain the commit

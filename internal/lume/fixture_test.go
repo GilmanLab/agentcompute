@@ -17,6 +17,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -55,20 +57,39 @@ type tunnelOpts struct {
 	GuestHostKey ssh.PublicKey
 	Seed         string
 	Image        string
+
+	// RunHelp replaces the `lume run --help` output the startup capability
+	// gate reads. Empty means the pinned source build.
+	RunHelp string
+
+	// LegacyDaemon makes the fake lume serve behave like 0.5.3: it drops the
+	// unknown vnc key and accepts the run-policy probe.
+	LegacyDaemon bool
 }
 
 type tunnelState struct {
 	client *Client
 	home   string
+	daemon *vncPolicyDaemon
 }
 
 func startTunnel(t *testing.T, opts tunnelOpts) *tunnelState {
+	t.Helper()
+	state, err := dialTunnel(t, opts)
+	require.NoError(t, err)
+	return state
+}
+
+// dialTunnel builds the fixture and returns New's error so the fail-closed
+// startup contract can be exercised directly.
+func dialTunnel(t *testing.T, opts tunnelOpts) (*tunnelState, error) {
 	t.Helper()
 
 	if opts.API == nil {
 		opts.API = http.NotFoundHandler()
 	}
-	httpServer := httptest.NewServer(opts.API)
+	daemon := &vncPolicyDaemon{next: opts.API, legacy: opts.LegacyDaemon}
+	httpServer := httptest.NewServer(daemon)
 	t.Cleanup(httpServer.Close)
 
 	home := filepath.Join(t.TempDir(), "home")
@@ -113,7 +134,7 @@ func startTunnel(t *testing.T, opts tunnelOpts) *tunnelState {
 		natDial:  opts.GuestDial,
 		home:     home,
 		user:     hostUser,
-		hostFn:   opts.Host,
+		hostFn:   capableHost(opts.Host, opts.RunHelp),
 	}
 	var acceptWG sync.WaitGroup
 	acceptWG.Go(func() {
@@ -155,9 +176,122 @@ func startTunnel(t *testing.T, opts tunnelOpts) *tunnelState {
 		GuestKnownHostsFile: guestKnown,
 		GuestKeys:           keys,
 	})
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 	t.Cleanup(func() { _ = client.Close() })
-	return &tunnelState{client: client, home: home}
+	return &tunnelState{client: client, home: home, daemon: daemon}, nil
+}
+
+// vncCapableRunHelp is the option block the pinned Lume source build prints
+// for `lume run --help`.
+const vncCapableRunHelp = `OPTIONS:
+  --no-display                   Do not open a display window
+  --vnc <vnc>                    VNC server policy: 'enabled' (default) or
+                                 'disabled'.
+  --vnc-port <vnc-port>          Port to use for the VNC server.
+  --vnc-password <vnc-password>  Password for the VNC server.
+  -h, --help                     Show help information.
+`
+
+// vncLegacyRunHelp is Lume 0.5.3: the port and password flags exist, the
+// policy flag does not.
+const vncLegacyRunHelp = `OPTIONS:
+  --no-display                   Do not open a display window
+  --vnc-port <vnc-port>          Port to use for the VNC server.
+  --vnc-password <vnc-password>  Password for the VNC server.
+  -h, --help                     Show help information.
+`
+
+// capableHost supplies the host-side halves of the startup capability gate —
+// the pinned CLI's help output, and an empty inventory for tests that bring
+// no VMs of their own — after the test's own script handler has had its say.
+func capableHost(next hostScriptHandler, runHelp string) hostScriptHandler {
+	if runHelp == "" {
+		runHelp = vncCapableRunHelp
+	}
+	return func(script string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
+		if next != nil {
+			if handled, err := next(script, stdin, stdout, stderr); handled || err != nil {
+				return handled, err
+			}
+		}
+		if strings.Contains(script, lumeBin+" run --help") {
+			_, _ = io.WriteString(stdout, runHelp)
+			return true, nil
+		}
+		if strings.Contains(script, lumeBin+" ls --format json") {
+			_, _ = io.WriteString(stdout, "[]")
+			return true, nil
+		}
+		return false, nil
+	}
+}
+
+type vncProbe struct {
+	VM        string
+	NoDisplay bool
+	Policy    string
+}
+
+// vncPolicyDaemon answers the VNC run-policy probe the way the pinned Lume
+// build does and forwards every other request to the test's own handler. With
+// legacy set it answers like 0.5.3, which has no vnc field at all, drops the
+// unknown key, and accepts the run.
+type vncPolicyDaemon struct {
+	next   http.Handler
+	legacy bool
+
+	mu     sync.Mutex
+	probes []vncProbe
+}
+
+func (d *vncPolicyDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	name, ok := vncProbeTarget(r)
+	if !ok {
+		d.next.ServeHTTP(w, r)
+		return
+	}
+	var body struct {
+		NoDisplay bool   `json:"noDisplay"`
+		VNC       string `json:"vnc"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"message":"Invalid run request body"}`, http.StatusBadRequest)
+		return
+	}
+	d.mu.Lock()
+	d.probes = append(d.probes, vncProbe{VM: name, NoDisplay: body.NoDisplay, Policy: body.VNC})
+	d.mu.Unlock()
+	if d.legacy {
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"message":"VM start initiated","status":"pending"}`))
+		return
+	}
+	if body.NoDisplay || body.VNC != vncPolicyDisabled {
+		http.Error(w, `{"message":"probe must combine a disabled policy with a display"}`,
+			http.StatusUnprocessableEntity)
+		return
+	}
+	http.Error(w, `{"message":"VNC is disabled for this run, so '--display vnc' cannot be used."}`,
+		http.StatusBadRequest)
+}
+
+func (d *vncPolicyDaemon) probeCalls() []vncProbe {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return slices.Clone(d.probes)
+}
+
+func vncProbeTarget(r *http.Request) (string, bool) {
+	if r.Method != http.MethodPost || !strings.HasSuffix(r.URL.Path, "/run") {
+		return "", false
+	}
+	name := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/lume/vms/"), "/run")
+	if !strings.HasPrefix(name, vncProbeVM) {
+		return "", false
+	}
+	return name, true
 }
 
 type sshTestServer struct {

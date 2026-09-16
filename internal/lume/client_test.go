@@ -233,7 +233,7 @@ func TestHostCallbackRunsBeforeShell(t *testing.T) {
 			return false, nil
 		},
 	)
-	out, err := client.host(t.Context(), "/usr/local/bin/lume ls --format json", nil)
+	out, err := client.host(t.Context(), lumeBin+" ls --format json", nil)
 	require.NoError(t, err)
 	assert.Contains(t, string(out), `"name":"fake"`)
 
