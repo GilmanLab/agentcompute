@@ -634,7 +634,7 @@ func (c *Client) getVM(ctx context.Context, name string) (lumeVM, error) {
 
 func (c *Client) lumeList(ctx context.Context) ([]lumeVM, error) {
 	out, err := c.host(ctx, `set -eu
-/usr/local/bin/lume ls --format json
+`+quote(lumeBin)+` ls --format json
 `, nil)
 	if err != nil {
 		return nil, err
@@ -882,17 +882,31 @@ func (c *Client) waitVMStatus(ctx context.Context, name, want string) error {
 }
 
 func (c *Client) runLocked(ctx context.Context, name string, inventory []lumeVM) error {
+	// An already-running guest is only accepted when its own run left no
+	// listener behind; one started outside this backend can still be holding
+	// a wildcard VNC port open.
 	if vm, ok := findVM(inventory, name); ok && vm.running() {
-		return nil
+		return c.requireNoVNCListener(ctx, name, vm)
 	}
 	if countRunningMacOS(inventory) >= maxMacOSGuests {
 		return agentError(errLimitOwned)
+	}
+	// A daemon that was replaced or rolled back under a live process would
+	// answer the run below with the same 202 either way, so the policy is
+	// re-proven immediately before the start that depends on it. The probe
+	// runs before the log cursor so its own rejection never lands inside the
+	// window stoppedRunError reads.
+	if err := c.requireVNCPolicyEnforced(ctx, inventory); err != nil {
+		return err
 	}
 	cursor, err := c.serveLogCursor(ctx)
 	if err != nil {
 		return err
 	}
-	body := map[string]any{"noDisplay": true}
+	// noDisplay stays true: Lume treats a display as an implicit VNC client
+	// and rejects the disabled policy when it is combined with one. It is the
+	// vnc field, not noDisplay, that keeps the listener from ever starting.
+	body := map[string]any{"noDisplay": true, "vnc": vncPolicyDisabled}
 	if err := c.api(ctx, http.MethodPost, "/lume/vms/"+name+"/run", body, nil); err != nil {
 		return err
 	}
@@ -906,7 +920,7 @@ func (c *Client) runLocked(ctx context.Context, name string, inventory []lumeVM)
 			return err
 		}
 		if vm.running() {
-			return nil
+			return c.requireNoVNCListener(ctx, name, vm)
 		}
 		if time.Now().After(deadline) {
 			return c.stoppedRunError(ctx, name, cursor)

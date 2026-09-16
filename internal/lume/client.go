@@ -158,6 +158,12 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 			return http.ErrUseLastResponse
 		},
 	}
+	// Nothing this backend starts may expose a VNC listener, so a host that
+	// cannot honour the disabled run policy is rejected before it can serve a
+	// single request.
+	if err := client.requireVNCDisableSupport(ctx); err != nil {
+		return nil, errors.Join(err, client.Close())
+	}
 	return client, nil
 }
 
@@ -183,11 +189,22 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) api(ctx context.Context, method, path string, request any, result any) error {
-	if err := c.errClosed(); err != nil {
+	status, payload, err := c.apiRaw(ctx, method, path, request)
+	if err != nil {
 		return err
 	}
+	return decodeAPIResponse(method, path, status, payload, result)
+}
+
+// apiRaw returns the transport-level outcome so callers that must inspect a
+// rejection — the VNC run-policy probe reads Lume's 400 body — are not limited
+// to the flattened error api returns.
+func (c *Client) apiRaw(ctx context.Context, method, path string, request any) (int, []byte, error) {
+	if err := c.errClosed(); err != nil {
+		return 0, nil, err
+	}
 	if path == "" {
-		return errors.New("lume api path is required")
+		return 0, nil, errors.New("lume api path is required")
 	}
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
@@ -197,14 +214,14 @@ func (c *Client) api(ctx context.Context, method, path string, request any, resu
 	if request != nil {
 		payload, err := json.Marshal(request)
 		if err != nil {
-			return fmt.Errorf("lume api %s %s: encode: %w", method, path, err)
+			return 0, nil, fmt.Errorf("lume api %s %s: encode: %w", method, path, err)
 		}
 		body = bytes.NewReader(payload)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, lumeAPIBase+path, body)
 	if err != nil {
-		return fmt.Errorf("lume api %s %s: %w", method, path, err)
+		return 0, nil, fmt.Errorf("lume api %s %s: %w", method, path, err)
 	}
 	if request != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -213,27 +230,26 @@ func (c *Client) api(ctx context.Context, method, path string, request any, resu
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return 0, nil, ctx.Err()
 		}
 		if unavailable(err) {
-			return fmt.Errorf("lume api %s %s: %w", method, path, compute.ErrUnavailable)
+			return 0, nil, fmt.Errorf("lume api %s %s: %w", method, path, compute.ErrUnavailable)
 		}
-		return fmt.Errorf("lume api %s %s: %w", method, path, err)
+		return 0, nil, fmt.Errorf("lume api %s %s: %w", method, path, err)
 	}
 	defer resp.Body.Close()
 
 	payload, err := io.ReadAll(io.LimitReader(resp.Body, apiBodyLimit+1))
 	if err != nil {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return 0, nil, ctx.Err()
 		}
-		return fmt.Errorf("lume api %s %s: read: %w", method, path, err)
+		return 0, nil, fmt.Errorf("lume api %s %s: read: %w", method, path, err)
 	}
 	if int64(len(payload)) > apiBodyLimit {
-		return fmt.Errorf("lume api %s %s: response too large", method, path)
+		return 0, nil, fmt.Errorf("lume api %s %s: response too large", method, path)
 	}
-
-	return decodeAPIResponse(method, path, resp.StatusCode, payload, result)
+	return resp.StatusCode, payload, nil
 }
 
 func decodeAPIResponse(method, path string, status int, payload []byte, result any) error {

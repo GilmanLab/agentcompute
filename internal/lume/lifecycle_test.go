@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,6 +26,19 @@ type lifecycleHost struct {
 	mu    sync.Mutex
 	vms   map[string]lumeVM
 	calls []string
+	runs  []lumeRun
+	// vncOnRun makes a started guest report a VNC endpoint, the exposure the
+	// disabled run policy exists to prevent.
+	vncOnRun string
+	// onRun fires once a run request has been recorded, letting a test end
+	// the guest-readiness wait that no fake host can satisfy.
+	onRun func()
+}
+
+type lumeRun struct {
+	VM        string
+	NoDisplay bool
+	Policy    string
 }
 
 func (h *lifecycleHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +73,9 @@ func (h *lifecycleHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/lume/vms/")
 		delete(h.vms, name)
 		w.WriteHeader(http.StatusOK)
+		return
+	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/run"):
+		h.runVM(w, r)
 		return
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/stop"):
 		name := strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/stop"), "/lume/vms/")
@@ -109,8 +126,43 @@ func (h *lifecycleHost) patchVM(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"message": "updated"})
 }
 
+func (h *lifecycleHost) runVM(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		NoDisplay bool   `json:"noDisplay"`
+		VNC       string `json:"vnc"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/run"), "/lume/vms/")
+	vm, ok := h.vms[name]
+	if !ok {
+		http.Error(w, `{"message":"not found"}`, http.StatusBadRequest)
+		return
+	}
+	h.runs = append(h.runs, lumeRun{VM: name, NoDisplay: body.NoDisplay, Policy: body.VNC})
+	vm.Status = vmStatusRunning
+	vm.IPAddress = new(testGuestNAT)
+	if h.vncOnRun != "" {
+		vm.VNCURL = new(h.vncOnRun)
+	}
+	h.vms[name] = vm
+	if h.onRun != nil {
+		h.onRun()
+	}
+	w.WriteHeader(http.StatusAccepted)
+	_, _ = w.Write([]byte(`{"message":"VM start initiated","status":"pending"}`))
+}
+
+func (h *lifecycleHost) runCalls() []lumeRun {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.runs)
+}
+
 func (h *lifecycleHost) host(script string, _ io.Reader, stdout, _ io.Writer) (bool, error) {
-	if strings.Contains(script, "/usr/local/bin/lume ls --format json") {
+	if strings.Contains(script, quote(lumeBin)+" ls --format json") {
 		h.mu.Lock()
 		defer h.mu.Unlock()
 		vms := make([]lumeVM, 0, len(h.vms))

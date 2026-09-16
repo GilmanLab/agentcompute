@@ -122,7 +122,7 @@ func (h *snapshotHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *snapshotHost) host(script string, _ io.Reader, stdout, _ io.Writer) (bool, error) {
-	if !strings.Contains(script, "/usr/local/bin/lume ls --format json") {
+	if !strings.Contains(script, quote(lumeBin)+" ls --format json") {
 		return false, nil
 	}
 	h.mu.Lock()
