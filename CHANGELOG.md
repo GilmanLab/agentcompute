@@ -16,6 +16,16 @@
 - Run host scripts under `/bin/sh` so empty sandbox discovery works with a
   zsh login shell.
 
+## [0.1.2](https://github.com/GilmanLab/agentcompute/compare/v0.1.1...v0.1.2) (2026-09-16)
+
+
+### Features
+
+* **desktop:** expose native Driver calls and screenshot URLs ([#26](https://github.com/GilmanLab/agentcompute/issues/26)) ([fa80821](https://github.com/GilmanLab/agentcompute/commit/fa80821970fb2da631fad467462838f89f279f28))
+* **images:** promote qualified lab image digests ([#30](https://github.com/GilmanLab/agentcompute/issues/30)) ([4c0b0d2](https://github.com/GilmanLab/agentcompute/commit/4c0b0d21218f5e607733ec277d1fb98053bdcb5e))
+* **lume:** qualify macOS backend against deployed service ([#36](https://github.com/GilmanLab/agentcompute/issues/36)) ([7f72d09](https://github.com/GilmanLab/agentcompute/commit/7f72d09e3f60ba9230258cdc833a12adeee76cfa))
+* **macos:** qualify the Tahoe Lume seed and its Mac Studio host ([#29](https://github.com/GilmanLab/agentcompute/issues/29)) ([01e0e06](https://github.com/GilmanLab/agentcompute/commit/01e0e06b1dc86288217013a8f63f0a8d104d8e12))
+
 ## [0.1.1](https://github.com/GilmanLab/agentcompute/compare/v0.1.0...v0.1.1) (2026-09-15)
 
 
