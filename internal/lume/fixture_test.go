@@ -428,7 +428,7 @@ func newGuestTransport(t *testing.T) *guestTransport {
 			_ = json.NewEncoder(w).Encode(lumeVM{
 				Name:      vmName,
 				OS:        "macOS",
-				Status:    "running",
+				Status:    vmStatusRunning,
 				IPAddress: &ip,
 			})
 			return

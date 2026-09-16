@@ -31,15 +31,15 @@ func TestFailedSnapshotCleanupRemainsOwned(t *testing.T) {
 			ref := compute.Ref{Sandbox: "demo", Name: "web"}
 			fixture := &snapshotHost{
 				vms: map[string]lumeVM{
-					seed:          {Name: seed, OS: "macOS", Status: "stopped"},
-					unrelated:     {Name: unrelated, OS: "macOS", Status: "stopped"},
-					"ac-demo-web": {Name: "ac-demo-web", OS: "macOS", Status: "stopped"},
+					seed:          {Name: seed, OS: "macOS", Status: vmStatusStopped},
+					unrelated:     {Name: unrelated, OS: "macOS", Status: vmStatusStopped},
+					"ac-demo-web": {Name: "ac-demo-web", OS: "macOS", Status: vmStatusStopped},
 				},
 				failCleanup: true,
 			}
 			snapshots := map[string]*snapshotRecord{}
 			if restore {
-				fixture.vms["ac-demo-pre"] = lumeVM{Name: "ac-demo-pre", OS: "macOS", Status: "stopped"}
+				fixture.vms["ac-demo-pre"] = lumeVM{Name: "ac-demo-pre", OS: "macOS", Status: vmStatusStopped}
 				snapshots["pre"] = &snapshotRecord{VM: "ac-demo-pre", CreatedAt: time.Now()}
 			}
 			client := newTunneledClientWithHost(t, fixture, fixture.host)

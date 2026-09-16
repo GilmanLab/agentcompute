@@ -45,7 +45,7 @@ func (h *lifecycleHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.vms[req.NewName] = lumeVM{
 			Name:       req.NewName,
 			OS:         "macOS",
-			Status:     "stopped",
+			Status:     vmStatusStopped,
 			CPUCount:   src.CPUCount,
 			MemorySize: src.MemorySize,
 			DiskSize:   src.DiskSize,
@@ -63,9 +63,9 @@ func (h *lifecycleHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/stop"):
 		name := strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/stop"), "/lume/vms/")
 		vm := h.vms[name]
-		vm.Status = "stopped"
+		vm.Status = vmStatusStopped
 		h.vms[name] = vm
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "stopped"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": vmStatusStopped})
 		return
 	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/lume/vms/"):
 		name := strings.TrimPrefix(r.URL.Path, "/lume/vms/")
@@ -151,7 +151,7 @@ func seedVM() lumeVM {
 	return lumeVM{
 		Name:       "ac-seed-macos-tahoe-desktop",
 		OS:         "macOS",
-		Status:     "stopped",
+		Status:     vmStatusStopped,
 		CPUCount:   4,
 		MemorySize: 8 << 30,
 		DiskSize:   lumeDisk{Total: 100 << 30},
@@ -161,9 +161,9 @@ func seedVM() lumeVM {
 func TestStartRefusesThirdGuestBeforeLumeAPI(t *testing.T) {
 	const seed = "ac-seed-macos-tahoe-desktop"
 	fixture := &lifecycleHost{vms: map[string]lumeVM{
-		"owner-one":   {Name: "owner-one", OS: "macOS", Status: "running"},
-		"owner-two":   {Name: "owner-two", OS: "macOS", Status: "running"},
-		"ac-demo-web": {Name: "ac-demo-web", OS: "macOS", Status: "stopped"},
+		"owner-one":   {Name: "owner-one", OS: "macOS", Status: vmStatusRunning},
+		"owner-two":   {Name: "owner-two", OS: "macOS", Status: vmStatusRunning},
+		"ac-demo-web": {Name: "ac-demo-web", OS: "macOS", Status: vmStatusStopped},
 		seed:          seedVM(),
 	}}
 	client := newTunneledClientWithHost(t, fixture, fixture.host)
@@ -184,8 +184,8 @@ func TestStartRefusesThirdGuestBeforeLumeAPI(t *testing.T) {
 func TestBeginCreateRefusesThirdGuestBeforeClone(t *testing.T) {
 	const seed = "ac-seed-macos-tahoe-desktop"
 	fixture := &lifecycleHost{vms: map[string]lumeVM{
-		"owner-one": {Name: "owner-one", OS: "macOS", Status: "running"},
-		"owner-two": {Name: "owner-two", OS: "macOS", Status: "running"},
+		"owner-one": {Name: "owner-one", OS: "macOS", Status: vmStatusRunning},
+		"owner-two": {Name: "owner-two", OS: "macOS", Status: vmStatusRunning},
 		seed:        seedVM(),
 	}}
 	client := newTunneledClientWithHost(t, fixture, fixture.host)
@@ -251,9 +251,9 @@ func TestDeleteSandboxDeletesExactMappedVMsOnly(t *testing.T) {
 	const extra = "ac-demo-web-extra"
 	const other = "ac-demo-other"
 	fixture := &lifecycleHost{vms: map[string]lumeVM{
-		"ac-demo-web": {Name: "ac-demo-web", OS: "macOS", Status: "stopped"},
-		extra:         {Name: extra, OS: "macOS", Status: "stopped"},
-		other:         {Name: other, OS: "macOS", Status: "stopped"},
+		"ac-demo-web": {Name: "ac-demo-web", OS: "macOS", Status: vmStatusStopped},
+		extra:         {Name: extra, OS: "macOS", Status: vmStatusStopped},
+		other:         {Name: other, OS: "macOS", Status: vmStatusStopped},
 		seed:          seedVM(),
 	}}
 	client := newTunneledClientWithHost(t, fixture, fixture.host)

@@ -229,7 +229,7 @@ func catalogPlatform(image CatalogImage) (string, error) {
 	if platform != platformMac && image.Seed != "" {
 		return "", errors.New("seed is only valid for platform mac")
 	}
-	if platform == platformIncus && strings.EqualFold(image.OS, "macos") {
+	if platform == platformIncus && strings.EqualFold(image.OS, osMacOS) {
 		return "", errors.New("macos images must use platform mac")
 	}
 	return platform, nil

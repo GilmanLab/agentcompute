@@ -117,7 +117,7 @@ func TestAPITunnelJSONDeleteAndErrors(t *testing.T) {
 	}
 	require.NoError(t, client.api(t.Context(), http.MethodGet, "/lume/vms/web", nil, &vm))
 	assert.Equal(t, "web", vm.Name)
-	assert.Equal(t, "running", vm.Status)
+	assert.Equal(t, vmStatusRunning, vm.Status)
 
 	require.NoError(t, client.api(t.Context(), http.MethodDelete, "/lume/vms/web", nil, &vm))
 	mu.Lock()

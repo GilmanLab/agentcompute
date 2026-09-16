@@ -21,6 +21,8 @@ import (
 )
 
 const (
+	vmStatusRunning     = "running"
+	vmStatusStopped     = "stopped"
 	stoppedAfterRun     = 12 * time.Second
 	lifecyclePoll       = 500 * time.Millisecond
 	errLimitOwned       = "macOS guest limit reached (2 per host); the owner's macOS VMs share this budget"
@@ -80,9 +82,9 @@ func macOSGuest(os string) bool {
 
 func mapLumeStatus(status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "running":
+	case vmStatusRunning:
 		return "Running"
-	case "stopped":
+	case vmStatusStopped:
 		return "Stopped"
 	default:
 		return status
@@ -103,7 +105,7 @@ func isNotFound(err error) bool {
 func countRunningMacOS(vms []lumeVM) int {
 	n := 0
 	for _, vm := range vms {
-		if macOSGuest(vm.OS) && strings.EqualFold(vm.Status, "running") {
+		if macOSGuest(vm.OS) && strings.EqualFold(vm.Status, vmStatusRunning) {
 			n++
 		}
 	}
@@ -146,11 +148,11 @@ func (vm lumeVM) vnc() string {
 }
 
 func (vm lumeVM) running() bool {
-	return strings.EqualFold(vm.Status, "running")
+	return strings.EqualFold(vm.Status, vmStatusRunning)
 }
 
 func (vm lumeVM) stopped() bool {
-	return strings.EqualFold(vm.Status, "stopped")
+	return strings.EqualFold(vm.Status, vmStatusStopped)
 }
 
 func randomID() (string, error) {
@@ -661,7 +663,7 @@ func markStopped(vms []lumeVM, name string) []lumeVM {
 	out := slices.Clone(vms)
 	for i := range out {
 		if out[i].Name == name {
-			out[i].Status = "stopped"
+			out[i].Status = vmStatusStopped
 		}
 	}
 	return out
@@ -843,7 +845,7 @@ func (c *Client) stopNamed(ctx context.Context, name string) error {
 	if err := c.api(ctx, http.MethodPost, "/lume/vms/"+name+"/stop", nil, nil); err != nil {
 		return err
 	}
-	return c.waitVMStatus(ctx, name, "stopped")
+	return c.waitVMStatus(ctx, name, vmStatusStopped)
 }
 
 func (c *Client) stopVM(ctx context.Context, name string) error {

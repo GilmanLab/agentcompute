@@ -176,7 +176,7 @@ func guestCommand(req compute.ExecRequest) (string, error) {
 	b.WriteString("exec ")
 	switch {
 	case seedUser(req.User):
-	case req.User == "root" || req.User == "0":
+	case req.User == rootUser || req.User == "0":
 		b.WriteString("sudo -n -- ")
 	default:
 		b.WriteString("sudo -n -u ")
@@ -235,7 +235,7 @@ func validateExecRequest(req compute.ExecRequest) error {
 }
 
 func validateExecUser(user string) error {
-	if seedUser(user) || user == "root" {
+	if seedUser(user) || user == rootUser {
 		return nil
 	}
 	if _, err := strconv.ParseUint(user, 10, 32); err != nil {

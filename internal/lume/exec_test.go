@@ -68,7 +68,7 @@ func TestGuestCommandSeedUsersSkipSudo(t *testing.T) {
 		assert.True(t, strings.HasPrefix(remote, "exec "), user)
 	}
 
-	root, err := guestCommand(compute.ExecRequest{Ref: ref, Argv: []string{"true"}, User: "root"})
+	root, err := guestCommand(compute.ExecRequest{Ref: ref, Argv: []string{"true"}, User: rootUser})
 	require.NoError(t, err)
 	assert.Contains(t, root, "exec sudo -n -- ")
 	assert.NotContains(t, root, "sudo -n -u")

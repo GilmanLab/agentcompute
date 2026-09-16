@@ -27,6 +27,7 @@ import (
 const (
 	hostUser          = "agentcompute"
 	guestUser         = "lume"
+	rootUser          = "root"
 	guestUID          = "501"
 	jumpHostAlias     = "ac-host"
 	guestHostAlias    = "ac-guest"

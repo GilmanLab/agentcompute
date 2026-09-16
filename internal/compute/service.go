@@ -18,6 +18,7 @@ const (
 	kindOVN           = "ovn"
 	kindContainer     = "container"
 	kindVM            = "vm"
+	osMacOS           = "macos"
 	statusRunning     = "Running"
 	numericUIDBase    = 10
 	numericUIDBitSize = 32
@@ -766,7 +767,7 @@ func validateExecUser(req ExecRequest, inst Instance) error {
 		}
 		return nil
 	}
-	if (osName == "macos" || osName == "darwin") && req.User == "lume" {
+	if (osName == osMacOS || osName == "darwin") && req.User == "lume" {
 		return nil
 	}
 	if req.User != "" && req.User != "root" {

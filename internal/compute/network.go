@@ -625,7 +625,7 @@ func (s *Service) requireLinuxGuest(ctx context.Context, inst Instance) error {
 		}
 	}
 	lowerOS := strings.ToLower(osName)
-	if strings.HasPrefix(lowerOS, "windows") || lowerOS == "darwin" || lowerOS == "macos" {
+	if strings.HasPrefix(lowerOS, "windows") || lowerOS == "darwin" || lowerOS == osMacOS {
 		return agentErrorf("net.impair is not supported on %s guests", osName)
 	}
 	stdout := newDrainingWriter(execOutputLimit)
