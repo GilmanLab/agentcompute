@@ -10,7 +10,7 @@ images:
   kinds:
   - container
   kind: container
-  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:6d056854851bdac1b69d36ae7f540a375ba4924a26b2c4d916472a5dd9cf9486
+  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:455d44cd99af83e5f6899ac3811ca249319093c93d82c38dd5a92aff66d47950
   cpus: 1
   memory_mb: 512
   disk_gb: 2
@@ -33,7 +33,7 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:ab0db6d044208e7464fd4b8330d871b8152ecdee6b4b331b4f1f5ae106d49ac5
+  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:1249ac60e7943cfdf3114f22508d268907d231e111228f12aac1272f88b04670
 - name: runner-publisher
   os: ubuntu
   version: '24.04'
@@ -43,7 +43,7 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:5ec346cca32487f9bce5748907efd2821636294af5556c7e12123d27e500cc14
+  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:d4757093c7aa37bff6169703437369f396ccc7e364c9908b0618246b36277f96
 - name: ubuntu/24.04/desktop
   os: ubuntu
   version: '24.04'
@@ -54,7 +54,7 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/ubuntu-24.04-desktop@sha256:e1a7d45dd1c3aeadef7d57770b6e7eecbecfa6300a8158080dad00ce1de0dff8
+  reference: ghcr.io/gilmanlab/agentcompute/ubuntu-24.04-desktop@sha256:b2a83d7d70de2239de0bb04e255c96079446afb97ebcd36434892acefa5f8b0e
 - name: windows/11/desktop
   os: windows
   version: 25H2
@@ -76,11 +76,9 @@ images:
   memory_mb: 4096
   disk_gb: 100
   alias: windows/server-2025-26100.32230
-# macOS images are host-local Lume seeds, not registry digests. The seed name
-# is the stopped VM on the Mac host; clones inherit operator TCC consent.
 - name: macos/tahoe/desktop
   os: macos
-  version: '26.6.2'
+  version: 26.6.2
   platform: mac
   kinds:
   - vm
