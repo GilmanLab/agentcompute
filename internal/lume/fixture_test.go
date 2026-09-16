@@ -2,7 +2,9 @@ package lume
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
 	"encoding/pem"
@@ -94,6 +96,12 @@ func startTunnel(t *testing.T, opts tunnelOpts) *tunnelState {
 		},
 	}
 	jumpCfg.AddHostKey(hostSigner)
+	// OpenSSH offers multiple host keys even when known_hosts pins only one.
+	ecdsaKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	ecdsaSigner, err := ssh.NewSignerFromKey(ecdsaKey)
+	require.NoError(t, err)
+	jumpCfg.AddHostKey(ecdsaSigner)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -273,7 +281,8 @@ func (s *sshTestServer) startCommand(ch ssh.Channel, req *ssh.Request) (*exec.Cm
 				return nil, true
 			}
 		}
-		cmd = exec.Command("sh", "-c", payload.Value)
+		// Match macOS zsh's unmatched-glob failure without requiring zsh in CI.
+		cmd = exec.Command("bash", "--noprofile", "--norc", "-O", "failglob", "-c", payload.Value)
 	}
 	cmd.Env = isolatedEnv(s.home, s.user)
 	cmd.Dir = s.home

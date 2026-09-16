@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -20,10 +22,9 @@ import (
 )
 
 type lifecycleHost struct {
-	mu      sync.Mutex
-	vms     map[string]lumeVM
-	calls   []string
-	patches []map[string]any
+	mu    sync.Mutex
+	vms   map[string]lumeVM
+	calls []string
 }
 
 func (h *lifecycleHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,13 +53,7 @@ func (h *lifecycleHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "cloned"})
 		return
 	case r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/lume/vms/"):
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		h.patches = append(h.patches, body)
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "updated"})
+		h.patchVM(w, r)
 		return
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/lume/vms/"):
 		name := strings.TrimPrefix(r.URL.Path, "/lume/vms/")
@@ -84,6 +79,34 @@ func (h *lifecycleHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "unexpected "+r.Method+" "+r.URL.Path, http.StatusBadRequest)
 	}
+}
+
+func (h *lifecycleHost) patchVM(w http.ResponseWriter, r *http.Request) {
+	var body map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/lume/vms/")
+	vm := h.vms[name]
+	if size, ok := body["diskSize"].(string); ok {
+		gb, err := strconv.ParseUint(strings.TrimSuffix(size, "GB"), 10, 64)
+		if err != nil || gb*bytesPerGiB <= vm.DiskSize.Total {
+			http.Error(w, "disk resize must strictly increase capacity", http.StatusBadRequest)
+			return
+		}
+		vm.DiskSize.Total = gb * bytesPerGiB
+	}
+	if cpu, ok := body["cpu"].(float64); ok {
+		vm.CPUCount = int64(cpu)
+	}
+	if memory, ok := body["memory"].(string); ok {
+		var mb uint64
+		_, _ = fmt.Sscanf(memory, "%dMB", &mb)
+		vm.MemorySize = mb * bytesPerMiB
+	}
+	h.vms[name] = vm
+	_ = json.NewEncoder(w).Encode(map[string]string{"message": "updated"})
 }
 
 func (h *lifecycleHost) host(script string, _ io.Reader, stdout, _ io.Writer) (bool, error) {
@@ -181,29 +204,29 @@ func TestBeginCreateRefusesThirdGuestBeforeClone(t *testing.T) {
 
 func TestCreateAppliesResourcesAndRejectsShrink(t *testing.T) {
 	const seed = "ac-seed-macos-tahoe-desktop"
-	t.Run("patches cpu memory and disk after clone", func(t *testing.T) {
-		fixture := &lifecycleHost{vms: map[string]lumeVM{seed: seedVM()}}
-		client := newTunneledClientWithHost(t, fixture, fixture.host)
-		require.NoError(t, client.CreateSandbox(t.Context(), compute.Sandbox{
-			Name: "demo", Platform: platformMac, ExpiresAt: time.Now().Add(time.Hour),
-		}))
-		pending, err := client.BeginCreateInstance(t.Context(), compute.CreateInstance{
-			Ref:   compute.Ref{Sandbox: "demo", Name: "web"},
-			Image: compute.CatalogImage{Name: "macos/tahoe/desktop", Seed: seed},
-			CPUs:  4, MemoryMB: 8192, DiskGB: 100,
+	for _, diskGB := range []int64{100, 120} {
+		t.Run(fmt.Sprintf("clone with %dGiB disk", diskGB), func(t *testing.T) {
+			fixture := &lifecycleHost{vms: map[string]lumeVM{seed: seedVM()}}
+			client := newTunneledClientWithHost(t, fixture, fixture.host)
+			require.NoError(t, client.CreateSandbox(t.Context(), compute.Sandbox{
+				Name: "demo", Platform: platformMac, ExpiresAt: time.Now().Add(time.Hour),
+			}))
+			pending, err := client.BeginCreateInstance(t.Context(), compute.CreateInstance{
+				Ref:   compute.Ref{Sandbox: "demo", Name: "web"},
+				Image: compute.CatalogImage{Name: "macos/tahoe/desktop", Seed: seed},
+				CPUs:  6, MemoryMB: 12288, DiskGB: diskGB,
+			})
+			require.NoError(t, err)
+			inst, err := pending.Wait(t.Context())
+			require.NoError(t, err)
+			assert.Equal(t, "Stopped", inst.Status)
+			assert.EqualValues(t, 6, inst.CPUs)
+			assert.EqualValues(t, 12288, inst.MemoryMB)
+			fixture.mu.Lock()
+			defer fixture.mu.Unlock()
+			assert.EqualValues(t, diskGB*bytesPerGiB, fixture.vms["ac-demo-web"].DiskSize.Total)
 		})
-		require.NoError(t, err)
-		require.NotNil(t, pending)
-		fixture.mu.Lock()
-		defer fixture.mu.Unlock()
-		require.NotEmpty(t, fixture.patches)
-		assert.EqualValues(t, 4, fixture.patches[0]["cpu"])
-		assert.Equal(t, "8192MB", fixture.patches[0]["memory"])
-		assert.Equal(t, "100GB", fixture.patches[0]["diskSize"])
-		for _, call := range fixture.calls {
-			assert.False(t, strings.HasSuffix(call, "/run"))
-		}
-	})
+	}
 	t.Run("rejects a shrink before any Lume HTTP call", func(t *testing.T) {
 		fixture := &lifecycleHost{vms: map[string]lumeVM{seed: seedVM()}}
 		client := newTunneledClientWithHost(t, fixture, fixture.host)
@@ -243,6 +266,9 @@ func TestDeleteSandboxDeletesExactMappedVMsOnly(t *testing.T) {
 	}))
 	require.NoError(t, client.DeleteSandbox(t.Context(), "demo"))
 	assert.ElementsMatch(t, []string{extra, other, seed}, fixture.names())
+	boxes, err := client.ListSandboxes(t.Context())
+	require.NoError(t, err)
+	assert.Empty(t, boxes)
 }
 
 func TestStartRefusesUnpreparedMappingWithoutClone(t *testing.T) {

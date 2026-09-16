@@ -285,7 +285,7 @@ func (c *Client) cloneStartLocked(ctx context.Context, req compute.CreateInstanc
 		})
 		return err
 	}
-	if err := c.applyResources(ctx, vmName, req); err != nil {
+	if err := c.applyResources(ctx, vmName, req, seedVM.DiskSize.Total); err != nil {
 		return err
 	}
 	if err := c.markPrepared(ctx, req.Ref.Sandbox, req.Ref.Name); err != nil {
@@ -686,11 +686,19 @@ func rejectShrink(req compute.CreateInstance, current lumeVM) error {
 	return nil
 }
 
-func (c *Client) applyResources(ctx context.Context, vmName string, req compute.CreateInstance) error {
+func (c *Client) applyResources(
+	ctx context.Context,
+	vmName string,
+	req compute.CreateInstance,
+	diskBytes uint64,
+) error {
 	body := map[string]any{
-		"cpu":      req.CPUs,
-		"memory":   fmt.Sprintf("%dMB", req.MemoryMB),
-		"diskSize": fmt.Sprintf("%dGB", req.DiskGB),
+		"cpu":    req.CPUs,
+		"memory": fmt.Sprintf("%dMB", req.MemoryMB),
+	}
+	// Lume rejects equal-size disk requests as well as actual shrinking.
+	if req.DiskGB > 0 && uint64(req.DiskGB) > diskBytes/bytesPerGiB {
+		body["diskSize"] = fmt.Sprintf("%dGB", req.DiskGB)
 	}
 	return c.api(ctx, http.MethodPatch, "/lume/vms/"+vmName, body, nil)
 }
@@ -718,7 +726,8 @@ func (c *Client) ensurePreparedLocked(
 		}
 		return nil
 	}
-	if _, ok := findVM(inventory, mapped.VM); !ok {
+	current, ok := findVM(inventory, mapped.VM)
+	if !ok {
 		return agentErrorf("instance %q is not prepared; delete it and recreate", ref.Name)
 	}
 	if mapped.Seed == "" {
@@ -728,15 +737,13 @@ func (c *Client) ensurePreparedLocked(
 	if err := validateResources(req); err != nil {
 		return err
 	}
-	if seedVM, ok := findVM(inventory, mapped.Seed); ok {
-		if err := rejectShrink(req, seedVM); err != nil {
-			return err
-		}
+	if err := rejectShrink(req, current); err != nil {
+		return err
 	}
 	if err := c.pinMachineIdentifier(ctx, mapped.VM, mapped.Seed); err != nil {
 		return err
 	}
-	if err := c.applyResources(ctx, mapped.VM, req); err != nil {
+	if err := c.applyResources(ctx, mapped.VM, req, current.DiskSize.Total); err != nil {
 		return err
 	}
 	if err := c.markPrepared(ctx, ref.Sandbox, ref.Name); err != nil {

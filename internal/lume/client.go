@@ -18,8 +18,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/skeema/knownhosts"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
 
 	"github.com/GilmanLab/agentcompute/internal/compute"
 )
@@ -98,7 +98,7 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse identity file: %w", err)
 	}
-	hostKeyCallback, err := knownhosts.New(cleaned.KnownHostsFile)
+	hostKeys, err := knownhosts.NewDB(cleaned.KnownHostsFile)
 	if err != nil {
 		return nil, fmt.Errorf("load known hosts: %w", err)
 	}
@@ -110,10 +110,11 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 		return nil, fmt.Errorf("%w: ssh dial: %w", compute.ErrUnavailable, err)
 	}
 	sshConfig := &ssh.ClientConfig{
-		User:            hostUser,
-		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
-		HostKeyCallback: hostKeyCallback,
-		Timeout:         sshDialTimeout,
+		User:              hostUser,
+		Auth:              []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback:   hostKeys.HostKeyCallback(),
+		HostKeyAlgorithms: hostKeys.HostKeyAlgorithms(addr),
+		Timeout:           sshDialTimeout,
 	}
 	clientConn, chans, reqs, err := ssh.NewClientConn(conn, addr, sshConfig)
 	if err != nil {
@@ -281,7 +282,7 @@ func (c *Client) host(ctx context.Context, script string, stdin io.Reader) ([]by
 		case <-runDone:
 		}
 	}()
-	err = session.Run(script)
+	err = session.Run("/bin/sh -c " + quote(script))
 	close(runDone)
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
