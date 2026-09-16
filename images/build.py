@@ -416,6 +416,11 @@ def validate_desktop_files() -> None:
     wrapper = overlay[0].read_text(encoding="utf-8")
     if "--socket" not in wrapper or "cua-driver.sock" not in wrapper:
         raise Error("desktop session wrapper must pass an explicit cua-driver socket")
+    if "serve --no-overlay" not in wrapper:
+        raise Error(
+            "desktop session wrapper must serve with --no-overlay; the Driver's "
+            "agent-cursor overlay freezes every root-window read on GNOME/Xorg"
+        )
     if "--permission-mode" in wrapper or "dangerously-bypass" in wrapper:
         raise Error("desktop session wrapper must keep default standard Driver permissions")
     if "-rfbport 5900" not in wrapper or "SecurityTypes None" not in wrapper:
