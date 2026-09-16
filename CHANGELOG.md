@@ -16,6 +16,13 @@
 - Run host scripts under `/bin/sh` so empty sandbox discovery works with a
   zsh login shell.
 
+## [0.1.3](https://github.com/GilmanLab/agentcompute/compare/v0.1.2...v0.1.3) (2026-09-16)
+
+
+### Bug Fixes
+
+* **lume:** enforce disabled VNC with an account-local pinned build ([#39](https://github.com/GilmanLab/agentcompute/issues/39)) ([9a9e259](https://github.com/GilmanLab/agentcompute/commit/9a9e259bb03d644b8a4142437b4d0492aa70bb00))
+
 ## [0.1.2](https://github.com/GilmanLab/agentcompute/compare/v0.1.1...v0.1.2) (2026-09-16)
 
 
