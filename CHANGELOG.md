@@ -19,6 +19,13 @@
 - Run host scripts under `/bin/sh` so empty sandbox discovery works with a
   zsh login shell.
 
+## [0.1.5](https://github.com/GilmanLab/agentcompute/compare/v0.1.4...v0.1.5) (2026-09-16)
+
+
+### Features
+
+* **sandbox:** add operator-only persistent pins ([#46](https://github.com/GilmanLab/agentcompute/issues/46)) ([544c0b3](https://github.com/GilmanLab/agentcompute/commit/544c0b37754ff2ccdf53585468c61432082bca76))
+
 ## [0.1.4](https://github.com/GilmanLab/agentcompute/compare/v0.1.3...v0.1.4) (2026-09-16)
 
 
