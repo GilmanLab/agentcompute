@@ -80,7 +80,7 @@ lume:
   # What this build adds over the released pin, and the exact shape of it.
   vnc_policy:
     cli: lume run <vm> --no-display --vnc disabled
-    http: POST /lume/vms/<name>/run with {"noDisplay": true, "vnc": "disabled"}
+    http: 'POST /lume/vms/<name>/run with {"noDisplay": true, "vnc": "disabled"}'
     # `disabled` conflicts with a display, so the HTTP body must also set
     # noDisplay: true. The server validates before it starts anything
     # (Handlers.swift handleRunVM -> validatedVNCPolicy(noDisplayDefault:
@@ -109,8 +109,8 @@ fallback:
   provenance: published
   published_by: https://api.github.com/repos/trycua/cua/releases (asset digest)
   installed_at: /usr/local/bin/lume
-  # Falling back means accepting a wildcard VNC listener again. It is a
-  # rollback path, not an equivalent option.
+  # Only a manual rollback reference: backend startup rejects this release.
+  # Never automatically fall back to a wildcard VNC listener.
   vnc_policy: none available
 
 # Delete this source build and return to a released pin as soon as one carries
@@ -119,8 +119,8 @@ revisit:
   condition: the first trycua/cua `lume-v*` release whose tree contains
     ab957bdb7566f7e137b00654cc01167d9e42af38 (that is, the first release after
     lume-v0.5.3 that includes cua#3209).
-  action: pin that release archive and its published SHA-256 in
-    images/macos/pins.lock.yaml, reinstall from it, and delete this file along
-    with images/macos/build-lume.sh.
+  action: replace this file's source-build fields with the release archive and
+    published SHA-256, install it account-locally, and retire
+    images/macos/build-lume.sh. Keep the account-local path and disabled policy.
   checked: 2026-09-15
   newest_release_at_check: lume-v0.5.3 (2026-08-11), does not contain the commit

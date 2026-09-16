@@ -216,11 +216,11 @@ func capableHost(next hostScriptHandler, runHelp string) hostScriptHandler {
 				return handled, err
 			}
 		}
-		if strings.Contains(script, quote(lumeBin)+" run --help") {
+		if strings.Contains(script, lumeBin+" run --help") {
 			_, _ = io.WriteString(stdout, runHelp)
 			return true, nil
 		}
-		if strings.Contains(script, quote(lumeBin)+" ls --format json") {
+		if strings.Contains(script, lumeBin+" ls --format json") {
 			_, _ = io.WriteString(stdout, "[]")
 			return true, nil
 		}

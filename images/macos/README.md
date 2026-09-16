@@ -32,10 +32,10 @@ current, matches the host's own build, and has a publisher-independent digest.
 
 | Piece | Where |
 | --- | --- |
-| Lume 0.5.3 | `/usr/local/bin/lume` plus `/usr/local/bin/lume.app` (the wrapper execs the bundle) |
+| Backend Lume | `/Users/agentcompute/bin/lume`; account-local source build and installed SHA-256 in [`pins/lume.yaml`](../../pins/lume.yaml) |
 | Backend account | `agentcompute`, standard (not admin), hidden, member of `com.apple.access_ssh` |
 | VM store | `/Users/agentcompute/.lume` |
-| API | `lume serve --port 7777`, `/Library/LaunchDaemons/io.gilman.agentcompute.lume-serve.plist`, bound to `127.0.0.1` only |
+| API | `/Users/agentcompute/bin/lume serve --port 7777`, `/Library/LaunchDaemons/io.gilman.agentcompute.lume-serve.plist`, bound to `127.0.0.1` only |
 | Approved server key policy | `from="<server-tailnet-ip>",no-agent-forwarding,no-X11-forwarding`; normal shell and local TCP forwarding |
 | Root-owned account policy | `/etc/ssh/sshd_config.d/110-agentcompute.conf` (`Match User agentcompute`) |
 | Guest key | Per-image key on the server; the seed's provisioned key is `/Users/agentcompute/.ssh/guest_ed25519` on Studio |
@@ -204,8 +204,8 @@ Machine-readable evidence is in
 Qualification used a runtime-only systemd override, then restored the
 fleet-pinned v0.1.1 binary, configuration, and catalog. Temporary credentials
 and binaries were removed. This is qualification evidence, not a permanent
-Lume rollout. PF and tailnet ACLs were not changed; the VNC restriction below
-remains an operator rollout prerequisite.
+Lume rollout. PF and tailnet ACLs were not changed. Phase 9b replaces the
+proposed high-port firewall gate with disabled VNC at its source, below.
 
 Three live-only defects were fixed and regression-tested: SSH negotiated an
 unpinned host-key algorithm; Lume rejected an equal-size disk PATCH; and zsh
@@ -218,70 +218,31 @@ One concurrent-listing finding remains outside this qualification fix:
 a listed sandbox before its details are read. This occurred during parallel
 live-lane teardown; the sequential lifecycle and TTL checks passed.
 
-## Restrict VNC before serving workers
+## Disable VNC before serving workers
 
-Lume's VNC listener uses an ephemeral TCP port, not port 5900. The observed
-host range is 49152–65535 (`sysctl net.inet.ip.portrange.first
-net.inet.ip.portrange.last`). `pf.anchor` admits that range only through
-loopback and the current Tailscale interface.
+Released Lume 0.5.3 opens a wildcard VNC listener even with `--display none`.
+The owner rejected a high-port PF block because it would also affect
+Continuity and `rapportd`. The obsolete anchor is removed; do not install it.
 
-**Impact:** this range also contains non-Lume applications. Review
-`sudo lsof -nP -iTCP -sTCP:LISTEN` before applying it. Do not apply it if
-another application requires LAN access in this range; resolve that conflict
-with the owner first. These rules were syntax-checked, not installed during
-the identity experiment.
+The backend instead requires the account-local source build in
+[`pins/lume.yaml`](../../pins/lume.yaml), which includes upstream
+[cua#3209](https://github.com/trycua/cua/pull/3209). Every run sends
+`{"noDisplay":true,"vnc":"disabled"}`. Startup checks both the CLI and daemon
+and fails closed if either lacks the policy. Inventory must report no VNC URL.
+The global 0.5.3 install remains the seed qualification/release rollback
+reference, not an automatic fallback for backend guests.
 
-1. Stop all worker VMs through the HTTP API so no pre-existing VNC states
-   survive the policy change. Leave the seed stopped.
-2. Find the current Tailscale interface with
-   `route -n get <online-tailnet-peer-ip>`; use its `interface` value below.
-   It was `utun9` during the experiment, but the number can change.
-3. Validate and install only the anchor file:
+`build-lume.sh` runs only as the standard `agentcompute` account and refuses
+to install a binary whose SHA-256 differs from the pin. Its source commit and
+dependencies are pinned, but a measured clean rebuild is **not bitwise
+reproducible**; a deliberate rebuild needs a reviewed artifact re-pin.
+The version string remains 0.5.3, so verify the installed path and hash.
 
-   ```sh
-   tailnet_if=utun9  # replace with the observed interface
-   sudo pfctl -n -D "tailnet_if=$tailnet_if" -f images/macos/pf.anchor
-   sudo install -o root -g wheel -m 0644 images/macos/pf.anchor \
-     /etc/pf.anchors/io.gilman.agentcompute
-   ```
-
-4. Back up `/etc/pf.conf`. Add `anchor "io.gilman.agentcompute" quick`
-   immediately before its existing `anchor "com.apple/*"` filter anchor.
-   Preserve every existing scrub, NAT, redirect, and Apple anchor. Compare
-   the live root rules (`sudo pfctl -sr`, `sudo pfctl -sn`) with the file:
-   reloading it can discard dynamically inserted root rules. If they differ,
-   stop and reconcile with the owner rather than losing another service's
-   rules. Check `sudo pfctl -nf /etc/pf.conf` before the maintenance-window
-   reload with `sudo pfctl -f /etc/pf.conf`. Never use a global flush.
-5. Load the child rules:
-
-   ```sh
-   sudo pfctl -a io.gilman.agentcompute \
-     -D "tailnet_if=$tailnet_if" -f /etc/pf.anchors/io.gilman.agentcompute
-   sudo pfctl -a io.gilman.agentcompute -sr
-   sudo pfctl -s info
-   ```
-
-   If PF is disabled, enable it with `sudo pfctl -E` and retain its reference
-   token. Never use `pfctl -d`: other host services also depend on PF.
-6. Start one disposable worker. Read its actual `vncUrl` port and verify a
-   fresh TCP connection from loopback and an allowed tailnet peer succeeds,
-   while fresh connections to both LAN addresses fail. Also test IPv6 if a
-   wildcard IPv6 listener exists. Stop the worker after checking.
-
-The child rules must be reloaded after a reboot or Tailscale interface
-change, **before** starting workers. The main anchor declaration alone does
-not load them. An unattended host boot loader is not installed by this
-procedure. If the interface cannot be identified or the anchor is absent,
-do not serve workers.
-
-Rollback: stop workers, then unload only this anchor with
-`sudo pfctl -a io.gilman.agentcompute -F rules`. Release only the PF reference
-token acquired by this procedure with `sudo pfctl -X <token>`. Restore the
-saved main configuration if its declaration must also be removed.
-
-Upstream bind-address request:
-[trycua/cua#3878](https://github.com/trycua/cua/issues/3878).
+The canonical [agentcompute runbook](https://github.com/GilmanLab/root/blob/master/docs/docs/runbooks/agentcompute.md)
+owns daemon activation, listener verification from request through Running,
+credential delivery, and manual console fallback. No PF or Internet Sharing
+change is required. Return to a release pin when upstream releases the
+disabled-VNC feature; the pin records that revisit condition.
 
 ## Build a seed
 
@@ -297,18 +258,20 @@ read_pin() { ( . images/macos/lib.sh; pin "$pins" "$1" "$2" ); }
 
 ### 1. Install the pinned Lume
 
+Follow `images/macos/build-lume.sh`'s staging instructions so the service
+account can read the script without access to the owner's home. Run the build
+as `agentcompute`, never root. The build touches only that account's home.
+
 ```sh
-curl -fsSL -o /tmp/lume.tar.gz "$(read_pin lume url)"
-shasum -a 256 /tmp/lume.tar.gz          # must equal $(read_pin lume sha256)
-tar xzf /tmp/lume.tar.gz -C /tmp
-sudo ditto /tmp/lume.app /usr/local/bin/lume.app
-sudo install -m 0755 /tmp/lume /usr/local/bin/lume
-lume --version                          # 0.5.3
-sudo -u agentcompute -H lume config telemetry disable
+sudo -u agentcompute -H /tmp/lume-build/images/macos/build-lume.sh
+export PATH=/Users/agentcompute/bin:$PATH
+lume run --help
 ```
 
-The archive ships a shell wrapper plus `lume.app`; both must land in the same
-directory or the wrapper cannot find the binary.
+Require the distinct `--vnc <vnc>` option, not just `--vnc-port`. Repoint the
+account's daemon using the canonical runbook before cloning a worker. The
+released archive remains pinned in `images/macos/pins.lock.yaml` as the
+historical seed-build input and in `pins/lume.yaml` as a rollback reference.
 
 ### 2. Fetch and verify the IPSW
 
@@ -462,7 +425,7 @@ Never run it while the clone is running. Then start through HTTP:
 
 ```sh
 curl -sS -X POST http://127.0.0.1:7777/lume/vms/ac-smoke-1/run -H 'Content-Type: application/json' \
-  -d '{"noDisplay":true}'
+  -d '{"noDisplay":true,"vnc":"disabled"}'
 ```
 
 Wait until `GET /lume/vms/ac-smoke-1` reports a NAT address and SSH accepts
@@ -514,7 +477,7 @@ experiment did not modify the seed or grant new permissions.
 ## Host-wide guest-count rule
 
 Before a create/start request makes any Lume HTTP call, inspect the dedicated
-account's inventory with `/usr/local/bin/lume ls --format json`. Count running
+account's inventory with `/Users/agentcompute/bin/lume ls --format json`. Count running
 **macOS** guests regardless of name, including a running seed, and serialize
 pending starts. Refuse a third Lume-owned running macOS guest:
 

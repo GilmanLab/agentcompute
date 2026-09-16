@@ -162,7 +162,7 @@ func (h *lifecycleHost) runCalls() []lumeRun {
 }
 
 func (h *lifecycleHost) host(script string, _ io.Reader, stdout, _ io.Writer) (bool, error) {
-	if strings.Contains(script, quote(lumeBin)+" ls --format json") {
+	if strings.Contains(script, lumeBin+" ls --format json") {
 		h.mu.Lock()
 		defer h.mu.Unlock()
 		vms := make([]lumeVM, 0, len(h.vms))

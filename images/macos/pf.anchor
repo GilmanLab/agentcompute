@@ -1,7 +1,0 @@
-# Supply the current Tailscale utun interface with pfctl -D tailnet_if=utunN.
-# Lume chooses an ephemeral TCP port; this range also covers other applications.
-# Install only after reviewing the host's other high-port listeners.
-vnc_ports = "49152:65535"
-pass in quick on lo0 proto tcp from any to self port $vnc_ports
-pass in quick on $tailnet_if proto tcp from any to self port $vnc_ports
-block in quick proto tcp from any to self port $vnc_ports

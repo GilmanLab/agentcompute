@@ -634,7 +634,7 @@ func (c *Client) getVM(ctx context.Context, name string) (lumeVM, error) {
 
 func (c *Client) lumeList(ctx context.Context) ([]lumeVM, error) {
 	out, err := c.host(ctx, `set -eu
-`+quote(lumeBin)+` ls --format json
+`+lumeBin+` ls --format json
 `, nil)
 	if err != nil {
 		return nil, err

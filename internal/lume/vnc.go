@@ -21,11 +21,8 @@ const (
 	// VNC listener, publishes no credentials, and reports a null vncUrl.
 	vncPolicyDisabled = "disabled"
 
-	// vncPinFile records the source build the host must run; vncSourceCommit
-	// is the exact upstream commit it pins.
-	vncPinFile      = "pins/lume.yaml"
-	vncSourceRepo   = "https://github.com/trycua/cua"
-	vncSourceCommit = "ab957bdb7566f7e137b00654cc01167d9e42af38"
+	// vncPinFile is the single source of installation and provenance details.
+	vncPinFile = "pins/lume.yaml"
 
 	// vncCLIOption is how the pinned build renders the run flag in help
 	// output. 0.5.3 already ships --vnc-port and --vnc-password, so the value
@@ -58,15 +55,14 @@ func (c *Client) requireVNCDisableSupport(ctx context.Context) error {
 	return c.requireVNCPolicyEnforced(ctx, inventory)
 }
 
-// requireVNCCLIOption proves the installed executable is the source build,
-// not the released 0.5.3 archive.
+// requireVNCCLIOption checks the installed executable's policy capability.
 func (c *Client) requireVNCCLIOption(ctx context.Context) error {
 	script := `set -eu
 if [ ! -x ` + quote(lumeBin) + ` ]; then
   echo 'not installed or not executable' >&2
   exit 1
 fi
-` + quote(lumeBin) + ` run --help
+` + lumeBin + ` run --help
 `
 	out, err := c.host(ctx, script, nil)
 	if err != nil {
@@ -129,8 +125,11 @@ func vncProbeName(inventory []lumeVM) (string, error) {
 
 func vncUnsupported(detail string) error {
 	return fmt.Errorf(
-		"lume on this host cannot start guests with VNC disabled: %s; install the source build pinned in %s (%s commit %s, upstream PR #3209) as %s and run lume serve from that executable",
-		detail, vncPinFile, vncSourceRepo, vncSourceCommit, lumeBin)
+		"lume on this host cannot start guests with VNC disabled: %s; install the build pinned in %s as %s and run lume serve from that executable",
+		detail,
+		vncPinFile,
+		lumeBin,
+	)
 }
 
 // requireNoVNCListener stops a guest that came up with a VNC endpoint anyway.
