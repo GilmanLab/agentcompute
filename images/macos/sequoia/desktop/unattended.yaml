@@ -1,0 +1,33 @@
+# Lume unattended setup for the macOS seed.
+#
+# Schema: libs/lume/src/Unattended/UnattendedConfig.swift (Lume 0.5.3) —
+# boot_wait, boot_commands, health_check{type,user,password,timeout,retries,
+# retry_delay}, post_ssh_commands. `lume create --unattended <path>` loads a
+# preset name first and falls back to a file path, so this file is passed by
+# path.
+#
+# This is upstream's `sequoia` preset with a longer health-check budget. The
+# preset installs macOS from the IPSW, boots once, patches the Data volume
+# offline (account, autologin, SSH, no sleep), boots again, and verifies SSH.
+# Nothing here logs into a GUI or clicks Setup Assistant.
+
+boot_wait: 0
+boot_commands: []
+
+health_check:
+  type: ssh
+  user: lume
+  password: lume
+  timeout: 5
+  # Upstream allows 60 retries at 5s (5 minutes). A headless lab host with no
+  # display attached and a cold IPSW install is slower than a developer laptop
+  # watching the console, so the budget is 15 minutes. A seed that needs more
+  # than that is a failed create, not a slow one.
+  retries: 180
+  retry_delay: 5
+
+# Deliberately empty. Provisioning is images/macos/sequoia/desktop/provision.sh,
+# which is idempotent, re-runnable against an existing seed, and checksum-gated.
+# post_ssh_commands would run the same work inside `lume create`, where a
+# failure destroys the install instead of leaving a VM to inspect.
+post_ssh_commands: []
