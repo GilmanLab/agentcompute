@@ -106,6 +106,16 @@ func TestScreenshotExpiryAndSandboxPurge(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestPinnedSandboxScreenshotStillExpiresAtRetention(t *testing.T) {
+	store, now := testStore(t)
+	shot, err := store.Publish("pinned", time.Time{}, bytes.NewReader(testPNG(t)))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, requestShot(t, store, http.MethodGet, shot.URL).Code)
+	*now = now.Add(5 * time.Minute)
+	store.Sweep()
+	assert.Equal(t, http.StatusNotFound, requestShot(t, store, http.MethodGet, shot.URL).Code)
+}
+
 func TestScreenshotSizeAndCapacityRejectWithoutEviction(t *testing.T) {
 	store, now := testStore(t)
 	pngData := testPNG(t)

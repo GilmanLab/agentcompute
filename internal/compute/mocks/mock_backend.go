@@ -1838,6 +1838,90 @@ func (_c *MockBackend_PeerNetworks_Call) RunAndReturn(run func(context1 context.
 	return _c
 }
 
+// PinSandbox provides a mock function for the type MockBackend
+func (_mock *MockBackend) PinSandbox(context1 context.Context, s string, b bool, s1 string, time1 time.Time) (compute.Sandbox, error) {
+	ret := _mock.Called(context1, s, b, s1, time1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PinSandbox")
+	}
+
+	var r0 compute.Sandbox
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, string, time.Time) (compute.Sandbox, error)); ok {
+		return returnFunc(context1, s, b, s1, time1)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool, string, time.Time) compute.Sandbox); ok {
+		r0 = returnFunc(context1, s, b, s1, time1)
+	} else {
+		r0 = ret.Get(0).(compute.Sandbox)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool, string, time.Time) error); ok {
+		r1 = returnFunc(context1, s, b, s1, time1)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBackend_PinSandbox_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PinSandbox'
+type MockBackend_PinSandbox_Call struct {
+	*mock.Call
+}
+
+// PinSandbox is a helper method to define mock.On call
+//   - context1 context.Context
+//   - s string
+//   - b bool
+//   - s1 string
+//   - time1 time.Time
+func (_e *MockBackend_Expecter) PinSandbox(context1 interface{}, s interface{}, b interface{}, s1 interface{}, time1 interface{}) *MockBackend_PinSandbox_Call {
+	return &MockBackend_PinSandbox_Call{Call: _e.mock.On("PinSandbox", context1, s, b, s1, time1)}
+}
+
+func (_c *MockBackend_PinSandbox_Call) Run(run func(context1 context.Context, s string, b bool, s1 string, time1 time.Time)) *MockBackend_PinSandbox_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 time.Time
+		if args[4] != nil {
+			arg4 = args[4].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBackend_PinSandbox_Call) Return(sandbox compute.Sandbox, err error) *MockBackend_PinSandbox_Call {
+	_c.Call.Return(sandbox, err)
+	return _c
+}
+
+func (_c *MockBackend_PinSandbox_Call) RunAndReturn(run func(context1 context.Context, s string, b bool, s1 string, time1 time.Time) (compute.Sandbox, error)) *MockBackend_PinSandbox_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PublishInstance provides a mock function for the type MockBackend
 func (_mock *MockBackend) PublishInstance(context1 context.Context, ref compute.Ref, s string) (string, error) {
 	ret := _mock.Called(context1, ref, s)

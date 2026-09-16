@@ -16,7 +16,7 @@ func TestCreateSandboxMacRequiresBackend(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
-	_, err := tc.service.CreateSandbox(t.Context(), "demo", 0, "subj", "mac")
+	_, err := tc.service.CreateSandbox(t.Context(), "demo", 0, "subj", "mac", false)
 	requireAgentMessage(t, err, `platform "mac" is not available yet`)
 }
 
@@ -34,7 +34,7 @@ func TestCreateSandboxMacUsesMacBackend(t *testing.T) {
 			return nil
 		})
 
-	got, err := tc.service.CreateSandbox(t.Context(), "demo", 0, "subj", "mac")
+	got, err := tc.service.CreateSandbox(t.Context(), "demo", 0, "subj", "mac", false)
 	require.NoError(t, err)
 	assert.Equal(t, "mac", got.Platform)
 	assert.Equal(t, "demo", got.Name)
@@ -46,7 +46,7 @@ func TestCreateSandboxNameIsGloballyUnique(t *testing.T) {
 	tc := newMixedContext(t)
 	tc.incus.EXPECT().GetSandbox(mock.Anything, "demo").Return(liveSandbox("demo"), nil)
 
-	_, err := tc.service.CreateSandbox(t.Context(), "demo", 0, "subj", "mac")
+	_, err := tc.service.CreateSandbox(t.Context(), "demo", 0, "subj", "mac", false)
 	requireAgentMessage(t, err, `sandbox "demo" already exists`)
 }
 

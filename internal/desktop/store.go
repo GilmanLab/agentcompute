@@ -105,6 +105,7 @@ func NewStore(dir, baseURL string) (*Store, error) {
 
 // Publish stores one PNG until five minutes or sandbox expiry, whichever is sooner.
 // Oversized images and exhausted capacity fail without evicting live screenshots.
+// A zero sandboxExpiry leaves only the five-minute screenshot retention limit.
 func (s *Store) Publish(sandbox string, sandboxExpiry time.Time, source io.Reader) (Screenshot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -114,7 +115,7 @@ func (s *Store) Publish(sandbox string, sandboxExpiry time.Time, source io.Reade
 	now := s.now()
 	s.expireLocked(now)
 	expires := now.Add(screenshotRetention)
-	if sandboxExpiry.Before(expires) {
+	if !sandboxExpiry.IsZero() && sandboxExpiry.Before(expires) {
 		expires = sandboxExpiry
 	}
 	if !expires.After(now) {

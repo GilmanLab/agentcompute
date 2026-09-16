@@ -35,6 +35,9 @@ type sandboxRecord struct {
 	NetworkKind string                     `json:"network_kind,omitempty"`
 	CreatedAt   time.Time                  `json:"created_at"`
 	ExpiresAt   time.Time                  `json:"expires_at"`
+	Pinned      bool                       `json:"pinned"`
+	PinnedBy    string                     `json:"pinned_by"`
+	PinnedAt    time.Time                  `json:"pinned_at"`
 	Instances   map[string]*instanceRecord `json:"instances"`
 }
 
@@ -179,6 +182,9 @@ func (rec *sandboxRecord) sandbox() compute.Sandbox {
 		NetworkKind: rec.NetworkKind,
 		CreatedAt:   rec.CreatedAt,
 		ExpiresAt:   rec.ExpiresAt,
+		Pinned:      rec.Pinned,
+		PinnedBy:    rec.PinnedBy,
+		PinnedAt:    rec.PinnedAt,
 	}
 }
 
@@ -267,6 +273,9 @@ func (c *Client) CreateSandbox(ctx context.Context, sandbox compute.Sandbox) err
 		NetworkKind: sandbox.NetworkKind,
 		CreatedAt:   created,
 		ExpiresAt:   expires,
+		Pinned:      sandbox.Pinned,
+		PinnedBy:    sandbox.PinnedBy,
+		PinnedAt:    sandbox.PinnedAt,
 		Instances:   map[string]*instanceRecord{},
 	})
 }
@@ -328,6 +337,28 @@ func (c *Client) GetSandbox(ctx context.Context, name string) (compute.Sandbox, 
 func (c *Client) ExtendSandbox(ctx context.Context, name string, expires time.Time) (compute.Sandbox, error) {
 	err := c.updateSandbox(ctx, name, func(rec *sandboxRecord) error {
 		rec.ExpiresAt = expires.UTC()
+		return nil
+	})
+	if err != nil {
+		return compute.Sandbox{}, err
+	}
+	return c.GetSandbox(ctx, name)
+}
+
+// PinSandbox persists pin metadata in the sidecar without changing expiry.
+func (c *Client) PinSandbox(
+	ctx context.Context,
+	name string,
+	pinned bool,
+	subject string,
+	since time.Time,
+) (compute.Sandbox, error) {
+	err := c.updateSandbox(ctx, name, func(rec *sandboxRecord) error {
+		rec.Pinned = pinned
+		rec.PinnedBy, rec.PinnedAt = "", time.Time{}
+		if pinned {
+			rec.PinnedBy, rec.PinnedAt = subject, since.UTC()
+		}
 		return nil
 	})
 	if err != nil {

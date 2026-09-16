@@ -72,16 +72,19 @@ func capabilityContracts() []capabilityContract {
 	return []capabilityContract{
 		{
 			name:      capabilitySandboxCreate,
-			signature: "sandbox.create(*, name: str | None, platform: str | None, ttl_minutes: int | None)",
+			signature: "sandbox.create(*, name: str | None, platform: str | None, ttl_minutes: int | None, pinned: bool | None)",
 			input: []fieldShape{
 				{Name: "name", Type: "str | None"},
 				{Name: "platform", Type: "str | None"},
 				{Name: "ttl_minutes", Type: "int | None"},
+				{Name: "pinned", Type: "bool | None"},
 			},
 			output: []fieldShape{
 				{Name: "name", Type: "str", Required: true},
 				{Name: "platform", Type: "str", Required: true},
 				{Name: "expires_at", Type: "str", Required: true},
+				{Name: "pinned", Type: "bool", Required: true},
+				{Name: "pinned_by", Type: "str", Required: true},
 				{Name: "network", Type: networkType, Required: true},
 			},
 		},
@@ -92,7 +95,7 @@ func capabilityContracts() []capabilityContract {
 			output: []fieldShape{
 				{
 					Name:     "items",
-					Type:     "list[{name: str, platform: str, created_at: str, expires_at: str, instances: int}]",
+					Type:     "list[{name: str, platform: str, created_at: str, expires_at: str, pinned: bool, pinned_by: str, instances: int}]",
 					Required: true,
 				},
 			},
@@ -106,6 +109,8 @@ func capabilityContracts() []capabilityContract {
 				{Name: "platform", Type: "str", Required: true},
 				{Name: "created_at", Type: "str", Required: true},
 				{Name: "expires_at", Type: "str", Required: true},
+				{Name: "pinned", Type: "bool", Required: true},
+				{Name: "pinned_by", Type: "str", Required: true},
 				{Name: "instances", Type: "list[" + instanceListItemType + "]", Required: true},
 				{Name: "networks", Type: "list[" + networkType + "]", Required: true},
 			},
@@ -118,6 +123,18 @@ func capabilityContracts() []capabilityContract {
 				{Name: "ttl_minutes", Type: "int", Required: true},
 			},
 			output: []fieldShape{{Name: "expires_at", Type: "str", Required: true}},
+		},
+		{
+			name:      capabilitySandboxPin,
+			signature: "sandbox.pin(*, name: str, pinned: bool)",
+			input: []fieldShape{
+				{Name: "name", Type: "str", Required: true},
+				{Name: "pinned", Type: "bool", Required: true},
+			},
+			output: []fieldShape{
+				{Name: "pinned", Type: "bool", Required: true},
+				{Name: "pinned_by", Type: "str", Required: true},
+			},
 		},
 		{
 			name:      capabilitySandboxDelete,

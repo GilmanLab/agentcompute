@@ -27,6 +27,9 @@ const (
 	metaVersion       = metaPrefix + "version"
 	metaCreatedAt     = metaPrefix + "created_at"
 	metaExpiresAt     = metaPrefix + "expires_at"
+	metaPinned        = metaPrefix + "pinned"
+	metaPinnedBy      = metaPrefix + "pinned_by"
+	metaPinnedAt      = metaPrefix + "pinned_at"
 	metaSubject       = metaPrefix + "subject"
 	metaHost          = metaPrefix + "host"
 	metaSandbox       = metaPrefix + "sandbox"
@@ -466,6 +469,7 @@ func parseSandbox(project api.Project) (compute.Sandbox, bool) {
 	}
 	created, _ := parseTime(project.Config[metaCreatedAt])
 	expires, _ := parseTime(project.Config[metaExpiresAt])
+	pinnedAt, _ := parseTime(project.Config[metaPinnedAt])
 	networkKind := networkKindBridge
 	if isTrue(project.Config[featuresNetworksKey]) {
 		networkKind = networkKindOVN
@@ -478,6 +482,9 @@ func parseSandbox(project api.Project) (compute.Sandbox, bool) {
 		NetworkKind: networkKind,
 		CreatedAt:   created,
 		ExpiresAt:   expires,
+		Pinned:      isTrue(project.Config[metaPinned]),
+		PinnedBy:    project.Config[metaPinnedBy],
+		PinnedAt:    pinnedAt,
 	}, true
 }
 

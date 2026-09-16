@@ -58,12 +58,13 @@ screenshots:
 | `sandbox.default_ttl_minutes` | Positive creation default, 240 minutes if omitted. |
 | `sandbox.max_ttl_minutes` | Positive upper bound, 1440 minutes if omitted; must be at least the default. |
 | `sandbox.default_network_kind` | `ovn` (default) or `bridge`. OVN requires an existing central, configured chassis, and physical uplink. |
+| `sandbox.pin_identities` | Exact authenticated subject IDs allowed to create pinned sandboxes and call `sandbox.pin` with either boolean value. Empty or omitted disables both operations; existing pins remain effective. |
 | `images_file` | Schema-version-1 catalog path; defaults to `images/catalog.yaml`. |
 | `screenshots.base_url` | Required absolute HTTP(S) URL reachable from the agent host, without credentials, query, or fragment. Never derived from the request's `Host` header. |
 | `screenshots.dir` | Scratch parent directory; defaults to `screenshots` beside the configuration file. Each process locks the parent and clears only its owned child directory. |
 | `screenshots.listen` | Separate screenshot listener in STDIO mode; defaults to `127.0.0.1:8081`. HTTP mode instead mounts screenshots beside MCP on `--addr`. |
 
-`sandbox.extend` replaces the expiry with **now + TTL**, rather than adding time to the old expiry. Explicit deletion first expires the project so a partial failure is retried by the reaper. The reaper scans at startup and every 30 seconds.
+`sandbox.extend` replaces the expiry with **now + TTL**, rather than adding time to the old expiry. Pinned sandboxes ignore that deadline, remain usable, and survive restart. `sandbox.pin(name=..., pinned=False)` restores the existing deadline without extending it. Explicit deletion first expires the sandbox and clears any pin so a partial failure is retried by the reaper. The reaper scans at startup and every 30 seconds, logging each pinned sandbox's identity and pin timestamp at INFO. Pins retain interactive machines, not reusable images; those require recipes under `images/`.
 
 The example above targets STDIO. For `agentcompute http --addr localhost:8080`,
 set `screenshots.base_url` to the agent-reachable URL for port 8080 instead.

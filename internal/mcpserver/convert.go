@@ -133,6 +133,8 @@ func sandboxListItemDTO(sandbox compute.Sandbox, instances int64) sandboxListIte
 		Platform:  sandbox.Platform,
 		CreatedAt: formatTime(sandbox.CreatedAt),
 		ExpiresAt: formatTime(sandbox.ExpiresAt),
+		Pinned:    sandbox.Pinned,
+		PinnedBy:  sandbox.PinnedBy,
 		Instances: instances,
 	}
 }

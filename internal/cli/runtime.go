@@ -70,9 +70,10 @@ type lumeConfig struct {
 }
 
 type sandboxConfig struct {
-	DefaultTTLMinutes  int64  `yaml:"default_ttl_minutes"  toml:"default_ttl_minutes"`
-	MaxTTLMinutes      int64  `yaml:"max_ttl_minutes"      toml:"max_ttl_minutes"`
-	DefaultNetworkKind string `yaml:"default_network_kind" toml:"default_network_kind"`
+	DefaultTTLMinutes  int64    `yaml:"default_ttl_minutes"  toml:"default_ttl_minutes"`
+	MaxTTLMinutes      int64    `yaml:"max_ttl_minutes"      toml:"max_ttl_minutes"`
+	DefaultNetworkKind string   `yaml:"default_network_kind" toml:"default_network_kind"`
+	PinIdentities      []string `yaml:"pin_identities"       toml:"pin_identities"`
 }
 
 type screenshotConfig struct {
@@ -283,6 +284,7 @@ func newRuntime(ctx context.Context, path string, logger *slog.Logger) (*runtime
 		DefaultNetworkKind: cfg.Sandbox.DefaultNetworkKind,
 		DefaultTTL:         time.Duration(cfg.Sandbox.DefaultTTLMinutes) * time.Minute,
 		MaxTTL:             time.Duration(cfg.Sandbox.MaxTTLMinutes) * time.Minute,
+		PinIdentities:      cfg.Sandbox.PinIdentities,
 		Logger:             logger,
 		Mac:                mac,
 		OnSandboxExpired: func(name string) {

@@ -50,7 +50,7 @@ Startup reconciles the image catalog. The client sees exactly `search_api`, `des
 Call `search_api` with `{"query":"sandbox"}` and then `describe_api` with `{"name":"sandbox.create"}`. Its signature is:
 
 ```text
-sandbox.create(*, name: str | None, platform: str | None, ttl_minutes: int | None)
+sandbox.create(*, name: str | None, platform: str | None, ttl_minutes: int | None, pinned: bool | None)
 ```
 
 Repeat discovery and description for `instance.create`, `instance.exec`, and `sandbox.delete`. Use the returned field names rather than guessing arguments.

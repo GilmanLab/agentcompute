@@ -77,6 +77,20 @@ func (r *router) ExtendSandbox(ctx context.Context, name string, expires time.Ti
 	return backend.ExtendSandbox(ctx, name, expires)
 }
 
+func (r *router) PinSandbox(
+	ctx context.Context,
+	name string,
+	pinned bool,
+	subject string,
+	since time.Time,
+) (Sandbox, error) {
+	backend, err := r.backendFor(ctx, name)
+	if err != nil {
+		return Sandbox{}, err
+	}
+	return backend.PinSandbox(ctx, name, pinned, subject, since)
+}
+
 func (r *router) DeleteSandbox(ctx context.Context, name string) error {
 	backend, err := r.backendFor(ctx, name)
 	if err != nil {

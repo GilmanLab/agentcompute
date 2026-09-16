@@ -34,6 +34,9 @@ type Options struct {
 	DefaultTTL time.Duration
 	// MaxTTL is the upper bound for create and extend. Zero selects 1440 minutes.
 	MaxTTL time.Duration
+	// PinIdentities allows these exact subjects to pin and unpin sandboxes.
+	// An empty list disables pinning.
+	PinIdentities []string
 	// DefaultNetworkKind selects ovn or bridge for new sandboxes. Empty selects ovn.
 	DefaultNetworkKind string
 	// Logger receives operational logs. Nil selects a no-op logger.
@@ -58,6 +61,7 @@ type Service struct {
 	defaultTTL         time.Duration
 	maxTTL             time.Duration
 	defaultNetworkKind string
+	pinIdentities      []string
 	onSandboxExpired   func(string)
 	onReap             func()
 	desktopReady       func(context.Context, Ref) (bool, error)
@@ -109,6 +113,7 @@ func New(backend Backend, catalog *Catalog, opts Options) (*Service, error) {
 		defaultTTL:         resolvedDefault,
 		maxTTL:             resolvedMax,
 		defaultNetworkKind: kind,
+		pinIdentities:      slices.Clone(opts.PinIdentities),
 		onSandboxExpired:   opts.OnSandboxExpired,
 		onReap:             opts.OnReap,
 		desktopReady:       opts.DesktopReady,
@@ -150,7 +155,11 @@ func (s *Service) CreateSandbox(
 	name string,
 	ttl time.Duration,
 	subject, platform string,
+	pinned bool,
 ) (Sandbox, error) {
+	if pinned && !s.canPin(subject) {
+		return Sandbox{}, agentError("pinning requires an operator identity")
+	}
 	ttl, err := s.resolveTTL(ttl)
 	if err != nil {
 		return Sandbox{}, err
@@ -160,7 +169,7 @@ func (s *Service) CreateSandbox(
 		if err != nil {
 			return Sandbox{}, err
 		}
-		return s.createGeneratedSandbox(ctx, ttl, subject, platform)
+		return s.createGeneratedSandbox(ctx, ttl, subject, platform, pinned)
 	}
 	if err = validateName(name); err != nil {
 		return Sandbox{}, err
@@ -169,7 +178,7 @@ func (s *Service) CreateSandbox(
 	if err != nil {
 		return Sandbox{}, err
 	}
-	return s.createNamedSandbox(ctx, name, ttl, subject, platform)
+	return s.createNamedSandbox(ctx, name, ttl, subject, platform, pinned)
 }
 
 // ListSandboxes returns every owned sandbox discovered from the backend.
@@ -232,6 +241,33 @@ func (s *Service) ExtendSandbox(ctx context.Context, name string, ttl time.Durat
 	return extended, nil
 }
 
+// PinSandbox sets an operator pin without changing the sandbox's TTL.
+// Repeated pins preserve attribution; unpinning restores the persisted expiry.
+func (s *Service) PinSandbox(ctx context.Context, name string, pinned bool, subject string) (Sandbox, error) {
+	if !s.canPin(subject) {
+		return Sandbox{}, agentError("pinning requires an operator identity")
+	}
+	var result Sandbox
+	err := s.withLiveSandbox(ctx, name, func(box Sandbox) error {
+		if box.Pinned == pinned {
+			result = box
+			return nil
+		}
+		by, since := "", time.Time{}
+		if pinned {
+			by, since = subject, time.Now()
+		}
+		var err error
+		result, err = s.backend.PinSandbox(ctx, name, pinned, by, since)
+		return s.mapBackend(ctx, "pin sandbox", err)
+	})
+	return result, err
+}
+
+func (s *Service) canPin(subject string) bool {
+	return subject != "" && slices.Contains(s.pinIdentities, subject)
+}
+
 // DeleteSandbox marks expiry as now, then deletes; a partial failure is retried by the reaper.
 func (s *Service) DeleteSandbox(ctx context.Context, name string) error {
 	if err := validateName(name); err != nil {
@@ -243,7 +279,8 @@ func (s *Service) DeleteSandbox(ctx context.Context, name string) error {
 	}
 	defer unlock()
 
-	if _, err := s.backend.GetSandbox(ctx, name); err != nil {
+	box, err := s.backend.GetSandbox(ctx, name)
+	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return sandboxNotFound(name)
 		}
@@ -254,6 +291,11 @@ func (s *Service) DeleteSandbox(ctx context.Context, name string) error {
 			return sandboxNotFound(name)
 		}
 		return s.backendError(ctx, "expire sandbox", err)
+	}
+	if box.Pinned {
+		if _, err := s.backend.PinSandbox(ctx, name, false, "", time.Time{}); err != nil {
+			return s.backendError(ctx, "unpin sandbox for deletion", err)
+		}
 	}
 	if s.onSandboxExpired != nil {
 		s.onSandboxExpired(name)
@@ -537,13 +579,14 @@ func (s *Service) createGeneratedSandbox(
 	ctx context.Context,
 	ttl time.Duration,
 	subject, platform string,
+	pinned bool,
 ) (Sandbox, error) {
 	for range nameGenerateTries {
 		name, err := generateName()
 		if err != nil {
 			return Sandbox{}, err
 		}
-		box, err := s.createNamedSandbox(ctx, name, ttl, subject, platform)
+		box, err := s.createNamedSandbox(ctx, name, ttl, subject, platform, pinned)
 		if err == nil {
 			return box, nil
 		}
@@ -560,6 +603,7 @@ func (s *Service) createNamedSandbox(
 	name string,
 	ttl time.Duration,
 	subject, platform string,
+	pinned bool,
 ) (Sandbox, error) {
 	unlock, err := s.gate.Lock(ctx, name)
 	if err != nil {
@@ -581,6 +625,9 @@ func (s *Service) createNamedSandbox(
 		Subject:   subject,
 		CreatedAt: now,
 		ExpiresAt: now.Add(ttl),
+	}
+	if pinned {
+		box.Pinned, box.PinnedBy, box.PinnedAt = true, subject, now
 	}
 	if platform != platformMac {
 		box.NetworkKind = s.defaultNetworkKind
@@ -697,7 +744,7 @@ func (s *Service) withLiveSandbox(ctx context.Context, name string, fn func(Sand
 	if box.Host == "" {
 		box.Host = s.host
 	}
-	if !box.ExpiresAt.After(time.Now()) {
+	if !box.Pinned && !box.ExpiresAt.After(time.Now()) {
 		return sandboxExpired(name)
 	}
 	return fn(box)

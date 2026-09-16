@@ -102,6 +102,7 @@ func (s *Service) ReadBinaryFile(ctx context.Context, ref Ref, path string) (io.
 }
 
 // SandboxExpiry reads live metadata without taking the control-plane mutation gate.
+// A zero expiry denotes a pinned sandbox with no TTL deadline.
 func (s *Service) SandboxExpiry(ctx context.Context, name string) (time.Time, error) {
 	if err := validateName(name); err != nil {
 		return time.Time{}, err
@@ -112,6 +113,9 @@ func (s *Service) SandboxExpiry(ctx context.Context, name string) (time.Time, er
 			return time.Time{}, sandboxNotFound(name)
 		}
 		return time.Time{}, s.backendError(ctx, "get sandbox", err)
+	}
+	if box.Pinned {
+		return time.Time{}, nil
 	}
 	if !box.ExpiresAt.After(time.Now()) {
 		return time.Time{}, sandboxExpired(name)
