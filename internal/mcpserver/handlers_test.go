@@ -23,7 +23,7 @@ func TestCreateSandboxHidesPhysicalNetworkIdentity(t *testing.T) {
 	created := time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC)
 	expires := created.Add(240 * time.Minute)
 	tc.sandbox.EXPECT().
-		CreateSandbox(mock.Anything, "", time.Duration(0), string(trustedSubjectID), platformIncus).
+		CreateSandbox(mock.Anything, "", time.Duration(0), string(trustedSubjectID), platformIncus, false).
 		Return(compute.Sandbox{Name: "demo", Platform: platformIncus, CreatedAt: created, ExpiresAt: expires}, nil)
 	tc.sandbox.EXPECT().
 		GetSandbox(mock.Anything, "demo").
@@ -71,7 +71,7 @@ func TestCreateSandboxMacOmitsDefaultNetwork(t *testing.T) {
 	expires := created.Add(240 * time.Minute)
 	platform := platformMac
 	tc.sandbox.EXPECT().
-		CreateSandbox(mock.Anything, "", time.Duration(0), string(trustedSubjectID), platformMac).
+		CreateSandbox(mock.Anything, "", time.Duration(0), string(trustedSubjectID), platformMac, false).
 		Return(compute.Sandbox{Name: "demo", Platform: platformMac, CreatedAt: created, ExpiresAt: expires}, nil)
 
 	out, err := sandboxAPI{sandboxes: tc.sandbox}.create(

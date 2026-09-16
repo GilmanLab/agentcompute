@@ -38,6 +38,7 @@ sandbox:
   default_ttl_minutes: 240
   max_ttl_minutes: 1440
   default_network_kind: ovn
+  pin_identities: []  # Disabled by default; use [omp] to allow that HTTP identity.
 images_file: images/catalog.yaml
 ```
 
@@ -95,6 +96,12 @@ def main():
     return result
 ```
 
+An identity listed in `sandbox.pin_identities` can create with `pinned=True` or call `sandbox.pin(name="keep", pinned=True)`. Pinned sandboxes remain usable past expiry and survive reaper scans and server restarts on both Incus and Mac. `sandbox.get` and `sandbox.list` expose `pinned` and `pinned_by`; each reaper scan logs the pin's identity and timestamp at INFO. Repeating a pin preserves its original attribution.
+
+TTL values and the 1440-minute maximum still apply: pinning does not change `expires_at`, and `sandbox.extend` updates it normally. `sandbox.pin(name="keep", pinned=False)` restores that deadline; if it has passed, the next scan deletes the sandbox. Both pin and unpin require an allowlisted identity; `sandbox.delete` remains available to every authenticated identity and removes pinned sandboxes too.
+
+Pins retain an interactive machine, not a reusable image. Instances, snapshots, and `instance.publish` images still belong to their sandbox and die with it. Use a recipe under `images/` for durable, reusable images.
+
 OVN instances may use an explicit online `host`. Without one, placement prefers the most free RAM, then the lowest one-minute load, then member name; automatic placement excludes manual/group-only schedulers. Bridge instances remain on the sandbox's persisted member and reject a different host. Bridge names are opaque; capabilities expose logical names such as `default` and `lan`.
 
 An OVN network with `nat=false` is isolated: it has no direct outside path and consumes no external address. Attach a router instance or use `net.peer` for reachability. Isolated networks reject external forwards. Operator-management and OOB denies are immutable, including against broader user allow rules.
@@ -140,7 +147,7 @@ The server keeps authentication identity outside program source, tool arguments,
 - HTTP uses `mcpserver.ContextSubject`. The receiving MCP middleware reads the SDK-authenticated `req.GetExtra().TokenInfo.UserID`, stores that non-secret identity with `authz.WithSubject`, and then lets the CodeMode adapter resolve it. Setting an arbitrary value only on the outer `net/http` request context is not sufficient.
 - HTTP reads `--auth-tokens-file` (`AGENTCOMPUTE_AUTH_TOKENS_FILE`), a JSON object mapping identity names to bearer tokens. The verified name becomes `TokenInfo.UserID` and `user.agentcompute.subject`; token values are never identities. Load the file through a systemd credential and restart after rotation. Allowed loopback and explicitly insecure unauthenticated modes use `development`.
 
-The CLI passes `authz.AllowAll()` explicitly. Every authenticated identity can manage every agentcompute sandbox; subject metadata records attribution, not ownership authorization. This is a trusted-operator service, not a multi-tenant boundary.
+The CLI passes `authz.AllowAll()` explicitly. Every authenticated identity can manage every agentcompute sandbox; subject metadata records attribution, not ownership authorization. Pinning and unpinning additionally require the subject to be listed in `sandbox.pin_identities` (empty by default). This is a trusted-operator service, not a multi-tenant boundary.
 
 Discovery is not filtered by per-invocation authorization. An authenticated subject can search and describe every statically enabled capability; authorization runs for each native capability call during `execute`. Do not put secrets or tenant-sensitive data in capability names, summaries, descriptions, search terms, or field names. Disable a capability at build time if its existence must be hidden.
 

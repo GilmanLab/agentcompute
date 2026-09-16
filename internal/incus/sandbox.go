@@ -47,6 +47,7 @@ func (c *Client) createBridgeSandbox(ctx context.Context, sandbox compute.Sandbo
 	}
 	expires := sandbox.ExpiresAt.UTC()
 	config := sandboxProjectConfig(host, physical, sandbox.Subject, created, expires)
+	setSandboxPin(config, sandbox.Pinned, sandbox.PinnedBy, sandbox.PinnedAt)
 
 	err = c.Scoped(ctx, "", "").CreateProject(api.ProjectsPost{
 		Name: projectName(sandbox.Name),
@@ -104,6 +105,7 @@ func (c *Client) createOVNSandbox(ctx context.Context, sandbox compute.Sandbox) 
 	}
 	expires := sandbox.ExpiresAt.UTC()
 	config := ovnProjectConfig(sandbox.Subject, created, expires, c.ovnUplinkName())
+	setSandboxPin(config, sandbox.Pinned, sandbox.PinnedBy, sandbox.PinnedAt)
 
 	err := c.Scoped(ctx, "", "").CreateProject(api.ProjectsPost{
 		Name: projectName(sandbox.Name),
@@ -177,6 +179,38 @@ func (c *Client) ExtendSandbox(ctx context.Context, name string, expires time.Ti
 		return compute.Sandbox{}, err
 	}
 	return c.GetSandbox(ctx, name)
+}
+
+// PinSandbox persists pin metadata with an ETag update, preserving expiry.
+func (c *Client) PinSandbox(
+	ctx context.Context,
+	name string,
+	pinned bool,
+	subject string,
+	since time.Time,
+) (compute.Sandbox, error) {
+	err := c.patchProject(ctx, name, func(project *api.Project) {
+		if project.Config == nil {
+			project.Config = map[string]string{}
+		}
+		setSandboxPin(project.Config, pinned, subject, since)
+	})
+	if err != nil {
+		return compute.Sandbox{}, err
+	}
+	return c.GetSandbox(ctx, name)
+}
+
+func setSandboxPin(config map[string]string, pinned bool, subject string, since time.Time) {
+	if !pinned {
+		delete(config, metaPinned)
+		delete(config, metaPinnedBy)
+		delete(config, metaPinnedAt)
+		return
+	}
+	config[metaPinned] = configTrue
+	config[metaPinnedBy] = subject
+	config[metaPinnedAt] = since.UTC().Format(time.RFC3339Nano)
 }
 
 // DeleteSandbox removes sandbox resources in dependency order.

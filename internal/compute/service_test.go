@@ -18,10 +18,10 @@ func TestCreateSandboxNameValidation(t *testing.T) {
 	t.Parallel()
 
 	tc := newTestContext(t)
-	_, err := tc.service.CreateSandbox(t.Context(), "Default", 0, "subj", "")
+	_, err := tc.service.CreateSandbox(t.Context(), "Default", 0, "subj", "", false)
 	requireAgentMessage(t, err, `invalid name "Default"`)
 
-	_, err = tc.service.CreateSandbox(t.Context(), "none", 0, "subj", "")
+	_, err = tc.service.CreateSandbox(t.Context(), "none", 0, "subj", "", false)
 	requireAgentMessage(t, err, `name "none" is reserved`)
 }
 
@@ -45,7 +45,7 @@ func TestCreateSandboxZeroTTLUsesOptionsDefault(t *testing.T) {
 			return nil
 		})
 
-	got, err := service.CreateSandbox(t.Context(), "demo", 0, "subj", "")
+	got, err := service.CreateSandbox(t.Context(), "demo", 0, "subj", "", false)
 	require.NoError(t, err)
 	assert.WithinDuration(t, time.Now().Add(configured), got.ExpiresAt, time.Second)
 }
@@ -67,7 +67,7 @@ func TestCreateSandboxGeneratedNameRetriesCollision(t *testing.T) {
 		})
 	tc.backend.EXPECT().CreateSandbox(mock.Anything, mock.AnythingOfType("compute.Sandbox")).Return(nil)
 
-	box, err := tc.service.CreateSandbox(t.Context(), "", 0, "subj", "")
+	box, err := tc.service.CreateSandbox(t.Context(), "", 0, "subj", "", false)
 	require.NoError(t, err)
 	assert.NotEqual(t, collision, box.Name)
 }

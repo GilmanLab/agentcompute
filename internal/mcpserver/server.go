@@ -31,6 +31,7 @@ const (
 	capabilitySandboxList    = "sandbox.list"
 	capabilitySandboxGet     = "sandbox.get"
 	capabilitySandboxExtend  = "sandbox.extend"
+	capabilitySandboxPin     = "sandbox.pin"
 	capabilitySandboxDelete  = "sandbox.delete"
 	capabilityImageList      = "image.list"
 	capabilityInstanceCreate = "instance.create"
@@ -55,10 +56,12 @@ type sandboxService interface {
 		name string,
 		ttl time.Duration,
 		subject, platform string,
+		pinned bool,
 	) (compute.Sandbox, error)
 	ListSandboxes(ctx context.Context) ([]compute.Sandbox, error)
 	GetSandbox(ctx context.Context, name string) (compute.Sandbox, []compute.Instance, []compute.Network, error)
 	ExtendSandbox(ctx context.Context, name string, ttl time.Duration) (compute.Sandbox, error)
+	PinSandbox(ctx context.Context, name string, pinned bool, subject string) (compute.Sandbox, error)
 	DeleteSandbox(ctx context.Context, name string) error
 }
 

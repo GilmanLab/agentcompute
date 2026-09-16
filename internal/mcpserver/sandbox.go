@@ -13,12 +13,15 @@ type sandboxCreateIn struct {
 	Name       *string `json:"name,omitempty"`
 	Platform   *string `json:"platform,omitempty"`
 	TTLMinutes *int64  `json:"ttl_minutes,omitempty"`
+	Pinned     *bool   `json:"pinned,omitempty"`
 }
 
 type sandboxCreateOut struct {
 	Name      string     `json:"name"`
 	Platform  string     `json:"platform"`
 	ExpiresAt string     `json:"expires_at"`
+	Pinned    bool       `json:"pinned"`
+	PinnedBy  string     `json:"pinned_by"`
 	Network   networkOut `json:"network"`
 }
 
@@ -29,6 +32,8 @@ type sandboxListItem struct {
 	Platform  string `json:"platform"`
 	CreatedAt string `json:"created_at"`
 	ExpiresAt string `json:"expires_at"`
+	Pinned    bool   `json:"pinned"`
+	PinnedBy  string `json:"pinned_by"`
 	Instances int64  `json:"instances"`
 }
 
@@ -45,6 +50,8 @@ type sandboxGetOut struct {
 	Platform  string             `json:"platform"`
 	CreatedAt string             `json:"created_at"`
 	ExpiresAt string             `json:"expires_at"`
+	Pinned    bool               `json:"pinned"`
+	PinnedBy  string             `json:"pinned_by"`
 	Instances []instanceListItem `json:"instances"`
 	Networks  []networkOut       `json:"networks"`
 }
@@ -56,6 +63,16 @@ type sandboxExtendIn struct {
 
 type sandboxExtendOut struct {
 	ExpiresAt string `json:"expires_at"`
+}
+
+type sandboxPinIn struct {
+	Name   string `json:"name"`
+	Pinned bool   `json:"pinned"`
+}
+
+type sandboxPinOut struct {
+	Pinned   bool   `json:"pinned"`
+	PinnedBy string `json:"pinned_by"`
 }
 
 type sandboxDeleteIn struct {
@@ -74,7 +91,7 @@ func registerSandbox(builder *codemode.Builder, deps Dependencies) {
 	codemode.Register(builder, codemode.Capability[sandboxCreateIn, sandboxCreateOut]{
 		ID:      capabilitySandboxCreate,
 		Name:    capabilitySandboxCreate,
-		Summary: "Create a time-limited sandbox and its default NAT network.",
+		Summary: "Create a sandbox and its default NAT network. Operator-only pinned=True ignores TTL until unpinned or deleted; TTL limits still apply.",
 		Handler: api.create,
 	})
 	codemode.Register(builder, codemode.Capability[sandboxListIn, sandboxListOut]{
@@ -92,8 +109,14 @@ func registerSandbox(builder *codemode.Builder, deps Dependencies) {
 	codemode.Register(builder, codemode.Capability[sandboxExtendIn, sandboxExtendOut]{
 		ID:      capabilitySandboxExtend,
 		Name:    capabilitySandboxExtend,
-		Summary: "Extend a sandbox TTL from now.",
+		Summary: "Extend a sandbox TTL from now within the configured limit. Pinned sandboxes ignore TTL until unpinned.",
 		Handler: api.extend,
+	})
+	codemode.Register(builder, codemode.Capability[sandboxPinIn, sandboxPinOut]{
+		ID:      capabilitySandboxPin,
+		Name:    capabilitySandboxPin,
+		Summary: "Pin or unpin a sandbox; requires an identity in sandbox.pin_identities. Unpinning restores its existing expiry and can cause deletion on the next scan. Pins retain machines, not reusable images: use recipes under images/ for those.",
+		Handler: api.pin,
 	})
 	codemode.Register(builder, codemode.Capability[sandboxDeleteIn, sandboxDeleteOut]{
 		ID:      capabilitySandboxDelete,
@@ -123,7 +146,14 @@ func (api sandboxAPI) create(
 			return sandboxCreateOut{}, err
 		}
 	}
-	sandbox, err := api.sandboxes.CreateSandbox(ctx, deref(in.Name, ""), ttl, string(subject.ID), platform)
+	sandbox, err := api.sandboxes.CreateSandbox(
+		ctx,
+		deref(in.Name, ""),
+		ttl,
+		string(subject.ID),
+		platform,
+		deref(in.Pinned, false),
+	)
 	if err != nil {
 		return sandboxCreateOut{}, err
 	}
@@ -131,6 +161,8 @@ func (api sandboxAPI) create(
 		Name:      sandbox.Name,
 		Platform:  sandbox.Platform,
 		ExpiresAt: formatTime(sandbox.ExpiresAt),
+		Pinned:    sandbox.Pinned,
+		PinnedBy:  sandbox.PinnedBy,
 	}
 	if sandbox.Platform == platformMac {
 		return out, nil
@@ -181,6 +213,8 @@ func (api sandboxAPI) get(
 		Platform:  sandbox.Platform,
 		CreatedAt: formatTime(sandbox.CreatedAt),
 		ExpiresAt: formatTime(sandbox.ExpiresAt),
+		Pinned:    sandbox.Pinned,
+		PinnedBy:  sandbox.PinnedBy,
 		Instances: instanceListItemDTOs(instances),
 		Networks:  networkDTOs(networks),
 	}, nil
@@ -200,6 +234,14 @@ func (api sandboxAPI) extend(
 		return sandboxExtendOut{}, err
 	}
 	return sandboxExtendOut{ExpiresAt: formatTime(sandbox.ExpiresAt)}, nil
+}
+
+func (api sandboxAPI) pin(ctx context.Context, subject authz.Subject, in sandboxPinIn) (sandboxPinOut, error) {
+	sandbox, err := api.sandboxes.PinSandbox(ctx, in.Name, in.Pinned, string(subject.ID))
+	if err != nil {
+		return sandboxPinOut{}, err
+	}
+	return sandboxPinOut{Pinned: sandbox.Pinned, PinnedBy: sandbox.PinnedBy}, nil
 }
 
 func (api sandboxAPI) delete(

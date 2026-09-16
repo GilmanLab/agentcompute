@@ -31,6 +31,12 @@ type Sandbox struct {
 	CreatedAt time.Time
 	// ExpiresAt is the persisted reaper deadline.
 	ExpiresAt time.Time
+	// Pinned exempts this sandbox from TTL expiry until explicitly unpinned.
+	Pinned bool
+	// PinnedBy is the identity that established the current pin.
+	PinnedBy string
+	// PinnedAt is when the current pin was established.
+	PinnedAt time.Time
 }
 
 // Instance describes observed guest state.
@@ -203,6 +209,7 @@ type Backend interface {
 	ListSandboxes(context.Context) ([]Sandbox, error)
 	GetSandbox(context.Context, string) (Sandbox, error)
 	ExtendSandbox(context.Context, string, time.Time) (Sandbox, error)
+	PinSandbox(context.Context, string, bool, string, time.Time) (Sandbox, error)
 	DeleteSandbox(context.Context, string) error
 	BeginCreateInstance(context.Context, CreateInstance) (PendingInstance, error)
 	ListInstances(context.Context, string) ([]Instance, error)

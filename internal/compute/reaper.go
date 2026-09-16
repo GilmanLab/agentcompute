@@ -24,6 +24,10 @@ func (s *Service) Reap(ctx context.Context) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		if box.Pinned {
+			s.logPinned(ctx, box)
+			continue
+		}
 		if box.ExpiresAt.After(time.Now()) {
 			continue
 		}
@@ -68,6 +72,10 @@ func (s *Service) reapSandbox(ctx context.Context, name string) error {
 		}
 		return s.backendError(ctx, "get sandbox", err)
 	}
+	if box.Pinned {
+		s.logPinned(ctx, box)
+		return nil
+	}
 	if box.ExpiresAt.After(time.Now()) {
 		return nil
 	}
@@ -81,4 +89,9 @@ func (s *Service) reapSandbox(ctx context.Context, name string) error {
 		return s.backendError(ctx, "delete sandbox", err)
 	}
 	return nil
+}
+
+func (s *Service) logPinned(ctx context.Context, box Sandbox) {
+	s.log.InfoContext(ctx, "sandbox pinned; expires_at ignored",
+		"sandbox", box.Name, "pinned_by", box.PinnedBy, "since", box.PinnedAt)
 }
