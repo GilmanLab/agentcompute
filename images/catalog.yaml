@@ -10,7 +10,7 @@ images:
   kinds:
   - container
   kind: container
-  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:9f4f95b75280be6890e9143432d8db398a0138acd960f4fbe499ad7b6507072c
+  reference: ghcr.io/gilmanlab/agentcompute/router@sha256:edf1e847394db674ef87b16bdfb3bd7a9a7cdaf1b1d7a221ea5356f1f158e4b2
   cpus: 1
   memory_mb: 512
   disk_gb: 2
@@ -33,7 +33,7 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:6218bfaec1c0cbb97a196f882b42002e00e3297d4da4a9650d18d48ec0d27596
+  reference: ghcr.io/gilmanlab/agentcompute/runner@sha256:1269d0da0a8911069e1d31d7fec688d27a8ae790f99742739c95ad33389d5050
 - name: runner-publisher
   os: ubuntu
   version: '24.04'
@@ -43,7 +43,7 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:21e6f8c6743db11262634ae6c48e60d3d4bb9de4753038a11cb5a2a4ea8b28e0
+  reference: ghcr.io/gilmanlab/agentcompute/runner-publisher@sha256:ab9d9ff0a6e96fb9ad817667b689a706f507f6dab40fe2142844824ae2e0b066
 - name: ubuntu/24.04/desktop
   os: ubuntu
   version: '24.04'
@@ -54,11 +54,7 @@ images:
   cpus: 4
   memory_mb: 8192
   disk_gb: 40
-  reference: ghcr.io/gilmanlab/agentcompute/ubuntu-24.04-desktop@sha256:5dc4e120a79dd06ad6784e69474f0617387f74cb98685af8844170b7165ea8e2
-# Windows images are cluster-local: evaluation media grants test rights, not
-# redistribution, so these rows carry an Incus alias in the shared image-build
-# namespace instead of a registry digest. `images/windows/bake.py promote`
-# moves the alias after fingerprint-bound qualification.
+  reference: ghcr.io/gilmanlab/agentcompute/ubuntu-24.04-desktop@sha256:3af1a60945928747643813093e7160744b22daedfcc7027b6c3370c4466c0c7e
 - name: windows/11/desktop
   os: windows
   version: 25H2
@@ -80,11 +76,9 @@ images:
   memory_mb: 4096
   disk_gb: 100
   alias: windows/server-2025-26100.32230
-# macOS images are host-local Lume seeds, not registry digests. The seed name
-# is the stopped VM on the Mac host; clones inherit operator TCC consent.
 - name: macos/tahoe/desktop
   os: macos
-  version: '26.6.2'
+  version: 26.6.2
   platform: mac
   kinds:
   - vm
