@@ -16,6 +16,18 @@
 - Run host scripts under `/bin/sh` so empty sandbox discovery works with a
   zsh login shell.
 
+## [0.1.4](https://github.com/GilmanLab/agentcompute/compare/v0.1.3...v0.1.4) (2026-09-16)
+
+
+### Features
+
+* **images:** promote qualified lab image digests ([#44](https://github.com/GilmanLab/agentcompute/issues/44)) ([9e68105](https://github.com/GilmanLab/agentcompute/commit/9e6810597add1746eea7b19a79896dc7489a47ea))
+
+
+### Bug Fixes
+
+* **images:** restore live Linux whole-desktop capture ([#41](https://github.com/GilmanLab/agentcompute/issues/41)) ([cb7f8c6](https://github.com/GilmanLab/agentcompute/commit/cb7f8c6d80bf1e66ea75ce28f07510db9636c34e))
+
 ## [0.1.3](https://github.com/GilmanLab/agentcompute/compare/v0.1.2...v0.1.3) (2026-09-16)
 
 
