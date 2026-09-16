@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Boot-test a split desktop VM for X11, cua-driver, and one list_apps call.
+"""Boot-test a split desktop VM for X11, cua-driver, list_apps, and live capture.
 
 The instance is created with security.nesting=false. This script imports the
 candidate only when the fingerprint is absent, never touches shared aliases,
@@ -32,6 +32,7 @@ GUEST_UID = "1000"
 GUEST_GID = "1000"
 X11_SOCKET = "/tmp/.X11-unix/X0"
 EDITOR_LAUNCH = "gnome-text-editor"
+GUEST_DESKTOP_PNG = "/tmp/agentcompute-desktop-smoke.png"
 
 
 class Error(RuntimeError):
@@ -117,6 +118,35 @@ def guest_exec(
         )
     args.extend(["--", *command])
     return incus(project, args, capture_output=True)
+
+
+def guest_pull(remote: str, project: str, name: str, guest_path: str, target: Path) -> None:
+    pulled = incus(
+        project,
+        ["file", "pull", f"{remote}:{name}{guest_path}", str(target)],
+        capture_output=True,
+    )
+    if pulled.returncode != 0:
+        die(f"pulling {guest_path} failed: {(pulled.stderr or pulled.stdout or '').strip()}")
+
+
+def screenshot_pixels(raw: bytes) -> bytes:
+    """Compare PNG image data without timestamps or other ancillary metadata."""
+    if not raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        die("screenshot is not a PNG")
+    offset = 8
+    pixels = bytearray()
+    while offset + 12 <= len(raw):
+        length = int.from_bytes(raw[offset : offset + 4], "big")
+        end = offset + 12 + length
+        if end > len(raw):
+            die("screenshot PNG contains a truncated chunk")
+        if raw[offset + 4 : offset + 8] == b"IDAT":
+            pixels.extend(raw[offset + 8 : end - 4])
+        offset = end
+    if not pixels:
+        die("screenshot PNG contains no image data")
+    return bytes(pixels)
 
 
 def main(argv: list[str]) -> int:
@@ -297,6 +327,40 @@ def main(argv: list[str]) -> int:
             die("list_apps did not include gnome-text-editor")
         note(f"list_apps returned {len(apps)} apps including {EDITOR_LAUNCH}", log)
 
+        def capture(filename: str) -> bytes:
+            captured = guest_exec(
+                remote, project, name,
+                [
+                    DRIVER_BIN, "call", "--socket", DRIVER_SOCKET,
+                    "--screenshot-out-file", GUEST_DESKTOP_PNG,
+                    "get_desktop_state", "{}",
+                ],
+                user=True,
+            )
+            if captured.returncode != 0:
+                die(f"get_desktop_state exited {captured.returncode}: {captured.stderr}")
+            target = evidence / filename
+            guest_pull(remote, project, name, GUEST_DESKTOP_PNG, target)
+            return screenshot_pixels(target.read_bytes())
+
+        before = capture("desktop-before.png")
+        launched = guest_exec(
+            remote, project, name,
+            [
+                "systemd-run", "--user", "--collect",
+                "--unit=agentcompute-capture-smoke", EDITOR_LAUNCH,
+            ],
+            user=True,
+        )
+        if launched.returncode != 0:
+            die(f"launching {EDITOR_LAUNCH} failed: {launched.stderr}")
+        wait_until(
+            min(deadline, time.time() + 30),
+            "whole-desktop pixels to change after launching Text Editor",
+            lambda: capture("desktop.png") != before,
+        )
+        note("whole-desktop pixels changed after launching Text Editor", log)
+
         result = {
             "fingerprint": fingerprint,
             "metadata": str(metadata),
@@ -308,6 +372,7 @@ def main(argv: list[str]) -> int:
             "x11": True,
             "cua_driver_unit": "active",
             "list_apps": len(apps),
+            "desktop_capture_live": True,
             "security_nesting": "false",
         }
         (evidence / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

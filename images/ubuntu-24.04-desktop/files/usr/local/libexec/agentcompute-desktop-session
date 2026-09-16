@@ -9,7 +9,9 @@ export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUN
 
 case "${1:-}" in
 cua-driver)
-	exec /usr/local/bin/cua-driver serve --socket "${XDG_RUNTIME_DIR}/cua-driver.sock"
+	# The cursor overlay freezes X root reads on GNOME/Xorg, including VNC.
+	# Disable that cosmetic overlay so whole-desktop capture stays live.
+	exec /usr/local/bin/cua-driver serve --no-overlay --socket "${XDG_RUNTIME_DIR}/cua-driver.sock"
 	;;
 x0vnc)
 	# Only private sandbox networks and explicitly created human-viewer forwards

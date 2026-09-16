@@ -13,7 +13,7 @@ image-build wrapper.
 | `router/distrobuilder.yaml` | The recipe. Installs only the pinned APKs from an offline seed (`--no-network`, empty `/etc/apk/repositories`), enables OpenRC `lxc` mode, and emits a unified tarball. |
 | `runner/distrobuilder.yaml` | Split VM recipe with `runner` and `publisher` variants, signed shim/GRUB, growroot, incus-agent generator, and `ttyS0` output. |
 | `ubuntu-24.04-desktop/distrobuilder.yaml` | Split desktop VM recipe with Xorg, GDM automatic login, AT-SPI, Cua Driver, X0tigervnc, systemd-networkd, growroot, and signed shim/GRUB. |
-| `ubuntu-24.04-desktop/smoke.py` | Candidate qualification for X11, the Driver session socket and user unit, native `list_apps`, disabled nesting, and owned-resource cleanup. |
+| `ubuntu-24.04-desktop/smoke.py` | Candidate qualification for X11, the Driver session socket and user unit, native `list_apps`, live whole-desktop capture after launching Text Editor, disabled nesting, and owned-resource cleanup. |
 | `build.py` | `validate` (schema and pin checks, no credentials) and `build` (download-verify, compile distrobuilder from vendored source, assemble). PEP 723 script with `build.py.lock`. |
 | `catalog.yaml` | Startup catalog: name → digest-pinned GHCR reference, upstream Incus `remote:alias`, or cluster-local `alias` in `image-build`, plus kind, OS, and defaults. |
 | `smoke.sh` | Router boot qualification, including the four `/opt/router/{nat,route,dhcp,wg}` helpers. |
@@ -95,6 +95,15 @@ native tool invocation. They run as UID 1000 from `/home/automation` with
 and JSON arguments pass through unchanged; the host does not add typed
 wrappers for individual Driver tools. Screenshots travel through the binary
 guest-file API and return as URLs rather than embedded image data.
+
+The daemon serves with `--no-overlay`: the synthetic agent-cursor overlay
+freezes X root-window reads on this GNOME/Xorg session. Starting before the
+first composite freezes a black frame; both Driver whole-desktop capture and
+VNC are affected. Reproduced on Driver 0.28.1 and 0.28.2. Window capture and
+input remain functional. Disabling the cosmetic overlay restores live capture
+but removes its session-coloured pointer; re-enabling it reintroduces the defect.
+The desktop smoke compares image data before and after launching Text Editor,
+so it rejects a frozen frame even when that frame is not black.
 
 See the [Phase 6 desktop spike report](../spikes/desktop/README.md) for direct
 Driver results, timing, screenshot scaling, VNC, and reboot evidence.
