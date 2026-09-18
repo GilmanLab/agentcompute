@@ -7,7 +7,7 @@ require (
 	github.com/imgoci/go v0.1.0
 	github.com/lxc/incus/v7 v7.3.0
 	github.com/meigma/codemode v0.2.1
-	github.com/modelcontextprotocol/go-sdk v1.7.0
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/pkg/sftp v1.13.11
 	github.com/skeema/knownhosts v1.3.3
