@@ -1,0 +1,149 @@
+{
+  "verdict": "FALLBACK",
+  "criterion": "lab01 gateway fails before and after one authorized reboot; nas01 gateway control passes",
+  "cycles": [
+    {
+      "cycle": "clean-1",
+      "ok": false,
+      "seconds": 50.489,
+      "router": "incus-net24-lr",
+      "gateway_chassis": "lab01.glab.lol",
+      "external_ip": "10.10.40.64",
+      "router_mac": "10:66:6a:49:f5:82",
+      "teardown": "skipped",
+      "network_create_seconds": null
+    },
+    {
+      "cycle": "keeper-1",
+      "ok": true,
+      "seconds": 29.756,
+      "router": "incus-net26-lr",
+      "gateway_chassis": "nas01.glab.lol",
+      "external_ip": "10.10.40.65",
+      "router_mac": "10:66:6a:ed:13:7f",
+      "teardown": "done",
+      "network_create_seconds": 0.382
+    },
+    {
+      "cycle": "keeper-2",
+      "ok": true,
+      "seconds": 32.19,
+      "router": "incus-net27-lr",
+      "gateway_chassis": "lab03.glab.lol",
+      "external_ip": "10.10.40.65",
+      "router_mac": "10:66:6a:6c:ad:18",
+      "teardown": "done",
+      "network_create_seconds": 0.374
+    },
+    {
+      "cycle": "keeper-3",
+      "ok": false,
+      "seconds": 61.306,
+      "router": "incus-net28-lr",
+      "gateway_chassis": "lab01.glab.lol",
+      "external_ip": "10.10.40.65",
+      "router_mac": "10:66:6a:14:21:7e",
+      "teardown": "done",
+      "network_create_seconds": 0.257
+    },
+    {
+      "cycle": "outage-fixture",
+      "ok": false,
+      "seconds": 55.432,
+      "router": "incus-net29-lr",
+      "gateway_chassis": "lab01.glab.lol",
+      "external_ip": "10.10.40.65",
+      "router_mac": "10:66:6a:ab:ba:f8",
+      "teardown": "retained-for-outage",
+      "network_create_seconds": 0.245
+    },
+    {
+      "cycle": "post-outage",
+      "ok": true,
+      "seconds": 31.078,
+      "router": "incus-net31-lr",
+      "gateway_chassis": "nas01.glab.lol",
+      "external_ip": "10.10.40.65",
+      "router_mac": "10:66:6a:ea:40:3b",
+      "teardown": "done",
+      "network_create_seconds": 0.306
+    },
+    {
+      "cycle": "gateway-pre-1",
+      "ok": true,
+      "seconds": 33.092,
+      "router": "incus-net32-lr",
+      "gateway_chassis": "lab02.glab.lol",
+      "external_ip": "10.10.40.64",
+      "router_mac": "10:66:6a:33:3f:c7",
+      "teardown": "done",
+      "network_create_seconds": 0.576
+    },
+    {
+      "cycle": "gateway-pre-2",
+      "ok": true,
+      "seconds": 29.904,
+      "router": "incus-net33-lr",
+      "gateway_chassis": "lab02.glab.lol",
+      "external_ip": "10.10.40.64",
+      "router_mac": "10:66:6a:74:95:5e",
+      "teardown": "done",
+      "network_create_seconds": 0.602
+    },
+    {
+      "cycle": "gateway-pre-3",
+      "ok": true,
+      "seconds": 31.142,
+      "router": "incus-net34-lr",
+      "gateway_chassis": "lab02.glab.lol",
+      "external_ip": "10.10.40.64",
+      "router_mac": "10:66:6a:1f:21:eb",
+      "teardown": "done",
+      "network_create_seconds": 0.633
+    },
+    {
+      "cycle": "gateway-pre-4",
+      "ok": true,
+      "seconds": 32.274,
+      "router": "incus-net35-lr",
+      "gateway_chassis": "lab02.glab.lol",
+      "external_ip": "10.10.40.64",
+      "router_mac": "10:66:6a:97:88:42",
+      "teardown": "done",
+      "network_create_seconds": 0.591
+    },
+    {
+      "cycle": "gateway-pre-5",
+      "ok": true,
+      "seconds": 32.47,
+      "router": "incus-net36-lr",
+      "gateway_chassis": "nas01.glab.lol",
+      "external_ip": "10.10.40.64",
+      "router_mac": "10:66:6a:ef:03:ee",
+      "teardown": "done",
+      "network_create_seconds": 0.56
+    },
+    {
+      "cycle": "gateway-pre-6",
+      "ok": false,
+      "seconds": 60.817,
+      "router": "incus-net37-lr",
+      "gateway_chassis": "lab01.glab.lol",
+      "external_ip": "10.10.40.64",
+      "router_mac": "10:66:6a:b2:7a:65",
+      "teardown": "done",
+      "network_create_seconds": 0.569
+    },
+    {
+      "cycle": "gateway-post-1",
+      "ok": false,
+      "seconds": 61.572,
+      "router": "incus-net38-lr",
+      "gateway_chassis": "lab01.glab.lol",
+      "external_ip": "10.10.40.64",
+      "router_mac": "10:66:6a:43:84:fe",
+      "teardown": "done",
+      "network_create_seconds": 0.569
+    }
+  ]
+}

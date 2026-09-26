@@ -1,0 +1,1146 @@
+=== incus network show exit=1 ===
+Error: Failed to load project "ac-ovn-spike": Project not found
+=== incus network list-allocations exit=1 ===
+Error: Failed to load project "ac-ovn-spike": Project not found
+=== sandbox01 nb/sb/neigh exit=0 ===
+=== ovn-nbctl show ===
+switch f046d2bd-f4a8-4b32-a828-ca8be5810acd (incus-net25-ls-ext)
+    port incus-net25-ls-ext-lsp-router
+        type: router
+        router-port: incus-net25-lr-lrp-ext
+    port incus-net25-ls-ext-lsp-provider
+        type: localnet
+        addresses: ["unknown"]
+switch 8f57dfa7-81c9-46e3-a2e8-d2a69f506da9 (incus-net25-ls-int)
+    port incus-net25-ls-int-lsp-router
+        type: router
+        router-port: incus-net25-lr-lrp-int
+router 2eaa7e25-aeb5-4fa9-adac-31c81c57a2fb (incus-net25-lr)
+    port incus-net25-lr-lrp-int
+        mac: "10:66:6a:70:1e:0b"
+        ipv6-lla: "fe80::1266:6aff:fe70:1e0b"
+        networks: ["10.253.72.1/24"]
+    port incus-net25-lr-lrp-ext
+        mac: "10:66:6a:70:1e:0b"
+        ipv6-lla: "fe80::1266:6aff:fe70:1e0b"
+        networks: ["10.10.40.64/24"]
+    nat 4ec00a90-5592-43ac-b4ad-64d0ccb37946
+        external ip: "10.10.40.64"
+        logical ip: "10.253.72.0/24"
+        type: "snat"
+=== ovn-sbctl show ===
+Chassis "5ec8d171-fbe4-49cf-9923-9d21f9c5d29b"
+    hostname: lab03.glab.lol
+    Encap geneve
+        ip: "10.10.30.13"
+        options: {csum="true"}
+Chassis "c2919898-1135-4799-80cf-860ae7e7ef9e"
+    hostname: nas01.glab.lol
+    Encap geneve
+        ip: "10.10.30.14"
+        options: {csum="true"}
+    Port_Binding cr-incus-net25-lr-lrp-ext
+Chassis "67314e94-b0b4-4c97-8146-0c67aff4d585"
+    hostname: lab02.glab.lol
+    Encap geneve
+        ip: "10.10.30.12"
+        options: {csum="true"}
+Chassis "2da6738c-78eb-4738-98be-0898402c0eaa"
+    hostname: lab01.glab.lol
+    Encap geneve
+        ip: "10.10.30.11"
+        options: {csum="true"}
+=== ovn-nbctl list Logical_Router_Port ===
+_uuid               : aaf81b99-01ec-463e-85f2-af131a1a29c8
+dhcp_relay          : []
+enabled             : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : c13b6fd6-e52d-4ac5-bd68-008c146bf1fa
+ipv6_prefix         : []
+ipv6_ra_configs     : {}
+mac                 : "10:66:6a:70:1e:0b"
+name                : incus-net25-lr-lrp-ext
+networks            : ["10.10.40.64/24"]
+options             : {gateway_mtu="1442"}
+peer                : []
+status              : {hosting-chassis="c2919898-1135-4799-80cf-860ae7e7ef9e"}
+
+_uuid               : 24771756-817b-4cbd-b664-58fbd3d9a377
+dhcp_relay          : []
+enabled             : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : []
+ipv6_prefix         : []
+ipv6_ra_configs     : {send_periodic="false"}
+mac                 : "10:66:6a:70:1e:0b"
+name                : incus-net25-lr-lrp-int
+networks            : ["10.253.72.1/24"]
+options             : {gateway_mtu="1442"}
+peer                : []
+status              : {}
+=== ovn-sbctl find Port_Binding type=chassisredirect ===
+_uuid               : 023a18f3-acd5-4bb9-a42c-8f493cae24ca
+additional_chassis  : []
+additional_encap    : []
+chassis             : 1e4eb895-1d17-4859-9e5b-0454f8482291
+datapath            : db7925f7-c524-4a0a-b84c-5ee7aec48844
+encap               : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : dc0e73d8-c24e-4f20-8384-5c87ec576925
+logical_port        : cr-incus-net25-lr-lrp-ext
+mac                 : ["10:66:6a:70:1e:0b 10.10.40.64/24"]
+mirror_port         : []
+mirror_rules        : []
+nat_addresses       : []
+options             : {always-redirect="true", distributed-port=incus-net25-lr-lrp-ext}
+parent_port         : []
+port_security       : []
+requested_additional_chassis: []
+requested_chassis   : []
+tag                 : []
+tunnel_key          : 2
+type                : chassisredirect
+up                  : true
+virtual_parent      : []
+=== ip neigh ===
+=== gateway neigh exit=0 ===
+10.10.40.65 dev br40 FAILED 
+=== lab01 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192981200926",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03252|dpif|WARN|Dropped 2052 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192981201051",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03253|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192981258870",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03254|poll_loop|INFO|Dropped 12476 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192981259079",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03255|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (99% CPU usage)"
+  },
+  {
+    "at": "1789192982200967",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03256|dpif|WARN|Dropped 2060 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192982201129",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03257|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192983201042",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03258|dpif|WARN|Dropped 2144 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192983201301",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03259|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192983224547",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03260|bridge|INFO|bridge incusovn16: added interface patch-incus-net28-ls-ext-lsp-provider-to-br-int on port 4"
+  },
+  {
+    "at": "1789192983224608",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03261|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net28-ls-ext-lsp-provider on port 21"
+  },
+  {
+    "at": "1789192984200968",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03262|dpif|WARN|Dropped 2030 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192984201077",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03263|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192984580285",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03264|bridge|INFO|bridge br-int: added interface veth9470b3e9 on port 22"
+  },
+  {
+    "at": "1789192985200827",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03265|dpif|WARN|Dropped 1956 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192985200973",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03266|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192986200741",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03267|dpif|WARN|Dropped 1995 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192986200996",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03268|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192987200775",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03269|dpif|WARN|Dropped 2002 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192987200992",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03270|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192987258777",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03271|poll_loop|INFO|Dropped 12221 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192987258896",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03272|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (99% CPU usage)"
+  },
+  {
+    "at": "1789192988200598",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03273|dpif|WARN|Dropped 2024 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192988200708",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03274|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192989200894",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03275|dpif|WARN|Dropped 2007 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192989201118",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03276|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192990201014",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03277|dpif|WARN|Dropped 1997 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192990201308",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03278|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192991200929",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03279|dpif|WARN|Dropped 2030 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192991201082",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03280|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192992200937",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03281|dpif|WARN|Dropped 2059 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192992201069",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03282|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192993200564",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03283|dpif|WARN|Dropped 2016 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192993200784",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03284|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192993258668",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03285|poll_loop|INFO|Dropped 12143 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192993258795",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03286|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (99% CPU usage)"
+  },
+  {
+    "at": "1789192994200903",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03287|dpif|WARN|Dropped 2010 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192994201132",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03288|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192995200903",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03289|dpif|WARN|Dropped 1984 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192995201170",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03290|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192996200630",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03291|dpif|WARN|Dropped 2017 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192996200772",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03292|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192997200880",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03293|dpif|WARN|Dropped 2009 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192997201141",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03294|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192998200916",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03295|dpif|WARN|Dropped 1997 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192998201156",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03296|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192999200682",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03297|dpif|WARN|Dropped 2036 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192999200797",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03298|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192999258844",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03299|poll_loop|INFO|Dropped 12062 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192999259061",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03300|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (99% CPU usage)"
+  },
+  {
+    "at": "1789193000201155",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03301|dpif|WARN|Dropped 2032 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193000201290",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03302|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193001200811",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03303|dpif|WARN|Dropped 1973 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193001201065",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03304|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193002200845",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03305|dpif|WARN|Dropped 1981 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193002201077",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03306|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193003200861",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03307|dpif|WARN|Dropped 1972 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193003201073",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03308|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193004200808",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03309|dpif|WARN|Dropped 1974 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193004200921",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03310|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193005200998",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03311|dpif|WARN|Dropped 1978 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193005201233",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03312|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193005258779",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03313|poll_loop|INFO|Dropped 11922 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193005258866",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03314|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (98% CPU usage)"
+  },
+  {
+    "at": "1789193006200847",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03315|dpif|WARN|Dropped 2038 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193006201005",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03316|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193007200675",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03317|dpif|WARN|Dropped 1997 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193007201008",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03318|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193007283643",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03319|connmgr|INFO|br-int<->unix#7: 949 flow_mods in the 7 s starting 24 s ago (854 adds, 65 deletes, 30 modifications)"
+  },
+  {
+    "at": "1789193008200750",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03320|dpif|WARN|Dropped 2004 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193008200953",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03321|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193009200726",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03322|dpif|WARN|Dropped 2022 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193009200830",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03323|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193010200762",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03324|dpif|WARN|Dropped 2034 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193010200876",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03325|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193011200669",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03326|dpif|WARN|Dropped 1973 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193011200778",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03327|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193011258735",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03328|poll_loop|INFO|Dropped 12075 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193011258939",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03329|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (99% CPU usage)"
+  },
+  {
+    "at": "1789193012200783",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03330|dpif|WARN|Dropped 2005 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193012200898",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03331|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193013200738",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03332|dpif|WARN|Dropped 2018 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193013200980",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03333|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193014139536",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03334|bridge|WARN|Dropped 123487 log messages in last 60 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193014139662",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03335|bridge|WARN|could not add network device fast40 to ofproto (Device or resource busy)"
+  },
+  {
+    "at": "1789193014200924",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03336|dpif|WARN|Dropped 2041 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193014201093",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03337|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193015201055",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03338|dpif|WARN|Dropped 1976 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193015201281",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03339|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193016200730",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03340|dpif|WARN|Dropped 1988 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193016200873",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03341|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193017201029",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03342|dpif|WARN|Dropped 1977 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193017201353",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03343|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193017258909",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03344|poll_loop|INFO|Dropped 12011 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193017258991",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03345|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (98% CPU usage)"
+  },
+  {
+    "at": "1789193018200938",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03346|dpif|WARN|Dropped 1997 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193018201052",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03347|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193019200573",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03348|dpif|WARN|Dropped 2039 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193019200706",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03349|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193020200659",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03350|dpif|WARN|Dropped 2029 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193020200868",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03351|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193021200731",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03352|dpif|WARN|Dropped 2021 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193021200933",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03353|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193022200673",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03354|dpif|WARN|Dropped 2041 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193022200791",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03355|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193023200570",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03356|dpif|WARN|Dropped 2055 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193023200680",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03357|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193023258905",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03358|poll_loop|INFO|Dropped 12201 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193023259061",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03359|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (98% CPU usage)"
+  },
+  {
+    "at": "1789193024200878",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03360|dpif|WARN|Dropped 2032 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193024200991",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03361|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193025200562",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03362|dpif|WARN|Dropped 2055 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193025200815",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03363|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193026200827",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03364|dpif|WARN|Dropped 2041 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193026201025",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03365|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193027200565",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03366|dpif|WARN|Dropped 2038 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193027200680",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03367|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193028200820",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03368|dpif|WARN|Dropped 2016 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193028201063",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03369|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193029200895",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03370|dpif|WARN|Dropped 2002 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193029201097",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03371|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193029258663",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03372|poll_loop|INFO|Dropped 12183 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193029258719",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03373|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (98% CPU usage)"
+  },
+  {
+    "at": "1789193030200770",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03374|dpif|WARN|Dropped 2040 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193030200896",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03375|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193031201073",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03376|dpif|WARN|Dropped 2065 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193031201277",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03377|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193032200680",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03378|dpif|WARN|Dropped 2020 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193032200780",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03379|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193033200976",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03380|dpif|WARN|Dropped 2018 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193033201216",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03381|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193034200851",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03382|dpif|WARN|Dropped 2000 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193034200980",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03383|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193035200679",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03384|dpif|WARN|Dropped 2016 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193035200915",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03385|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193035258700",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03386|poll_loop|INFO|Dropped 12168 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193035258751",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03387|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (98% CPU usage)"
+  },
+  {
+    "at": "1789193036200608",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03388|dpif|WARN|Dropped 2044 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193036200719",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03389|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193037201027",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03390|dpif|WARN|Dropped 2075 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193037201247",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03391|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193037937201",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03392|bridge|INFO|bridge br-int: deleted interface veth9470b3e9 on port 22"
+  },
+  {
+    "at": "1789193038200976",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03393|dpif|WARN|Dropped 1951 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193038201069",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03394|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193039200656",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03395|dpif|WARN|Dropped 2076 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193039200761",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03396|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193040200712",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03397|dpif|WARN|Dropped 2083 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193040200919",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03398|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193040244856",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03399|bridge|INFO|bridge incusovn16: deleted interface patch-incus-net28-ls-ext-lsp-provider-to-br-int on port 4"
+  },
+  {
+    "at": "1789193040244918",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03400|bridge|INFO|bridge br-int: deleted interface patch-br-int-to-incus-net28-ls-ext-lsp-provider on port 21"
+  },
+  {
+    "at": "1789193041200950",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03401|dpif|WARN|Dropped 2095 log messages in last 1 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193041201149",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03402|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789193041258571",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03403|poll_loop|INFO|Dropped 12358 log messages in last 6 seconds (most recently, 0 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789193041258630",
+    "member": "lab01.glab.lol",
+    "boot_id": "f9f71dd5a051466283d7da6fb860c528",
+    "message": "ovs|03404|poll_loop|INFO|wakeup due to [POLLIN] on fd 14 (NETLINK_ROUTE<->NETLINK_ROUTE) at ../lib/netlink-socket.c:1419 (99% CPU usage)"
+  }
+]
+
+=== lab02 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192983217463",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00143|bridge|INFO|bridge incusovn16: added interface patch-incus-net28-ls-ext-lsp-provider-to-br-int on port 5"
+  },
+  {
+    "at": "1789192983218383",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00144|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net28-ls-ext-lsp-provider on port 14"
+  },
+  {
+    "at": "1789193007277481",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00145|connmgr|INFO|br-int<->unix#7: 942 flow_mods in the 7 s starting 24 s ago (851 adds, 91 deletes)"
+  },
+  {
+    "at": "1789193040238365",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00146|bridge|INFO|bridge incusovn16: deleted interface patch-incus-net28-ls-ext-lsp-provider-to-br-int on port 5"
+  },
+  {
+    "at": "1789193040238653",
+    "member": "lab02.glab.lol",
+    "boot_id": "81e2acca155f4ac99c2a077d9ac72583",
+    "message": "ovs|00147|bridge|INFO|bridge br-int: deleted interface patch-br-int-to-incus-net28-ls-ext-lsp-provider on port 14"
+  }
+]
+
+=== lab03 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192983223973",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00153|bridge|INFO|bridge incusovn16: added interface patch-incus-net28-ls-ext-lsp-provider-to-br-int on port 5"
+  },
+  {
+    "at": "1789192983224172",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00154|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net28-ls-ext-lsp-provider on port 19"
+  },
+  {
+    "at": "1789192985536173",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00155|bridge|INFO|bridge br-int: added interface vethc3c8caab on port 20"
+  },
+  {
+    "at": "1789193007283241",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00156|connmgr|INFO|br-int<->unix#7: 964 flow_mods in the 7 s starting 24 s ago (868 adds, 96 deletes)"
+  },
+  {
+    "at": "1789193038919275",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00157|bridge|INFO|bridge br-int: deleted interface vethc3c8caab on port 20"
+  },
+  {
+    "at": "1789193040235660",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00158|bridge|INFO|bridge incusovn16: deleted interface patch-incus-net28-ls-ext-lsp-provider-to-br-int on port 5"
+  },
+  {
+    "at": "1789193040235774",
+    "member": "lab03.glab.lol",
+    "boot_id": "3c8c53f2fe38435e99abb369646320e0",
+    "message": "ovs|00159|bridge|INFO|bridge br-int: deleted interface patch-br-int-to-incus-net28-ls-ext-lsp-provider on port 19"
+  }
+]
+
+=== nas01 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789192983207988",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00147|bridge|INFO|bridge incusovn16: added interface patch-incus-net28-ls-ext-lsp-provider-to-br-int on port 5"
+  },
+  {
+    "at": "1789192983208267",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00148|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net28-ls-ext-lsp-provider on port 16"
+  },
+  {
+    "at": "1789193007278102",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00149|connmgr|INFO|br-int<->unix#7: 998 flow_mods in the 7 s starting 24 s ago (879 adds, 119 deletes)"
+  },
+  {
+    "at": "1789193040248550",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00150|bridge|INFO|bridge incusovn16: deleted interface patch-incus-net28-ls-ext-lsp-provider-to-br-int on port 5"
+  },
+  {
+    "at": "1789193040248768",
+    "member": "nas01.glab.lol",
+    "boot_id": "1829964eb02542619d82dc594bc2b5d3",
+    "message": "ovs|00151|bridge|INFO|bridge br-int: deleted interface patch-br-int-to-incus-net28-ls-ext-lsp-provider on port 16"
+  }
+]
+

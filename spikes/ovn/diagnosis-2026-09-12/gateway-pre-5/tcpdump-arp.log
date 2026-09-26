@@ -1,0 +1,5 @@
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enp2s0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+15:49:12.814191 10:66:6a:ef:03:ee > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 10.10.40.64 tell 10.10.40.64, length 46
+15:49:20.816246 10:66:6a:ef:03:ee > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 10.10.40.64 tell 10.10.40.64, length 46
+Connection to sandbox01 closed.

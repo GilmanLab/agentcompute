@@ -1,0 +1,18 @@
+{
+  "observed_during": "after keeper cycle 1",
+  "member": "lab01",
+  "project": "default",
+  "instance": "soak01",
+  "commands": [
+    "incus query 'nas01:/1.0/instances/soak01?project=default' | jq '{name, status, expanded_devices}'",
+    "incus query 'nas01:/1.0/instances/soak01/state?project=default' | jq '{status,eth1:(.network.eth1|{state,host_name,mtu,type})}'"
+  ],
+  "status": "Running",
+  "expanded_devices": {
+    "eth0": {"name": "eth0", "network": "incusbr0", "type": "nic"},
+    "eth1": {"nictype": "macvlan", "parent": "fast40", "type": "nic"},
+    "root": {"path": "/", "pool": "data", "type": "disk"}
+  },
+  "eth1_runtime": {"state": "up", "host_name": "fast40", "mtu": 1500, "type": "broadcast"},
+  "mutations": []
+}

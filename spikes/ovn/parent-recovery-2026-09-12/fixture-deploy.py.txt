@@ -1,0 +1,34 @@
+"""Remove only the owner-authorized default/soak01 fixture on lab01."""
+
+import os
+
+from pyinfra import host
+from pyinfra_incus.facts import Instances
+from pyinfra_incus.operations import instance, instance_state
+
+from fleet_cluster.config import REMOTE
+
+ACTION = os.environ["FLEET_OVN_SOAK_ACTION"]
+if ACTION not in {"stop", "delete"}:
+    raise ValueError("FLEET_OVN_SOAK_ACTION must be stop or delete")
+current = host.get_fact(Instances, project="default", remote=REMOTE).get("soak01")
+if current is not None and current.get("location") != "lab01":
+    raise ValueError("Refusing fixture removal: default/soak01 is not on lab01")
+if ACTION == "stop" and current is not None:
+    instance_state(
+        name="Stop authorized default/soak01 fixture on lab01",
+        instance_name="soak01",
+        project="default",
+        desired_state="stopped",
+        timeout=30,
+        remote=REMOTE,
+        force=True,
+    )
+if ACTION == "delete":
+    instance(
+        name="Delete stopped authorized default/soak01 fixture on lab01",
+        instance_name="soak01",
+        project="default",
+        present=False,
+        remote=REMOTE,
+    )

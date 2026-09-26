@@ -1,0 +1,8 @@
+probe: gateway ping one -> 10.10.40.1 failed
+probe: gateway ping two -> 10.10.40.1 failed
+probe: dns lookup example.com from one via 10.10.40.1 failed
+probe: dns lookup example.com from two via 10.10.40.1 failed
+probe: internet egress curl from one failed
+probe: internet egress curl from two failed
+probe: workstation curl of forward-url failed
+probe: 7 datapath checks failed

@@ -1,0 +1,5338 @@
+=== incus network show exit=0 ===
+config:
+  bridge.mtu: "1442"
+  dns.nameservers: 10.10.40.1
+  ipv4.address: 10.253.73.1/24
+  ipv4.dhcp: "true"
+  ipv4.nat: "true"
+  ipv6.address: none
+  network: fast40-uplink
+  volatile.network.ipv4.address: 10.10.40.64
+description: ""
+name: default
+type: ovn
+used_by:
+  - /1.0/instances/one?project=ac-ovn-spike
+  - /1.0/instances/two?project=ac-ovn-spike
+managed: true
+status: Created
+locations:
+  - nas01
+  - lab01
+  - lab02
+  - lab03
+project: ac-ovn-spike
+=== incus network list-allocations exit=0 ===
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+|                             USED BY                             |    ADDRESS     | NETWORK |      TYPE       | NAT |    MAC ADDRESS    |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+| /1.0/instances/one?project=ac-ovn-spike                         | 10.253.73.2/32 | default | instance        | YES | 10:66:6a:02:dd:b1 |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+| /1.0/instances/two?project=ac-ovn-spike                         | 10.253.73.3/32 | default | instance        | YES | 10:66:6a:35:90:e5 |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+| /1.0/networks/default/forwards/10.10.40.79?project=ac-ovn-spike | 10.10.40.79/32 | default | network-forward | NO  |                   |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+| /1.0/networks/default?project=ac-ovn-spike                      | 10.253.73.1/24 | default | network         | YES |                   |
++-----------------------------------------------------------------+----------------+---------+-----------------+-----+-------------------+
+=== sandbox01 nb/sb/neigh exit=0 ===
+=== ovn-nbctl show ===
+switch 2fabcc2c-8c19-4664-9b37-fc7eae2922d3 (incus-net39-ls-int)
+    port incus-net39-ls-int-lsp-router
+        type: router
+        router-port: incus-net39-lr-lrp-int
+    port incus-net39-instance-172371c5-b4be-4aec-bd88-4a680cb21ed2-eth0
+        addresses: ["10:66:6a:02:dd:b1 dynamic"]
+    port incus-net39-instance-4c35ca2f-5270-4de1-9682-6929c8560e10-eth0
+        addresses: ["10:66:6a:35:90:e5 dynamic"]
+switch a755c7f5-f0d6-4322-a17b-271a274a21da (incus-net39-ls-ext)
+    port incus-net39-ls-ext-lsp-router
+        type: router
+        router-port: incus-net39-lr-lrp-ext
+    port incus-net39-ls-ext-lsp-provider
+        type: localnet
+        addresses: ["unknown"]
+router 498600bd-50df-49c1-ab2c-3843a2479f5c (incus-net39-lr)
+    port incus-net39-lr-lrp-int
+        mac: "10:66:6a:66:eb:74"
+        ipv6-lla: "fe80::1266:6aff:fe66:eb74"
+        networks: ["10.253.73.1/24"]
+    port incus-net39-lr-lrp-ext
+        mac: "10:66:6a:66:eb:74"
+        ipv6-lla: "fe80::1266:6aff:fe66:eb74"
+        networks: ["10.10.40.64/24"]
+    nat 317a50de-d456-4a6c-ae06-7587737357a5
+        external ip: "10.10.40.64"
+        logical ip: "10.253.73.0/24"
+        type: "snat"
+=== ovn-sbctl show ===
+Chassis "5ec8d171-fbe4-49cf-9923-9d21f9c5d29b"
+    hostname: lab03.glab.lol
+    Encap geneve
+        ip: "10.10.30.13"
+        options: {csum="true"}
+    Port_Binding incus-net39-instance-4c35ca2f-5270-4de1-9682-6929c8560e10-eth0
+Chassis "c2919898-1135-4799-80cf-860ae7e7ef9e"
+    hostname: nas01.glab.lol
+    Encap geneve
+        ip: "10.10.30.14"
+        options: {csum="true"}
+Chassis "67314e94-b0b4-4c97-8146-0c67aff4d585"
+    hostname: lab02.glab.lol
+    Encap geneve
+        ip: "10.10.30.12"
+        options: {csum="true"}
+Chassis "2da6738c-78eb-4738-98be-0898402c0eaa"
+    hostname: lab01.glab.lol
+    Encap geneve
+        ip: "10.10.30.11"
+        options: {csum="true"}
+    Port_Binding cr-incus-net39-lr-lrp-ext
+    Port_Binding incus-net39-instance-172371c5-b4be-4aec-bd88-4a680cb21ed2-eth0
+=== ovn-nbctl list Logical_Router_Port ===
+_uuid               : 8d438d4a-dc31-4873-8526-52a5346b882f
+dhcp_relay          : []
+enabled             : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : []
+ipv6_prefix         : []
+ipv6_ra_configs     : {send_periodic="false"}
+mac                 : "10:66:6a:66:eb:74"
+name                : incus-net39-lr-lrp-int
+networks            : ["10.253.73.1/24"]
+options             : {gateway_mtu="1442"}
+peer                : []
+status              : {}
+
+_uuid               : 973cf967-a8ef-42b9-859d-0c8cecb865fe
+dhcp_relay          : []
+enabled             : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : 54c3b455-e298-4244-96f5-74f35ecc3fc0
+ipv6_prefix         : []
+ipv6_ra_configs     : {}
+mac                 : "10:66:6a:66:eb:74"
+name                : incus-net39-lr-lrp-ext
+networks            : ["10.10.40.64/24"]
+options             : {gateway_mtu="1442"}
+peer                : []
+status              : {hosting-chassis="2da6738c-78eb-4738-98be-0898402c0eaa"}
+=== ovn-sbctl find Port_Binding type=chassisredirect ===
+_uuid               : f53f332a-127b-4377-91ff-518a407a5dad
+additional_chassis  : []
+additional_encap    : []
+chassis             : 72b73acb-7cce-4153-829c-7d6bb0eb202c
+datapath            : fe11145c-7ada-4028-a9f7-2ae19989a23b
+encap               : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : 9a5658b7-bc56-4478-9bf9-c84d4cbabe45
+logical_port        : cr-incus-net39-lr-lrp-ext
+mac                 : ["10:66:6a:66:eb:74 10.10.40.64/24"]
+mirror_port         : []
+mirror_rules        : []
+nat_addresses       : []
+options             : {always-redirect="true", distributed-port=incus-net39-lr-lrp-ext}
+parent_port         : []
+port_security       : []
+requested_additional_chassis: []
+requested_chassis   : []
+tag                 : []
+tunnel_key          : 2
+type                : chassisredirect
+up                  : true
+virtual_parent      : []
+=== ovn-nbctl list HA_Chassis_Group ===
+_uuid               : 54c3b455-e298-4244-96f5-74f35ecc3fc0
+external_ids        : {}
+ha_chassis          : [30c8a37b-38ba-4349-87a9-8851248d621e, 4d0f6aae-1a22-4016-9a22-e8d7a02f445a, e9931224-7bd1-4a73-b58b-e183d7ad7600, ff9a7008-51e4-43fc-9b7e-3dc6a969ca36]
+name                : incus-net39
+=== ovn-nbctl list HA_Chassis ===
+_uuid               : e9931224-7bd1-4a73-b58b-e183d7ad7600
+chassis_name        : "2da6738c-78eb-4738-98be-0898402c0eaa"
+external_ids        : {}
+priority            : 30644
+
+_uuid               : ff9a7008-51e4-43fc-9b7e-3dc6a969ca36
+chassis_name        : "67314e94-b0b4-4c97-8146-0c67aff4d585"
+external_ids        : {}
+priority            : 10877
+
+_uuid               : 4d0f6aae-1a22-4016-9a22-e8d7a02f445a
+chassis_name        : "c2919898-1135-4799-80cf-860ae7e7ef9e"
+external_ids        : {}
+priority            : 12329
+
+_uuid               : 30c8a37b-38ba-4349-87a9-8851248d621e
+chassis_name        : "5ec8d171-fbe4-49cf-9923-9d21f9c5d29b"
+external_ids        : {}
+priority            : 15145
+=== ovn-sbctl list Chassis ===
+{"data":[["5ec8d171-fbe4-49cf-9923-9d21f9c5d29b","lab03.glab.lol",["map",[["ct-commit-nat-v2","true"],["ct-commit-to-zone","true"],["ct-label-flush","true"],["ct-next-zone","true"],["ct-no-masked-label","true"],["ct-state-save","true"],["datapath-type","system"],["fdb-timestamp","true"],["iface-types","bareudp,erspan,geneve,gre,gtpu,internal,ip6erspan,ip6gre,patch,srv6,system,tap,vxlan"],["is-interconn","false"],["ls-dpg-column","true"],["mac-binding-timestamp","true"],["ovn-bridge-mappings","fast40-uplink:incusovn16"],["ovn-chassis-mac-mappings",""],["ovn-cms-options",""],["ovn-ct-lb-related","true"],["ovn-enable-lflow-cache","true"],["ovn-evpn-local-ip",""],["ovn-evpn-vxlan-ports",""],["ovn-limit-lflow-cache",""],["ovn-memlimit-lflow-cache-kb",""],["ovn-monitor-all","false"],["ovn-sample-with-registers","true"],["ovn-trim-limit-lflow-cache",""],["ovn-trim-timeout-ms",""],["ovn-trim-wmark-perc-lflow-cache",""],["port-up-notif","true"]]]],["c2919898-1135-4799-80cf-860ae7e7ef9e","nas01.glab.lol",["map",[["ct-commit-nat-v2","true"],["ct-commit-to-zone","true"],["ct-label-flush","true"],["ct-next-zone","true"],["ct-no-masked-label","true"],["ct-state-save","true"],["datapath-type","system"],["fdb-timestamp","true"],["iface-types","bareudp,erspan,geneve,gre,gtpu,internal,ip6erspan,ip6gre,patch,srv6,system,tap,vxlan"],["is-interconn","false"],["ls-dpg-column","true"],["mac-binding-timestamp","true"],["ovn-bridge-mappings","fast40-uplink:incusovn16"],["ovn-chassis-mac-mappings",""],["ovn-cms-options",""],["ovn-ct-lb-related","true"],["ovn-enable-lflow-cache","true"],["ovn-evpn-local-ip",""],["ovn-evpn-vxlan-ports",""],["ovn-limit-lflow-cache",""],["ovn-memlimit-lflow-cache-kb",""],["ovn-monitor-all","false"],["ovn-sample-with-registers","true"],["ovn-trim-limit-lflow-cache",""],["ovn-trim-timeout-ms",""],["ovn-trim-wmark-perc-lflow-cache",""],["port-up-notif","true"]]]],["67314e94-b0b4-4c97-8146-0c67aff4d585","lab02.glab.lol",["map",[["ct-commit-nat-v2","true"],["ct-commit-to-zone","true"],["ct-label-flush","true"],["ct-next-zone","true"],["ct-no-masked-label","true"],["ct-state-save","true"],["datapath-type","system"],["fdb-timestamp","true"],["iface-types","bareudp,erspan,geneve,gre,gtpu,internal,ip6erspan,ip6gre,patch,srv6,system,tap,vxlan"],["is-interconn","false"],["ls-dpg-column","true"],["mac-binding-timestamp","true"],["ovn-bridge-mappings","fast40-uplink:incusovn16"],["ovn-chassis-mac-mappings",""],["ovn-cms-options",""],["ovn-ct-lb-related","true"],["ovn-enable-lflow-cache","true"],["ovn-evpn-local-ip",""],["ovn-evpn-vxlan-ports",""],["ovn-limit-lflow-cache",""],["ovn-memlimit-lflow-cache-kb",""],["ovn-monitor-all","false"],["ovn-sample-with-registers","true"],["ovn-trim-limit-lflow-cache",""],["ovn-trim-timeout-ms",""],["ovn-trim-wmark-perc-lflow-cache",""],["port-up-notif","true"]]]],["2da6738c-78eb-4738-98be-0898402c0eaa","lab01.glab.lol",["map",[["ct-commit-nat-v2","true"],["ct-commit-to-zone","true"],["ct-label-flush","true"],["ct-next-zone","true"],["ct-no-masked-label","true"],["ct-state-save","true"],["datapath-type","system"],["fdb-timestamp","true"],["iface-types","bareudp,erspan,geneve,gre,gtpu,internal,ip6erspan,ip6gre,patch,srv6,system,tap,vxlan"],["is-interconn","false"],["ls-dpg-column","true"],["mac-binding-timestamp","true"],["ovn-bridge-mappings","fast40-uplink:incusovn16"],["ovn-chassis-mac-mappings",""],["ovn-cms-options",""],["ovn-ct-lb-related","true"],["ovn-enable-lflow-cache","true"],["ovn-evpn-local-ip",""],["ovn-evpn-vxlan-ports",""],["ovn-limit-lflow-cache",""],["ovn-memlimit-lflow-cache-kb",""],["ovn-monitor-all","false"],["ovn-sample-with-registers","true"],["ovn-trim-limit-lflow-cache",""],["ovn-trim-timeout-ms",""],["ovn-trim-wmark-perc-lflow-cache",""],["port-up-notif","true"]]]]],"headings":["name","hostname","other_config"]}
+=== ip neigh ===
+10.10.40.64 dev enp2s0 lladdr 10:66:6a:66:eb:74 STALE 
+=== gateway neigh exit=0 ===
+10.10.40.64 dev br40 lladdr 10:66:6a:66:eb:74 REACHABLE 
+=== lab01 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789233168821394",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00212|bridge|INFO|bridge incusovn16: added interface incusovn16 on port 65534"
+  },
+  {
+    "at": "1789233168821548",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00213|bridge|INFO|bridge incusovn16: using datapath ID 00009669fb73544c"
+  },
+  {
+    "at": "1789233168821577",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00214|connmgr|INFO|incusovn16: added service controller \"punix:/var/run/openvswitch/incusovn16.mgmt\""
+  },
+  {
+    "at": "1789233168823984",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00215|bfd|INFO|ovn-5ec8d1-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168824041",
+    "member": "lab01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168824065",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168824085",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168824105",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168824126",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168824141",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now -4483827ms"
+  },
+  {
+    "at": "1789233168824158",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now -4483827ms"
+  },
+  {
+    "at": "1789233168824178",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -4483827ms"
+  },
+  {
+    "at": "1789233168824194",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168824207",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168824225",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168824239",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0xc4521b29"
+  },
+  {
+    "at": "1789233168824256",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824268",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168824279",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168824291",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168824302",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168824317",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168824329",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168824341",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168824354",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168824369",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00216|bfd|INFO|ovn-c29198-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168824383",
+    "member": "lab01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168824399",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168824410",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168824423",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168824433",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168824444",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now -4483827ms"
+  },
+  {
+    "at": "1789233168824455",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now -4483827ms"
+  },
+  {
+    "at": "1789233168824466",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -4483827ms"
+  },
+  {
+    "at": "1789233168824478",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168824489",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168824505",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168824517",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0x61d86ef2"
+  },
+  {
+    "at": "1789233168824529",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824540",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168824550",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168824561",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168824572",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168824583",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168824592",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168824602",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168824619",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168824629",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00001|ofproto_dpif_monitor(monitor65)|INFO|monitor thread created"
+  },
+  {
+    "at": "1789233168830826",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00217|bfd|INFO|ovn-67314e-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168830870",
+    "member": "lab01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168830889",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168830901",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168830915",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168830929",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168830941",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now -4483834ms"
+  },
+  {
+    "at": "1789233168830956",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now -4483834ms"
+  },
+  {
+    "at": "1789233168830966",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -4483834ms"
+  },
+  {
+    "at": "1789233168830979",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168830992",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168831002",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168831014",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0xcfbfe66f"
+  },
+  {
+    "at": "1789233168831029",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168831040",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168831053",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168831069",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168831081",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168831092",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168831103",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168831115",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168831130",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168919953",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00218|bridge|INFO|bridge incusovn16: added interface fast40 on port 1"
+  },
+  {
+    "at": "1789233168920177",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00219|bridge|INFO|bridge incusovn16: using datapath ID 000038052532def3"
+  },
+  {
+    "at": "1789233168922264",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00001|bfd(handler40)|INFO|Interface ovn-5ec8d1-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168922326",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00002|bfd(handler40)|INFO|ovn-5ec8d1-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168922365",
+    "member": "lab01.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:init mult:3 length:24"
+  },
+  {
+    "at": "1789233168922405",
+    "member": "lab01.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168922441",
+    "member": "lab01.glab.lol",
+    "message": "  my_disc:0x8cb25190 your_disc:0xc4521b29"
+  },
+  {
+    "at": "1789233168922474",
+    "member": "lab01.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168922508",
+    "member": "lab01.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168922542",
+    "member": "lab01.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168922585",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168922614",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168922648",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168922680",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168922710",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now -4483925ms"
+  },
+  {
+    "at": "1789233168922739",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now +752ms"
+  },
+  {
+    "at": "1789233168922777",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -98ms"
+  },
+  {
+    "at": "1789233168922812",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168922846",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168922882",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168922914",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0xc4521b29"
+  },
+  {
+    "at": "1789233168922946",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168922978",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168923012",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168923044",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233168923075",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168923106",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0x8cb25190"
+  },
+  {
+    "at": "1789233168923139",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168923179",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168923215",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168923247",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00003|bfd(handler40)|INFO|ovn-5ec8d1-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168923282",
+    "member": "lab01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168923323",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168923356",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168923388",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168923420",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168923454",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168923489",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now +751ms"
+  },
+  {
+    "at": "1789233168923528",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -99ms"
+  },
+  {
+    "at": "1789233168923563",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168923594",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168923625",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168923653",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0xc4521b29"
+  },
+  {
+    "at": "1789233168923684",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168923715",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168923749",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168923780",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233168923811",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168923842",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0x8cb25190"
+  },
+  {
+    "at": "1789233168923873",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168923907",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168923938",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168926377",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00004|bfd(handler40)|INFO|Interface ovn-67314e-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168926481",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00005|bfd(handler40)|INFO|ovn-67314e-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168926527",
+    "member": "lab01.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:init mult:3 length:24"
+  },
+  {
+    "at": "1789233168926562",
+    "member": "lab01.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168926596",
+    "member": "lab01.glab.lol",
+    "message": "  my_disc:0x10864ed9 your_disc:0xcfbfe66f"
+  },
+  {
+    "at": "1789233168926642",
+    "member": "lab01.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168926671",
+    "member": "lab01.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168926702",
+    "member": "lab01.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168926734",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168926764",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168926796",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168926827",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168926859",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now -4483929ms"
+  },
+  {
+    "at": "1789233168926894",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now +989ms"
+  },
+  {
+    "at": "1789233168926927",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -1ms"
+  },
+  {
+    "at": "1789233168926959",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168926991",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168927023",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168927057",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0xcfbfe66f"
+  },
+  {
+    "at": "1789233168927088",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168927120",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168927148",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168927180",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233168927211",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168927239",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0x10864ed9"
+  },
+  {
+    "at": "1789233168927273",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168927304",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168927339",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168927371",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00006|bfd(handler40)|INFO|ovn-67314e-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168927407",
+    "member": "lab01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168927514",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168927546",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168927578",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168927609",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168927636",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168927668",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now +989ms"
+  },
+  {
+    "at": "1789233168927700",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -1ms"
+  },
+  {
+    "at": "1789233168927731",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168927758",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168927789",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168927817",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0xcfbfe66f"
+  },
+  {
+    "at": "1789233168927848",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168927879",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168927910",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168927941",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233168927972",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168928000",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0x10864ed9"
+  },
+  {
+    "at": "1789233168928031",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168928062",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168928093",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168928123",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00220|bridge|INFO|bridge incusovn16: added interface patch-incus-net39-ls-ext-lsp-provider-to-br-int on port 2"
+  },
+  {
+    "at": "1789233168928159",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00221|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net39-ls-ext-lsp-provider on port 6"
+  },
+  {
+    "at": "1789233169749719",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00007|bfd(handler40)|INFO|Interface ovn-c29198-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233169749802",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00008|bfd(handler40)|INFO|ovn-c29198-0: New remote min_rx."
+  },
+  {
+    "at": "1789233169749820",
+    "member": "lab01.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:init mult:3 length:24"
+  },
+  {
+    "at": "1789233169749836",
+    "member": "lab01.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233169749847",
+    "member": "lab01.glab.lol",
+    "message": "  my_disc:0xae7cb34c your_disc:0x61d86ef2"
+  },
+  {
+    "at": "1789233169749861",
+    "member": "lab01.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233169749872",
+    "member": "lab01.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233169749882",
+    "member": "lab01.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233169749895",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169749905",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233169749927",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169749937",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169749949",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now -4484753ms"
+  },
+  {
+    "at": "1789233169749969",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now +894ms"
+  },
+  {
+    "at": "1789233169749988",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -56ms"
+  },
+  {
+    "at": "1789233169750005",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233169750019",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233169750030",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169750040",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0x61d86ef2"
+  },
+  {
+    "at": "1789233169750053",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169750064",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169750078",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233169750089",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233169750100",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169750111",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0xae7cb34c"
+  },
+  {
+    "at": "1789233169750126",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233169750139",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169750154",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169750165",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00009|bfd(handler40)|INFO|ovn-c29198-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233169750177",
+    "member": "lab01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233169750188",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169750200",
+    "member": "lab01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233169750211",
+    "member": "lab01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169750221",
+    "member": "lab01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169750230",
+    "member": "lab01.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233169750241",
+    "member": "lab01.glab.lol",
+    "message": "  Next TX Time: now +894ms"
+  },
+  {
+    "at": "1789233169750252",
+    "member": "lab01.glab.lol",
+    "message": "  Last TX Time: now -56ms"
+  },
+  {
+    "at": "1789233169750263",
+    "member": "lab01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233169750273",
+    "member": "lab01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233169750285",
+    "member": "lab01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169750295",
+    "member": "lab01.glab.lol",
+    "message": "  Local Discriminator: 0x61d86ef2"
+  },
+  {
+    "at": "1789233169750305",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169750323",
+    "member": "lab01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169750337",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233169750350",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233169750363",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169750373",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Discriminator: 0xae7cb34c"
+  },
+  {
+    "at": "1789233169750385",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169750397",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169750408",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233170158976",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00222|bridge|INFO|bridge br-int: added interface vethd42ad9e0 on port 7"
+  }
+]
+=== lab02 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789233168811784",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00278|bridge|INFO|bridge incusovn16: added interface incusovn16 on port 65534"
+  },
+  {
+    "at": "1789233168811961",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00279|bridge|INFO|bridge incusovn16: using datapath ID 00005ecb8e6efe4b"
+  },
+  {
+    "at": "1789233168811983",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00280|connmgr|INFO|incusovn16: added service controller \"punix:/var/run/openvswitch/incusovn16.mgmt\""
+  },
+  {
+    "at": "1789233168813667",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00281|bfd|INFO|ovn-5ec8d1-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168813736",
+    "member": "lab02.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168813766",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168813788",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168813807",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168813827",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168813849",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168813872",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168813892",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168813912",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168813931",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168813949",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168813981",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0xd9afc13d"
+  },
+  {
+    "at": "1789233168814004",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168814022",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814040",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168814101",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168814123",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168814142",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168814164",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814184",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814204",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168814222",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00282|bfd|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168814245",
+    "member": "lab02.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168814263",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168814281",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168814298",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168814316",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168814334",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168814352",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168814370",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168814390",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168814413",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168814436",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00001|ofproto_dpif_monitor(monitor417)|INFO|monitor thread created"
+  },
+  {
+    "at": "1789233168814456",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168814475",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0x10864ed9"
+  },
+  {
+    "at": "1789233168814494",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168814510",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814528",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168814546",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168814564",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168814584",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168814602",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814617",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814635",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168814655",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00283|bfd|INFO|ovn-c29198-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168814674",
+    "member": "lab02.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168814691",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168814709",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168814727",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168814748",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168814770",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168814791",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168814819",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -1596423813ms"
+  },
+  {
+    "at": "1789233168814846",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168814867",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168814890",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168814927",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0xf2fd4c97"
+  },
+  {
+    "at": "1789233168814950",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168814974",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814998",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168815027",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168815047",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168815069",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168815089",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168815110",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168815131",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168906956",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00284|bridge|INFO|bridge incusovn16: added interface fast40 on port 1"
+  },
+  {
+    "at": "1789233168907003",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00285|bridge|INFO|bridge incusovn16: using datapath ID 000038052532dd99"
+  },
+  {
+    "at": "1789233168908983",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00001|bfd(handler387)|INFO|Interface ovn-c29198-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168909067",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00002|bfd(handler387)|INFO|ovn-c29198-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168909099",
+    "member": "lab02.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:down mult:3 length:24"
+  },
+  {
+    "at": "1789233168909125",
+    "member": "lab02.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168909150",
+    "member": "lab02.glab.lol",
+    "message": "  my_disc:0x7d56a557 your_disc:0x0"
+  },
+  {
+    "at": "1789233168909170",
+    "member": "lab02.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168909195",
+    "member": "lab02.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168909214",
+    "member": "lab02.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168909231",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168909250",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168909270",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168909290",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168909312",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now -1596423908ms"
+  },
+  {
+    "at": "1789233168909332",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now -1596423908ms"
+  },
+  {
+    "at": "1789233168909352",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -1596423908ms"
+  },
+  {
+    "at": "1789233168909369",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168909388",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168909418",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168909438",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0xf2fd4c97"
+  },
+  {
+    "at": "1789233168909464",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168909482",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168909496",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168909505",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168909515",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168909525",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0x7d56a557"
+  },
+  {
+    "at": "1789233168909533",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168909542",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168909551",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168909560",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00003|bfd(handler387)|INFO|ovn-c29198-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168909573",
+    "member": "lab02.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168909582",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168909590",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168909598",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168909623",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168909631",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168909642",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now -1596423908ms"
+  },
+  {
+    "at": "1789233168909650",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -1596423908ms"
+  },
+  {
+    "at": "1789233168909659",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168909667",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168909677",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168909685",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0xf2fd4c97"
+  },
+  {
+    "at": "1789233168909693",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168909701",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168909709",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168909717",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168909725",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168909732",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0x7d56a557"
+  },
+  {
+    "at": "1789233168909740",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168909751",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168909759",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168910813",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00004|bfd(handler387)|INFO|Interface ovn-5ec8d1-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168910900",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00005|bfd(handler387)|INFO|ovn-5ec8d1-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168910936",
+    "member": "lab02.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:init mult:3 length:24"
+  },
+  {
+    "at": "1789233168910964",
+    "member": "lab02.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168910990",
+    "member": "lab02.glab.lol",
+    "message": "  my_disc:0x85855f99 your_disc:0xd9afc13d"
+  },
+  {
+    "at": "1789233168911003",
+    "member": "lab02.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168911015",
+    "member": "lab02.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168911023",
+    "member": "lab02.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168911032",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168911040",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168911049",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168911057",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168911065",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now -1596423910ms"
+  },
+  {
+    "at": "1789233168911080",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now +743ms"
+  },
+  {
+    "at": "1789233168911089",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -97ms"
+  },
+  {
+    "at": "1789233168911097",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168911105",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168911114",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168911122",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0xd9afc13d"
+  },
+  {
+    "at": "1789233168911133",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168911142",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168911150",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168911162",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233168911171",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168911180",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0x85855f99"
+  },
+  {
+    "at": "1789233168911188",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168911196",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168911205",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168911213",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00006|bfd(handler387)|INFO|ovn-5ec8d1-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168911223",
+    "member": "lab02.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168911231",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168911240",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168911250",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168911259",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168911269",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168911277",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now +743ms"
+  },
+  {
+    "at": "1789233168911284",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -97ms"
+  },
+  {
+    "at": "1789233168911292",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168911300",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168911309",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168911317",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0xd9afc13d"
+  },
+  {
+    "at": "1789233168911325",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168911332",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168911342",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168911349",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233168911357",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168911364",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0x85855f99"
+  },
+  {
+    "at": "1789233168911378",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168911386",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168911396",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168912854",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00001|bfd(handler392)|INFO|Interface ovn-2da673-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168912911",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00002|bfd(handler392)|INFO|ovn-2da673-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168912954",
+    "member": "lab02.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:down mult:3 length:24"
+  },
+  {
+    "at": "1789233168912978",
+    "member": "lab02.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168913000",
+    "member": "lab02.glab.lol",
+    "message": "  my_disc:0xcfbfe66f your_disc:0x0"
+  },
+  {
+    "at": "1789233168913025",
+    "member": "lab02.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168913046",
+    "member": "lab02.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168913067",
+    "member": "lab02.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168913090",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168913115",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168913141",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168913161",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168913181",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now -1596423912ms"
+  },
+  {
+    "at": "1789233168913204",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now -1596423912ms"
+  },
+  {
+    "at": "1789233168913228",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -1596423912ms"
+  },
+  {
+    "at": "1789233168913251",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168913276",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168913297",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168913318",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0x10864ed9"
+  },
+  {
+    "at": "1789233168913340",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168913366",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168913386",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168913417",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168913441",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168913460",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0xcfbfe66f"
+  },
+  {
+    "at": "1789233168913482",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168913503",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168913522",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168913543",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00003|bfd(handler392)|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168913568",
+    "member": "lab02.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168913589",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168913615",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168913636",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168913657",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168913676",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168913695",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now -1596423912ms"
+  },
+  {
+    "at": "1789233168913715",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -1596423912ms"
+  },
+  {
+    "at": "1789233168913777",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168913799",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168913820",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168913839",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0x10864ed9"
+  },
+  {
+    "at": "1789233168913860",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168913878",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168913899",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168913919",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168913940",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168913961",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0xcfbfe66f"
+  },
+  {
+    "at": "1789233168913979",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168914000",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168914021",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168914610",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00286|bridge|INFO|bridge incusovn16: added interface patch-incus-net39-ls-ext-lsp-provider-to-br-int on port 2"
+  },
+  {
+    "at": "1789233168914686",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00287|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net39-ls-ext-lsp-provider on port 24"
+  },
+  {
+    "at": "1789233169699852",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00007|bfd(handler387)|INFO|ovn-c29198-0: BFD state change: (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233169699972",
+    "member": "lab02.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233169699985",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169699995",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233169700005",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169700015",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169700025",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233169700033",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now +774ms"
+  },
+  {
+    "at": "1789233169700042",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -26ms"
+  },
+  {
+    "at": "1789233169700052",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233169700070",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: init"
+  },
+  {
+    "at": "1789233169700084",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169700094",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0xf2fd4c97"
+  },
+  {
+    "at": "1789233169700102",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169700111",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169700121",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233169700130",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: up"
+  },
+  {
+    "at": "1789233169700140",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169700149",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0x7d56a557"
+  },
+  {
+    "at": "1789233169700158",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 100ms"
+  },
+  {
+    "at": "1789233169700167",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169700176",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169903740",
+    "member": "lab02.glab.lol",
+    "message": "ovs|00004|bfd(handler392)|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233169904049",
+    "member": "lab02.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233169904078",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169904101",
+    "member": "lab02.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233169904126",
+    "member": "lab02.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169904150",
+    "member": "lab02.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169904179",
+    "member": "lab02.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233169904204",
+    "member": "lab02.glab.lol",
+    "message": "  Next TX Time: now +670ms"
+  },
+  {
+    "at": "1789233169904238",
+    "member": "lab02.glab.lol",
+    "message": "  Last TX Time: now -220ms"
+  },
+  {
+    "at": "1789233169904263",
+    "member": "lab02.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233169904290",
+    "member": "lab02.glab.lol",
+    "message": "  Local Session State: init"
+  },
+  {
+    "at": "1789233169904324",
+    "member": "lab02.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169904352",
+    "member": "lab02.glab.lol",
+    "message": "  Local Discriminator: 0x10864ed9"
+  },
+  {
+    "at": "1789233169904378",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169904418",
+    "member": "lab02.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169904447",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233169904467",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Session State: up"
+  },
+  {
+    "at": "1789233169904490",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169904510",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Discriminator: 0xcfbfe66f"
+  },
+  {
+    "at": "1789233169904532",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum TX Interval: 100ms"
+  },
+  {
+    "at": "1789233169904554",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169904573",
+    "member": "lab02.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  }
+]
+=== lab03 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789233168811894",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00308|bridge|INFO|bridge incusovn16: added interface incusovn16 on port 65534"
+  },
+  {
+    "at": "1789233168812001",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00309|bridge|INFO|bridge incusovn16: using datapath ID 0000da6e2727ca42"
+  },
+  {
+    "at": "1789233168812014",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00310|connmgr|INFO|incusovn16: added service controller \"punix:/var/run/openvswitch/incusovn16.mgmt\""
+  },
+  {
+    "at": "1789233168813745",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00311|bfd|INFO|ovn-c29198-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168813808",
+    "member": "lab03.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168813830",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168813843",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168813854",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168813865",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168813880",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now -55323811ms"
+  },
+  {
+    "at": "1789233168813892",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now -55323811ms"
+  },
+  {
+    "at": "1789233168813909",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -55323811ms"
+  },
+  {
+    "at": "1789233168813921",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168813932",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168813944",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168813961",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0xa62322ab"
+  },
+  {
+    "at": "1789233168813973",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168813985",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168813996",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168814006",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168814017",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168814028",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168814038",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814052",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814066",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168814082",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00312|bfd|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168814094",
+    "member": "lab03.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168814110",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168814120",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168814132",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168814144",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168814153",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now -55323811ms"
+  },
+  {
+    "at": "1789233168814168",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now -55323811ms"
+  },
+  {
+    "at": "1789233168814178",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -55323811ms"
+  },
+  {
+    "at": "1789233168814191",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168814201",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168814212",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168814222",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0x8cb25190"
+  },
+  {
+    "at": "1789233168814239",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168814255",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814266",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168814278",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168814290",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168814300",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00001|ofproto_dpif_monitor(monitor417)|INFO|monitor thread created"
+  },
+  {
+    "at": "1789233168814316",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168814326",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814337",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168814349",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168815784",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00313|bfd|INFO|ovn-67314e-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168815864",
+    "member": "lab03.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168815880",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168815892",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168815911",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168815926",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168815939",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now -55323813ms"
+  },
+  {
+    "at": "1789233168815956",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now -55323813ms"
+  },
+  {
+    "at": "1789233168815976",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -55323813ms"
+  },
+  {
+    "at": "1789233168815990",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168816002",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168816015",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168816028",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0x85855f99"
+  },
+  {
+    "at": "1789233168816041",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168816054",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168816071",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168816086",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168816098",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168816115",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168816129",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168816143",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168816157",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168816417",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00001|bfd(handler392)|INFO|Interface ovn-2da673-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168816451",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00002|bfd(handler392)|INFO|ovn-2da673-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168816469",
+    "member": "lab03.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:down mult:3 length:24"
+  },
+  {
+    "at": "1789233168816490",
+    "member": "lab03.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168816508",
+    "member": "lab03.glab.lol",
+    "message": "  my_disc:0xc4521b29 your_disc:0x0"
+  },
+  {
+    "at": "1789233168816521",
+    "member": "lab03.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168816536",
+    "member": "lab03.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168816549",
+    "member": "lab03.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168816563",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168816577",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168816596",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168816608",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168816626",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now -55323814ms"
+  },
+  {
+    "at": "1789233168816643",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now -55323814ms"
+  },
+  {
+    "at": "1789233168816656",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -55323814ms"
+  },
+  {
+    "at": "1789233168816674",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168816687",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168816703",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168816714",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0x8cb25190"
+  },
+  {
+    "at": "1789233168816725",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168816737",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168816751",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168816769",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168816787",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168816800",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0xc4521b29"
+  },
+  {
+    "at": "1789233168816818",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168816829",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168816841",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168816858",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00003|bfd(handler392)|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168816873",
+    "member": "lab03.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168816889",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168816907",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168816919",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168816931",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168816943",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168816957",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now -55323814ms"
+  },
+  {
+    "at": "1789233168816969",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -55323814ms"
+  },
+  {
+    "at": "1789233168816980",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168816991",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168817003",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168817014",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0x8cb25190"
+  },
+  {
+    "at": "1789233168817026",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168817038",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168817049",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168817064",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168817080",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168817093",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0xc4521b29"
+  },
+  {
+    "at": "1789233168817104",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168817119",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168817132",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168817931",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00001|bfd(handler395)|INFO|Interface ovn-67314e-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168817977",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00002|bfd(handler395)|INFO|ovn-67314e-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168817994",
+    "member": "lab03.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:down mult:3 length:24"
+  },
+  {
+    "at": "1789233168818009",
+    "member": "lab03.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168818022",
+    "member": "lab03.glab.lol",
+    "message": "  my_disc:0xd9afc13d your_disc:0x0"
+  },
+  {
+    "at": "1789233168818036",
+    "member": "lab03.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168818049",
+    "member": "lab03.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168818065",
+    "member": "lab03.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168818081",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168818092",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168818105",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168818117",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168818129",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now -55323815ms"
+  },
+  {
+    "at": "1789233168818143",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now -55323815ms"
+  },
+  {
+    "at": "1789233168818157",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -55323815ms"
+  },
+  {
+    "at": "1789233168818170",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168818180",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168818194",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168818206",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0x85855f99"
+  },
+  {
+    "at": "1789233168818218",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168818230",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168818242",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168818252",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168818265",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168818277",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0xd9afc13d"
+  },
+  {
+    "at": "1789233168818290",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168818302",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168818330",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168818347",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00003|bfd(handler395)|INFO|ovn-67314e-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168818367",
+    "member": "lab03.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168818383",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168818394",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168818406",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168818418",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168818430",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168818443",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now -55323815ms"
+  },
+  {
+    "at": "1789233168818455",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -55323815ms"
+  },
+  {
+    "at": "1789233168818467",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168818479",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168818491",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168818504",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0x85855f99"
+  },
+  {
+    "at": "1789233168818515",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168818527",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168818541",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168818552",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168818564",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168818576",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0xd9afc13d"
+  },
+  {
+    "at": "1789233168818589",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168818600",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168818614",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168910298",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00314|bridge|INFO|bridge incusovn16: added interface fast40 on port 1"
+  },
+  {
+    "at": "1789233168910336",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00315|bridge|INFO|bridge incusovn16: using datapath ID 000038052532e13b"
+  },
+  {
+    "at": "1789233168917621",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00316|bridge|INFO|bridge incusovn16: added interface patch-incus-net39-ls-ext-lsp-provider-to-br-int on port 2"
+  },
+  {
+    "at": "1789233168917693",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00317|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net39-ls-ext-lsp-provider on port 39"
+  },
+  {
+    "at": "1789233169602771",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00004|bfd(handler395)|INFO|Interface ovn-c29198-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233169602882",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00005|bfd(handler395)|INFO|ovn-c29198-0: New remote min_rx."
+  },
+  {
+    "at": "1789233169602923",
+    "member": "lab03.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:init mult:3 length:24"
+  },
+  {
+    "at": "1789233169602954",
+    "member": "lab03.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233169602977",
+    "member": "lab03.glab.lol",
+    "message": "  my_disc:0xed7c59ec your_disc:0xa62322ab"
+  },
+  {
+    "at": "1789233169603005",
+    "member": "lab03.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233169603030",
+    "member": "lab03.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233169603057",
+    "member": "lab03.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233169603097",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169603122",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233169603145",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169603172",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169603205",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now -55324600ms"
+  },
+  {
+    "at": "1789233169603235",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now +991ms"
+  },
+  {
+    "at": "1789233169603266",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -9ms"
+  },
+  {
+    "at": "1789233169603297",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233169603322",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233169603348",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169603373",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0xa62322ab"
+  },
+  {
+    "at": "1789233169603398",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169603420",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169603447",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233169603472",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233169603498",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169603523",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0xed7c59ec"
+  },
+  {
+    "at": "1789233169603549",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233169603577",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169603602",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169603628",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00006|bfd(handler395)|INFO|ovn-c29198-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233169603660",
+    "member": "lab03.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233169603751",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169603775",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233169603800",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169603828",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169603853",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233169603878",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now +991ms"
+  },
+  {
+    "at": "1789233169603901",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -9ms"
+  },
+  {
+    "at": "1789233169603926",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233169603950",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233169604017",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169604043",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0xa62322ab"
+  },
+  {
+    "at": "1789233169604075",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169604105",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169604129",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233169604153",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233169604182",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169604219",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0xed7c59ec"
+  },
+  {
+    "at": "1789233169604242",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169604266",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169604290",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169658608",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00007|bfd(handler395)|INFO|ovn-67314e-0: BFD state change: (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233169658702",
+    "member": "lab03.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233169658732",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169658757",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233169658780",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169658810",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169658833",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233169658857",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now +85ms"
+  },
+  {
+    "at": "1789233169658888",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -745ms"
+  },
+  {
+    "at": "1789233169658916",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233169658994",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: init"
+  },
+  {
+    "at": "1789233169659030",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169659053",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0x85855f99"
+  },
+  {
+    "at": "1789233169659091",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169659117",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169659144",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233169659168",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: up"
+  },
+  {
+    "at": "1789233169659193",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169659225",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0xd9afc13d"
+  },
+  {
+    "at": "1789233169659250",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 100ms"
+  },
+  {
+    "at": "1789233169659277",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169659301",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169665970",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00004|bfd(handler392)|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233169666054",
+    "member": "lab03.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233169666078",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233169666090",
+    "member": "lab03.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233169666103",
+    "member": "lab03.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169666116",
+    "member": "lab03.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233169666128",
+    "member": "lab03.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233169666141",
+    "member": "lab03.glab.lol",
+    "message": "  Next TX Time: now +28ms"
+  },
+  {
+    "at": "1789233169666154",
+    "member": "lab03.glab.lol",
+    "message": "  Last TX Time: now -752ms"
+  },
+  {
+    "at": "1789233169666173",
+    "member": "lab03.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233169666184",
+    "member": "lab03.glab.lol",
+    "message": "  Local Session State: init"
+  },
+  {
+    "at": "1789233169666197",
+    "member": "lab03.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169666209",
+    "member": "lab03.glab.lol",
+    "message": "  Local Discriminator: 0x8cb25190"
+  },
+  {
+    "at": "1789233169666221",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169666231",
+    "member": "lab03.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169666241",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233169666257",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Session State: up"
+  },
+  {
+    "at": "1789233169666267",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233169666277",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Discriminator: 0xc4521b29"
+  },
+  {
+    "at": "1789233169666290",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum TX Interval: 100ms"
+  },
+  {
+    "at": "1789233169666300",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233169666310",
+    "member": "lab03.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233170952370",
+    "member": "lab03.glab.lol",
+    "message": "ovs|00318|bridge|INFO|bridge br-int: added interface veth7279dfcc on port 40"
+  }
+]
+=== nas01 ovs-vswitchd journal since cycle start exit=0 ===
+[
+  {
+    "at": "1789233168798597",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00282|bridge|INFO|bridge incusovn16: added interface incusovn16 on port 65534"
+  },
+  {
+    "at": "1789233168798695",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00283|bridge|INFO|bridge incusovn16: using datapath ID 00009ee860452c48"
+  },
+  {
+    "at": "1789233168798710",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00284|connmgr|INFO|incusovn16: added service controller \"punix:/var/run/openvswitch/incusovn16.mgmt\""
+  },
+  {
+    "at": "1789233168798816",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00285|bridge|INFO|bridge incusovn16: added interface fast40 on port 1"
+  },
+  {
+    "at": "1789233168798832",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00286|bridge|INFO|bridge incusovn16: using datapath ID 0000380525378d7b"
+  },
+  {
+    "at": "1789233168798843",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00287|bridge|INFO|bridge incusovn16: added interface patch-incus-net39-ls-ext-lsp-provider-to-br-int on port 2"
+  },
+  {
+    "at": "1789233168798858",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00288|bridge|INFO|bridge br-int: added interface patch-br-int-to-incus-net39-ls-ext-lsp-provider on port 26"
+  },
+  {
+    "at": "1789233168819005",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00289|bfd|INFO|ovn-5ec8d1-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168819040",
+    "member": "nas01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168819061",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168819075",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168819086",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168819095",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168819106",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now -1596550683ms"
+  },
+  {
+    "at": "1789233168819118",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now -1596550683ms"
+  },
+  {
+    "at": "1789233168819128",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -1596550683ms"
+  },
+  {
+    "at": "1789233168819138",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168819150",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168819160",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168819170",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0xed7c59ec"
+  },
+  {
+    "at": "1789233168819180",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168819191",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168819200",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168819212",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168819222",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168819234",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168819243",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168819256",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168819271",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168819285",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00290|bfd|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168819302",
+    "member": "nas01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168819316",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168819329",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168819347",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168819361",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168819378",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now -1596550683ms"
+  },
+  {
+    "at": "1789233168819393",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now -1596550683ms"
+  },
+  {
+    "at": "1789233168819408",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -1596550683ms"
+  },
+  {
+    "at": "1789233168819421",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168819432",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168819442",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168819452",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0xae7cb34c"
+  },
+  {
+    "at": "1789233168819463",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168819479",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168819489",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168819498",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168819508",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168819518",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168819527",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168819537",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168819548",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168819557",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00001|ofproto_dpif_monitor(monitor417)|INFO|monitor thread created"
+  },
+  {
+    "at": "1789233168821906",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00001|bfd(handler401)|INFO|Interface ovn-5ec8d1-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168821934",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00002|bfd(handler401)|INFO|ovn-5ec8d1-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168821952",
+    "member": "nas01.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:down mult:3 length:24"
+  },
+  {
+    "at": "1789233168821979",
+    "member": "nas01.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168821994",
+    "member": "nas01.glab.lol",
+    "message": "  my_disc:0xa62322ab your_disc:0x0"
+  },
+  {
+    "at": "1789233168822010",
+    "member": "nas01.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168822027",
+    "member": "nas01.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168822041",
+    "member": "nas01.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168822058",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168822073",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168822082",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168822094",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168822112",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now -1596550686ms"
+  },
+  {
+    "at": "1789233168822132",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now +787ms"
+  },
+  {
+    "at": "1789233168822147",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -3ms"
+  },
+  {
+    "at": "1789233168822175",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168822190",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168822204",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168822214",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0xed7c59ec"
+  },
+  {
+    "at": "1789233168822224",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168822239",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168822249",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168822258",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168822270",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168822280",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0xa62322ab"
+  },
+  {
+    "at": "1789233168822290",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168822300",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168822313",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168822326",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00003|bfd(handler401)|INFO|ovn-5ec8d1-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168822337",
+    "member": "nas01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168822347",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168822356",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168822365",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168822375",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168822385",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168822399",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now +787ms"
+  },
+  {
+    "at": "1789233168822409",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -3ms"
+  },
+  {
+    "at": "1789233168822421",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168822430",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168822439",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168822448",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0xed7c59ec"
+  },
+  {
+    "at": "1789233168822457",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168822467",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168822476",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168822491",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168822506",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168822515",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0xa62322ab"
+  },
+  {
+    "at": "1789233168822527",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168822539",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168822549",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168823236",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00291|bfd|INFO|ovn-67314e-0: BFD state change: (bfd.SessionState: admin_down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168823261",
+    "member": "nas01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168823275",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168823289",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168823303",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168823317",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 0ms"
+  },
+  {
+    "at": "1789233168823330",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now -1596550687ms"
+  },
+  {
+    "at": "1789233168823347",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now -1596550687ms"
+  },
+  {
+    "at": "1789233168823360",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -1596550687ms"
+  },
+  {
+    "at": "1789233168823369",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168823379",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: admin_down"
+  },
+  {
+    "at": "1789233168823389",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168823398",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0x7d56a557"
+  },
+  {
+    "at": "1789233168823410",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168823420",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168823428",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168823443",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: admin_down"
+  },
+  {
+    "at": "1789233168823458",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168823473",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0x0"
+  },
+  {
+    "at": "1789233168823487",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168823503",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789233168823517",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789233168824126",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00004|bfd(handler401)|INFO|Interface ovn-2da673-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168824147",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00005|bfd(handler401)|INFO|ovn-2da673-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168824164",
+    "member": "nas01.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:down mult:3 length:24"
+  },
+  {
+    "at": "1789233168824179",
+    "member": "nas01.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168824198",
+    "member": "nas01.glab.lol",
+    "message": "  my_disc:0x61d86ef2 your_disc:0x0"
+  },
+  {
+    "at": "1789233168824213",
+    "member": "nas01.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168824227",
+    "member": "nas01.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168824237",
+    "member": "nas01.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168824250",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168824264",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168824279",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168824293",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168824308",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now -1596550688ms"
+  },
+  {
+    "at": "1789233168824328",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now +925ms"
+  },
+  {
+    "at": "1789233168824339",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -5ms"
+  },
+  {
+    "at": "1789233168824356",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168824366",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168824377",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168824389",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0xae7cb34c"
+  },
+  {
+    "at": "1789233168824402",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824411",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824423",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168824433",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168824444",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168824453",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0x61d86ef2"
+  },
+  {
+    "at": "1789233168824463",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168824472",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824481",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168824491",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00006|bfd(handler401)|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168824501",
+    "member": "nas01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168824510",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168824518",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168824528",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168824541",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168824551",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168824561",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now +925ms"
+  },
+  {
+    "at": "1789233168824570",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -5ms"
+  },
+  {
+    "at": "1789233168824585",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168824595",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168824604",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168824613",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0xae7cb34c"
+  },
+  {
+    "at": "1789233168824629",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824639",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824650",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168824660",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: down"
+  },
+  {
+    "at": "1789233168824669",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168824679",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0x61d86ef2"
+  },
+  {
+    "at": "1789233168824688",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824698",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168824708",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168925985",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00007|bfd(handler401)|INFO|Interface ovn-67314e-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789233168926128",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00008|bfd(handler401)|INFO|ovn-67314e-0: New remote min_rx."
+  },
+  {
+    "at": "1789233168926146",
+    "member": "nas01.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:init mult:3 length:24"
+  },
+  {
+    "at": "1789233168926168",
+    "member": "nas01.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789233168926180",
+    "member": "nas01.glab.lol",
+    "message": "  my_disc:0xf2fd4c97 your_disc:0x7d56a557"
+  },
+  {
+    "at": "1789233168926194",
+    "member": "nas01.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168926209",
+    "member": "nas01.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789233168926224",
+    "member": "nas01.glab.lol",
+    "message": "  min_rx_echo:0us (0ms)  Forwarding: false"
+  },
+  {
+    "at": "1789233168926240",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168926256",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168926275",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168926290",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168926305",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now -1596550790ms"
+  },
+  {
+    "at": "1789233168926322",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now +754ms"
+  },
+  {
+    "at": "1789233168926339",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -6ms"
+  },
+  {
+    "at": "1789233168926359",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168926381",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168926394",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168926414",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0x7d56a557"
+  },
+  {
+    "at": "1789233168926429",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168926444",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168926455",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168926465",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233168926478",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168926497",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0xf2fd4c97"
+  },
+  {
+    "at": "1789233168926512",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789233168926524",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168926538",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168926553",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00009|bfd(handler401)|INFO|ovn-67314e-0: BFD state change: (bfd.SessionState: down, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233168926568",
+    "member": "nas01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233168926578",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233168926589",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233168926598",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168926610",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233168926623",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233168926636",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now +754ms"
+  },
+  {
+    "at": "1789233168926649",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -6ms"
+  },
+  {
+    "at": "1789233168926657",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233168926667",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: down"
+  },
+  {
+    "at": "1789233168926677",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168926687",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0x7d56a557"
+  },
+  {
+    "at": "1789233168926696",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168926706",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168926715",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233168926725",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: init"
+  },
+  {
+    "at": "1789233168926735",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233168926745",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0xf2fd4c97"
+  },
+  {
+    "at": "1789233168926755",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168926764",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233168926774",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233170602635",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00010|bfd(handler401)|INFO|ovn-5ec8d1-0: BFD state change: (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233170603050",
+    "member": "nas01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233170603076",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233170603134",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233170603189",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233170603225",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233170603251",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233170603273",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now +688ms"
+  },
+  {
+    "at": "1789233170603295",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -152ms"
+  },
+  {
+    "at": "1789233170603319",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233170603345",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: init"
+  },
+  {
+    "at": "1789233170603390",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233170603413",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0xed7c59ec"
+  },
+  {
+    "at": "1789233170603444",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233170603465",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233170603483",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233170603502",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: up"
+  },
+  {
+    "at": "1789233170603527",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233170603548",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0xa62322ab"
+  },
+  {
+    "at": "1789233170603612",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 100ms"
+  },
+  {
+    "at": "1789233170603643",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233170603666",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233170645027",
+    "member": "nas01.glab.lol",
+    "message": "ovs|00011|bfd(handler401)|INFO|ovn-2da673-0: BFD state change: (bfd.SessionState: init, bfd.LocalDiag: \"No Diagnostic\") -> (bfd.SessionState: up, bfd.LocalDiag: \"No Diagnostic\")"
+  },
+  {
+    "at": "1789233170645219",
+    "member": "nas01.glab.lol",
+    "message": "  Forwarding: false"
+  },
+  {
+    "at": "1789233170645255",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Multiplier: 3"
+  },
+  {
+    "at": "1789233170645280",
+    "member": "nas01.glab.lol",
+    "message": "  Concatenated Path Down: false"
+  },
+  {
+    "at": "1789233170645306",
+    "member": "nas01.glab.lol",
+    "message": "  TX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233170645342",
+    "member": "nas01.glab.lol",
+    "message": "  RX Interval: Approx 1000ms"
+  },
+  {
+    "at": "1789233170645369",
+    "member": "nas01.glab.lol",
+    "message": "  Detect Time: now +3000ms"
+  },
+  {
+    "at": "1789233170645460",
+    "member": "nas01.glab.lol",
+    "message": "  Next TX Time: now +105ms"
+  },
+  {
+    "at": "1789233170645491",
+    "member": "nas01.glab.lol",
+    "message": "  Last TX Time: now -895ms"
+  },
+  {
+    "at": "1789233170645527",
+    "member": "nas01.glab.lol",
+    "message": "  Local Flags: none"
+  },
+  {
+    "at": "1789233170645550",
+    "member": "nas01.glab.lol",
+    "message": "  Local Session State: init"
+  },
+  {
+    "at": "1789233170645576",
+    "member": "nas01.glab.lol",
+    "message": "  Local Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233170645610",
+    "member": "nas01.glab.lol",
+    "message": "  Local Discriminator: 0xae7cb34c"
+  },
+  {
+    "at": "1789233170645637",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum TX Interval: 1000ms"
+  },
+  {
+    "at": "1789233170645664",
+    "member": "nas01.glab.lol",
+    "message": "  Local Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233170645691",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Flags: none"
+  },
+  {
+    "at": "1789233170645715",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Session State: up"
+  },
+  {
+    "at": "1789233170645741",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Diagnostic: No Diagnostic"
+  },
+  {
+    "at": "1789233170645771",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Discriminator: 0x61d86ef2"
+  },
+  {
+    "at": "1789233170645795",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 100ms"
+  },
+  {
+    "at": "1789233170645820",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 1000ms"
+  },
+  {
+    "at": "1789233170645851",
+    "member": "nas01.glab.lol",
+    "message": "  Remote Detect Multiplier: 3"
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "at": "1789192054044824",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum TX Interval: 0ms"
+  },
+  {
+    "at": "1789192054044833",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Minimum RX Interval: 0ms"
+  },
+  {
+    "at": "1789192054044844",
+    "member": "lab01.glab.lol",
+    "message": "  Remote Detect Multiplier: 0"
+  },
+  {
+    "at": "1789192054139872",
+    "member": "lab01.glab.lol",
+    "message": "ovs|01274|dpif|WARN|Dropped 873 log messages in last 10015 seconds (most recently, 10014 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192054139987",
+    "member": "lab01.glab.lol",
+    "message": "ovs|01275|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192054140034",
+    "member": "lab01.glab.lol",
+    "message": "ovs|01276|bridge|WARN|Dropped 11077 log messages in last 10020 seconds (most recently, 10014 seconds ago) due to excessive rate"
+  },
+  {
+    "at": "1789192054140071",
+    "member": "lab01.glab.lol",
+    "message": "ovs|01277|bridge|WARN|could not add network device fast40 to ofproto (Device or resource busy)"
+  },
+  {
+    "at": "1789192054140111",
+    "member": "lab01.glab.lol",
+    "message": "ovs|01278|dpif|WARN|system@ovs-system: failed to add fast40 as port: Device or resource busy"
+  },
+  {
+    "at": "1789192054140137",
+    "member": "lab01.glab.lol",
+    "message": "ovs|01279|bridge|WARN|could not add network device fast40 to ofproto (Device or resource busy)"
+  },
+  {
+    "at": "1789192054140429",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00001|bfd(handler101)|INFO|Interface ovn-c29198-0 remote mult value 0 changed to 3"
+  },
+  {
+    "at": "1789192054140562",
+    "member": "lab01.glab.lol",
+    "message": "ovs|00002|bfd(handler101)|INFO|ovn-c29198-0: New remote min_rx."
+  },
+  {
+    "at": "1789192054140601",
+    "member": "lab01.glab.lol",
+    "message": "  vers:1 diag:\"No Diagnostic\" state:down mult:3 length:24"
+  },
+  {
+    "at": "1789192054140639",
+    "member": "lab01.glab.lol",
+    "message": "  flags: none"
+  },
+  {
+    "at": "1789192054140672",
+    "member": "lab01.glab.lol",
+    "message": "  my_disc:0x59c6c3e your_disc:0x0"
+  },
+  {
+    "at": "1789192054140716",
+    "member": "lab01.glab.lol",
+    "message": "  min_tx:1000000us (1000ms)"
+  },
+  {
+    "at": "1789192054140744",
+    "member": "lab01.glab.lol",
+    "message": "  min_rx:1000000us (1000ms)"
+  }
+]

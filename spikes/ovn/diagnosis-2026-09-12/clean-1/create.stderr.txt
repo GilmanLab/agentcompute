@@ -1,0 +1,6 @@
+WARNING: fetching https://dl-cdn.alpinelinux.org/alpine/v3.22/main: temporary error (try again later)
+ERROR: unable to select packages:
+  busybox-extras (no such package):
+    required by: world[busybox-extras]
+  curl (no such package):
+    required by: world[curl]
